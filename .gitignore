@@ -1,0 +1,16 @@
+node_modules/
+.env
+frontend/dist/
+backend/uploads/
+
+# Config local de Claude Code (específico de esta máquina)
+.claude/
+
+# Token de reseteo de contraseña — se regenera en runtime, nunca versionar
+backend/tokens.json
+
+# Backup del viejo "Excel como base de datos" (pre-Supabase, datos reales de prueba)
+backend/data.xlsx
+
+# Documentación generada (regenerar con generar-docs.js)
+DOCUMENTACION_v2.xlsx

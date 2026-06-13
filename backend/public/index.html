@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Condo Admin — Panel API</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f172a; --surface: #1e293b; --surface2: #263449;
+      --border: #334155; --text: #e2e8f0; --muted: #64748b;
+      --blue: #38bdf8; --green: #4ade80; --yellow: #facc15;
+      --orange: #fb923c; --red: #f87171; --purple: #c084fc;
+    }
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; font-size: 14px; }
+
+    /* ── Login screen ── */
+    #login-screen {
+      position: fixed; inset: 0; background: var(--bg); z-index: 500;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #login-screen.hidden { display: none; }
+    .login-box {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      padding: 2rem 2rem 1.75rem; width: 360px; display: flex; flex-direction: column; gap: 1.25rem;
+    }
+    .login-box h1 { font-size: 1.1rem; color: var(--blue); font-weight: 700; }
+    .login-box p  { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+    .login-field  { display: flex; flex-direction: column; gap: 0.35rem; }
+    .login-field label { font-size: 0.75rem; color: var(--muted); font-weight: 500; }
+    .login-field input {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 7px;
+      color: var(--text); padding: 0.55rem 0.8rem; font-size: 0.9rem; outline: none;
+      transition: border-color 0.15s;
+    }
+    .login-field input:focus { border-color: var(--blue); }
+    .login-error { color: var(--red); font-size: 0.8rem; min-height: 1rem; }
+    #login-btn {
+      background: var(--blue); color: #0f172a; border: none; border-radius: 8px;
+      padding: 0.65rem; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+      transition: opacity 0.15s; margin-top: 0.25rem;
+    }
+    #login-btn:hover { opacity: 0.88; }
+    #login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Sidebar ── */
+    aside { width: 220px; min-width: 220px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
+    .brand { padding: 1.25rem 1rem 1rem; border-bottom: 1px solid var(--border); }
+    .brand h1 { font-size: 1rem; color: var(--blue); font-weight: 700; }
+    .brand p  { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+    nav { flex: 1; padding: 0.75rem 0; }
+    nav a { display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 1rem; cursor: pointer; color: var(--muted); font-size: 0.85rem; text-decoration: none; transition: background 0.15s, color 0.15s; border-left: 3px solid transparent; }
+    nav a:hover  { background: var(--surface2); color: var(--text); }
+    nav a.active { background: var(--surface2); color: var(--blue); border-left-color: var(--blue); }
+    nav .section-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: 1rem 1rem 0.25rem; }
+    .health-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-left: auto; }
+    .sidebar-user {
+      border-top: 1px solid var(--border); padding: 0.85rem 1rem;
+      display: flex; align-items: center; gap: 0.6rem;
+    }
+    .sidebar-user-info { flex: 1; min-width: 0; }
+    .sidebar-user-info strong { display: block; font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sidebar-user-info span { font-size: 0.72rem; color: var(--muted); }
+    .btn-logout { background: none; border: none; color: var(--red); cursor: pointer; font-size: 0.78rem; white-space: nowrap; padding: 0.2rem 0; }
+    .btn-logout:hover { text-decoration: underline; }
+
+    /* ── Main ── */
+    main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem; background: var(--surface); }
+    header h2 { font-size: 1rem; font-weight: 600; flex: 1; }
+    .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.9rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.82rem; font-weight: 500; transition: opacity 0.15s; }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--blue); color: #0f172a; }
+    .btn-danger  { background: var(--red);  color: #0f172a; }
+    .btn-ghost   { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-sm { padding: 0.3rem 0.65rem; font-size: 0.75rem; }
+    .hidden { display: none !important; }
+
+    /* ── Content area ── */
+    .content { flex: 1; overflow-y: auto; padding: 1.5rem; }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { background: var(--surface2); padding: 0.65rem 1rem; text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); white-space: nowrap; }
+    tbody td { padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.83rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    .actions { display: flex; gap: 0.4rem; }
+
+    /* ── Badges ── */
+    .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 99px; font-size: 0.72rem; font-weight: 600; }
+    .badge-green  { background: #14532d; color: var(--green); }
+    .badge-red    { background: #450a0a; color: var(--red); }
+    .badge-yellow { background: #422006; color: var(--yellow); }
+    .badge-blue   { background: #0c3460; color: var(--blue); }
+    .badge-gray   { background: #1e293b; color: var(--muted); }
+    .badge-purple { background: #2e1065; color: var(--purple); }
+
+    /* ── Modal ── */
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; display: flex; align-items: center; justify-content: center; }
+    .overlay.hidden { display: none; }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; width: 480px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column; }
+    .modal-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h3 { font-size: 0.95rem; font-weight: 600; }
+    .modal-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.2rem; line-height: 1; }
+    .modal-body  { padding: 1.25rem 1.5rem; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 0.85rem; }
+    .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.6rem; }
+    .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+    .form-group label { font-size: 0.78rem; color: var(--muted); font-weight: 500; }
+    .form-group input, .form-group select, .form-group textarea {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); padding: 0.5rem 0.75rem; font-size: 0.83rem; font-family: inherit;
+      outline: none; transition: border-color 0.15s;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--blue); }
+    .form-group textarea { resize: vertical; min-height: 80px; }
+
+    /* ── Empty / loading ── */
+    .empty { padding: 3rem; text-align: center; color: var(--muted); }
+    .toast-bar { position: fixed; bottom: 1.5rem; right: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; z-index: 200; }
+    .toast { padding: 0.7rem 1.1rem; border-radius: 8px; font-size: 0.83rem; font-weight: 500; color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.3); animation: slideUp 0.25s ease; display: flex; align-items: center; gap: 0.5rem; }
+    @keyframes slideUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    .toast-ok  { background: #166534; }
+    .toast-err { background: #7f1d1d; }
+    .confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: flex; align-items: center; justify-content: center; }
+    .confirm-overlay.hidden { display: none; }
+    .confirm-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; width: 360px; }
+    .confirm-box p { color: var(--muted); font-size: 0.85rem; margin-top: 0.5rem; }
+    .confirm-box .row { display: flex; gap: 0.6rem; justify-content: flex-end; margin-top: 1.25rem; }
+    .json-view { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; font-family: monospace; font-size: 0.78rem; color: var(--green); overflow-x: auto; white-space: pre; max-height: 300px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+
+<!-- ── Login screen ── -->
+<div id="login-screen">
+  <div class="login-box">
+    <div>
+      <h1>Condo Admin</h1>
+      <p>Panel de gestión — iniciá sesión para continuar</p>
+    </div>
+    <div class="login-field">
+      <label>Correo electrónico</label>
+      <input type="email" id="login-email" placeholder="admin@ejemplo.com" autocomplete="email" />
+    </div>
+    <div class="login-field">
+      <label>Contraseña</label>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <button id="login-btn" onclick="doLogin()">Iniciar sesión</button>
+  </div>
+</div>
+
+<!-- ── Sidebar ── -->
+<aside>
+  <div class="brand">
+    <h1>Condo Admin</h1>
+    <p>Panel de gestión API</p>
+  </div>
+  <nav id="nav">
+    <div class="section-label">Entidades</div>
+    <a onclick="load('condominios')"        data-key="condominios">Condominios</a>
+    <a onclick="load('usuarios')"           data-key="usuarios">Usuarios</a>
+    <a onclick="load('propiedades')"        data-key="propiedades">Propiedades</a>
+    <a onclick="load('pagos')"              data-key="pagos">Pagos</a>
+    <a onclick="load('anuncios')"           data-key="anuncios">Anuncios</a>
+    <a onclick="load('asambleas')"          data-key="asambleas">Asambleas</a>
+    <a onclick="load('visitas')"            data-key="visitas">Visitas / QR</a>
+    <a onclick="load('historial-visitas')"  data-key="historial-visitas">Historial</a>
+    <a onclick="load('panic')"              data-key="panic">Pánico</a>
+    <div class="section-label">Sistema</div>
+    <a onclick="load('health')"   data-key="health">Health <span class="health-dot"></span></a>
+    <a onclick="load('apiinfo')" data-key="apiinfo">API / JWT Info</a>
+  </nav>
+  <div class="sidebar-user" id="sidebar-user" style="display:none">
+    <div class="sidebar-user-info">
+      <strong id="sidebar-name">—</strong>
+      <span id="sidebar-role">—</span>
+    </div>
+    <button class="btn-logout" onclick="doLogout()">Salir</button>
+  </div>
+</aside>
+
+<!-- ── Main ── -->
+<main>
+  <header>
+    <h2 id="page-title">Seleccioná una sección</h2>
+    <button class="btn btn-primary hidden" id="btn-new" onclick="openCreate()">+ Nuevo</button>
+  </header>
+  <div class="content" id="content">
+    <div class="empty">← Elegí una sección del menú</div>
+  </div>
+</main>
+
+<!-- Modal create/edit -->
+<div class="overlay hidden" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Nuevo registro</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" id="modal-save" onclick="saveModal()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm delete -->
+<div class="confirm-overlay hidden" id="confirm-overlay">
+  <div class="confirm-box">
+    <strong>¿Eliminar registro?</strong>
+    <p>Esta acción no se puede deshacer.</p>
+    <div class="row">
+      <button class="btn btn-ghost" onclick="closeConfirm()">Cancelar</button>
+      <button class="btn btn-danger" id="confirm-ok">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-bar" id="toasts"></div>
+
+<script>
+const API = 'http://localhost:3001/api';
+const TOKEN_KEY = 'admin_panel_token';
+let token = localStorage.getItem(TOKEN_KEY) || '';
+let currentSection = null;
+let currentData = [];
+let editingId = null;
+let confirmCb = null;
+
+// ── Auth ─────────────────────────────────────────────────────
+async function doLogin() {
+  const email    = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl    = document.getElementById('login-error');
+  const btn      = document.getElementById('login-btn');
+  errEl.textContent = '';
+  if (!email || !password) { errEl.textContent = 'Completá email y contraseña.'; return; }
+  btn.disabled = true;
+  btn.textContent = 'Ingresando…';
+  try {
+    const res  = await fetch(`${API}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+    if (!['Super Admin', 'Administrador'].includes(data.user?.role)) {
+      throw new Error('Solo Super Admin o Administrador pueden acceder al panel.');
+    }
+    token = data.token;
+    localStorage.setItem(TOKEN_KEY, token);
+    showPanel(data.user);
+  } catch(e) {
+    errEl.textContent = e.message;
+    btn.disabled = false;
+    btn.textContent = 'Iniciar sesión';
+  }
+}
+
+function showPanel(user) {
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('sidebar-user').style.display = 'flex';
+  document.getElementById('sidebar-name').textContent = user?.name || 'Usuario';
+  document.getElementById('sidebar-role').textContent = user?.role || '';
+  load('usuarios');
+}
+
+function doLogout() {
+  token = '';
+  localStorage.removeItem(TOKEN_KEY);
+  location.reload();
+}
+
+// ── API fetch with token ──────────────────────────────────────
+async function apiFetch(path, opts = {}) {
+  const res = await fetch(API + path, {
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    ...opts
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    doLogout();
+    throw new Error('Sesión expirada. Volvé a iniciar sesión.');
+  }
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  return data;
+}
+
+// ── Schemas ───────────────────────────────────────────────────
+const schemas = {
+  condominios: {
+    label: 'Condominios',
+    fields: [
+      { key: 'name',    label: 'Nombre',    type: 'text',   required: true },
+      { key: 'type',    label: 'Tipo',      type: 'select', options: ['Condominio','Edificio'] },
+      { key: 'address', label: 'Dirección', type: 'text' },
+    ],
+    cols: ['name','type','address'],
+  },
+  usuarios: {
+    label: 'Usuarios',
+    fields: [
+      { key: 'name',     label: 'Nombre',    type: 'text', required: true },
+      { key: 'email',    label: 'Email',     type: 'text', required: true },
+      { key: 'password', label: 'Contraseña (nueva)', type: 'text' },
+      { key: 'role',     label: 'Rol',       type: 'select', options: ['Super Admin','Administrador','Propietario','Inquilino','Seguridad'] },
+      { key: 'phone',    label: 'Teléfono',  type: 'text' },
+      { key: 'condo',    label: 'Condominio',type: 'text' },
+    ],
+    cols: ['name','email','role','condo','phone'],
+  },
+  propiedades: {
+    label: 'Propiedades',
+    fields: [
+      { key: 'code',   label: 'Código',      type: 'text', required: true },
+      { key: 'street', label: 'Calle',       type: 'text', required: true },
+      { key: 'block',  label: 'Bloque',      type: 'text' },
+      { key: 'owner',  label: 'Propietario', type: 'text' },
+      { key: 'tenant', label: 'Inquilino',   type: 'text' },
+      { key: 'condo',  label: 'Condominio',  type: 'text' },
+      { key: 'debt',   label: 'Deuda',       type: 'number' },
+    ],
+    cols: ['code','street','block','owner','condo','debt'],
+  },
+  pagos: {
+    label: 'Pagos',
+    fields: [
+      { key: 'propietario', label: 'Propietario', type: 'text', required: true },
+      { key: 'propiedad',   label: 'Propiedad',   type: 'text', required: true },
+      { key: 'tipo',        label: 'Tipo',        type: 'select', options: ['Expensa','Multa','Servicios','Reserva','Otro'] },
+      { key: 'monto',       label: 'Monto',       type: 'number', required: true },
+      { key: 'estado',      label: 'Estado',      type: 'select', options: ['pendiente','aprobado','rechazado'] },
+      { key: 'dueDate',     label: 'Vence',       type: 'text' },
+    ],
+    cols: ['propietario','propiedad','tipo','monto','estado','dueDate'],
+    statusField: 'estado',
+    statusOptions: ['pendiente','aprobado','rechazado'],
+    statusEndpoint: (id) => `${API}/pagos/${id}/status`,
+    statusBody: (val) => ({ estado: val }),
+  },
+  anuncios: {
+    label: 'Anuncios',
+    fields: [
+      { key: 'title',   label: 'Título',   type: 'text',     required: true },
+      { key: 'message', label: 'Mensaje',  type: 'textarea', required: true },
+      { key: 'target',  label: 'Para',     type: 'select', options: ['todos','propietarios','inquilinos','seguridad'] },
+      { key: 'condo',   label: 'Condominio', type: 'text' },
+    ],
+    cols: ['title','target','condo','dateLabel'],
+  },
+  asambleas: {
+    label: 'Asambleas',
+    fields: [
+      { key: 'title',        label: 'Título',      type: 'text',     required: true },
+      { key: 'description',  label: 'Descripción', type: 'textarea' },
+      { key: 'dueDate',      label: 'Vencimiento', type: 'text' },
+      { key: 'documentName', label: 'Documento',   type: 'text' },
+    ],
+    cols: ['title','dueDate','condo'],
+    noEdit: true,
+  },
+  visitas: {
+    label: 'Visitas / QR',
+    fields: [
+      { key: 'fullName', label: 'Nombre completo', type: 'text', required: true },
+      { key: 'idNumber', label: 'Documento',       type: 'text', required: true },
+      { key: 'property', label: 'Propiedad',       type: 'text', required: true },
+      { key: 'motive',   label: 'Motivo',          type: 'text' },
+      { key: 'mode',     label: 'Modo',            type: 'select', options: ['peatonal','vehicular'] },
+      { key: 'plate',    label: 'Placa',           type: 'text' },
+    ],
+    cols: ['fullName','idNumber','property','mode','status','code','createdAt'],
+    statusField: 'status',
+    statusOptions: ['Activo','Escaneado','Revocado'],
+    statusEndpoint: (id) => `${API}/visitas/${id}/status`,
+    statusBody: (val) => ({ status: val }),
+    noEdit: true,
+  },
+  'historial-visitas': {
+    label: 'Historial de Visitas',
+    fields: [],
+    cols: ['visitante','cedula','propiedad','tipo','placa','entrada','salida'],
+    noEdit: true, noDelete: true, noCreate: true,
+  },
+  panic: {
+    label: 'Alertas de Pánico',
+    fields: [],
+    cols: ['resident','phone','address','unit','status','createdAt'],
+    statusField: 'status',
+    statusOptions: ['Pendiente','En camino','Atendida'],
+    statusEndpoint: (id) => `${API}/panic/${id}/status`,
+    statusBody: (val) => ({ status: val }),
+    noEdit: true, noDelete: true, noCreate: true,
+  },
+  apiinfo: { label: 'API / JWT Info', noCreate: true },
+};
+
+// ── Helpers ───────────────────────────────────────────────────
+function toast(msg, ok = true) {
+  const el = document.createElement('div');
+  el.className = `toast ${ok ? 'toast-ok' : 'toast-err'}`;
+  el.textContent = (ok ? '✓ ' : '✗ ') + msg;
+  document.getElementById('toasts').prepend(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+function setActive(key) {
+  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('active', a.dataset.key === key));
+}
+
+function statusBadge(val) {
+  if (!val) return '—';
+  const v = val.toLowerCase();
+  const cls = ['activo','pagado','ocupado','atendida','aprobado'].includes(v) ? 'badge-green'
+    : ['pendiente','escaneado','en camino'].includes(v) ? 'badge-yellow'
+    : ['vencido','revocado','falsa alarma','rechazado'].includes(v) ? 'badge-red'
+    : v === 'disponible' ? 'badge-blue'
+    : 'badge-gray';
+  return `<span class="badge ${cls}">${val}</span>`;
+}
+
+function cellVal(row, col) {
+  const v = row[col];
+  if (v === undefined || v === null || v === '') return '<span style="color:var(--muted)">—</span>';
+  if (['status','estado','plan'].includes(col)) return statusBadge(String(v));
+  if (['monto','monthlyFee','debt'].includes(col)) return `<span style="color:var(--green)">$${Number(v).toLocaleString()}</span>`;
+  if (col === 'code') return `<code style="font-size:0.72rem;color:var(--blue)">${v}</code>`;
+  if (col === 'role') return `<span class="badge badge-purple">${v}</span>`;
+  const s = String(v);
+  return s.length > 40 ? s.slice(0, 40) + '…' : s;
+}
+
+function colLabel(col) {
+  const map = {
+    id:'ID', name:'Nombre', email:'Email', role:'Rol', phone:'Teléfono', condo:'Condominio',
+    code:'Código', street:'Calle', block:'Bloque', owner:'Propietario', tenant:'Inquilino',
+    debt:'Deuda', status:'Estado', estado:'Estado', fullName:'Nombre', idNumber:'Documento',
+    property:'Propiedad', motive:'Motivo', mode:'Modo', plate:'Placa', createdAt:'Fecha',
+    dateLabel:'Fecha', title:'Título', message:'Mensaje', target:'Para', dueDate:'Vence',
+    monto:'Monto', tipo:'Tipo', propietario:'Propietario', propiedad:'Propiedad',
+    resident:'Residente', address:'Dirección', unit:'Unidad', plan:'Plan', units:'Unidades',
+    type:'Tipo', visitante:'Visitante', cedula:'Cédula', entrada:'Entrada', salida:'Salida',
+  };
+  return map[col] || col;
+}
+
+// ── Load section ──────────────────────────────────────────────
+async function load(key) {
+  currentSection = key;
+  setActive(key);
+  const schema = schemas[key];
+  document.getElementById('page-title').textContent = schema?.label || key;
+  document.getElementById('btn-new').classList.toggle('hidden', key === 'health' || schema?.noCreate || !schema?.fields?.length);
+  document.getElementById('content').innerHTML = '<div class="empty">Cargando…</div>';
+
+  if (key === 'health') {
+    const data = await apiFetch('/health').catch(e => ({ error: e.message }));
+    document.getElementById('content').innerHTML = `<div class="json-view">${JSON.stringify(data, null, 2)}</div>`;
+    return;
+  }
+
+  if (key === 'apiinfo') {
+    const payload = token ? (() => { try { return JSON.parse(atob(token.split('.')[1])); } catch { return null; } })() : null;
+    const exp = payload?.exp ? new Date(payload.exp * 1000).toLocaleString('es') : '—';
+    const endpoints = [
+      { method:'POST',  path:'/api/auth/login',           auth:'No', roles:'—',                          desc:'Iniciar sesión' },
+      { method:'POST',  path:'/api/auth/forgot-password', auth:'No', roles:'—',                          desc:'Solicitar reset de contraseña' },
+      { method:'POST',  path:'/api/auth/reset-password',  auth:'No', roles:'—',                          desc:'Cambiar contraseña con token' },
+      { method:'GET',   path:'/api/condominios',           auth:'Sí', roles:'Super Admin, Administrador', desc:'Listar condominios' },
+      { method:'POST',  path:'/api/condominios',           auth:'Sí', roles:'Super Admin',                desc:'Crear condominio' },
+      { method:'PUT',   path:'/api/condominios/:id',       auth:'Sí', roles:'Super Admin',                desc:'Editar condominio' },
+      { method:'DELETE',path:'/api/condominios/:id',       auth:'Sí', roles:'Super Admin',                desc:'Eliminar condominio' },
+      { method:'GET',   path:'/api/usuarios',              auth:'Sí', roles:'Super Admin, Administrador', desc:'Listar usuarios' },
+      { method:'POST',  path:'/api/usuarios',              auth:'Sí', roles:'Super Admin, Administrador', desc:'Crear usuario' },
+      { method:'PUT',   path:'/api/usuarios/:id',          auth:'Sí', roles:'Super Admin, Administrador', desc:'Editar usuario' },
+      { method:'DELETE',path:'/api/usuarios/:id',          auth:'Sí', roles:'Super Admin',                desc:'Eliminar usuario' },
+      { method:'GET',   path:'/api/propiedades',           auth:'Sí', roles:'Super Admin, Administrador', desc:'Listar propiedades' },
+      { method:'POST',  path:'/api/propiedades',           auth:'Sí', roles:'Super Admin, Administrador', desc:'Crear propiedad' },
+      { method:'PUT',   path:'/api/propiedades/:id',       auth:'Sí', roles:'Super Admin, Administrador', desc:'Editar propiedad' },
+      { method:'DELETE',path:'/api/propiedades/:id',       auth:'Sí', roles:'Super Admin, Administrador', desc:'Eliminar propiedad' },
+      { method:'GET',   path:'/api/pagos',                 auth:'Sí', roles:'Todos',                      desc:'Listar pagos' },
+      { method:'POST',  path:'/api/pagos',                 auth:'Sí', roles:'Super Admin, Administrador', desc:'Crear pago' },
+      { method:'PATCH', path:'/api/pagos/:id/status',      auth:'Sí', roles:'Super Admin, Administrador', desc:'Cambiar estado de pago' },
+      { method:'GET',   path:'/api/anuncios',              auth:'Sí', roles:'Todos',                      desc:'Listar anuncios' },
+      { method:'POST',  path:'/api/anuncios',              auth:'Sí', roles:'Super Admin, Administrador', desc:'Crear anuncio' },
+      { method:'PUT',   path:'/api/anuncios/:id',          auth:'Sí', roles:'Super Admin, Administrador', desc:'Editar anuncio' },
+      { method:'DELETE',path:'/api/anuncios/:id',          auth:'Sí', roles:'Super Admin, Administrador', desc:'Eliminar anuncio' },
+      { method:'GET',   path:'/api/asambleas',             auth:'Sí', roles:'Todos',                      desc:'Listar asambleas' },
+      { method:'POST',  path:'/api/asambleas',             auth:'Sí', roles:'Super Admin, Administrador', desc:'Crear asamblea' },
+      { method:'POST',  path:'/api/asambleas/:id/votar',   auth:'Sí', roles:'Todos',                      desc:'Votar en asamblea' },
+      { method:'GET',   path:'/api/visitas',               auth:'Sí', roles:'Todos',                      desc:'Listar visitas' },
+      { method:'POST',  path:'/api/visitas',               auth:'Sí', roles:'Todos',                      desc:'Registrar visita' },
+      { method:'GET',   path:'/api/visitas/:code/verify',  auth:'Sí', roles:'Seguridad+',                 desc:'Verificar QR' },
+      { method:'PATCH', path:'/api/visitas/:id/status',    auth:'Sí', roles:'Seguridad+',                 desc:'Cambiar estado visita' },
+      { method:'GET',   path:'/api/historial-visitas',     auth:'Sí', roles:'Seguridad+',                 desc:'Historial de visitas' },
+      { method:'GET',   path:'/api/panic',                 auth:'Sí', roles:'Todos',                      desc:'Listar alertas de pánico' },
+      { method:'POST',  path:'/api/panic',                 auth:'Sí', roles:'Todos',                      desc:'Crear alerta de pánico' },
+      { method:'PATCH', path:'/api/panic/:id/status',      auth:'Sí', roles:'Seguridad+',                 desc:'Cambiar estado alerta' },
+      { method:'GET',   path:'/api/health',                auth:'No', roles:'—',                          desc:'Estado del servidor' },
+    ];
+    const mc = { GET:'#4ade80', POST:'#38bdf8', PUT:'#facc15', PATCH:'#fb923c', DELETE:'#f87171' };
+    const rows = endpoints.map(e => `<tr>
+      <td><span style="color:${mc[e.method]||'#e2e8f0'};font-weight:700;font-family:monospace;font-size:0.75rem">${e.method}</span></td>
+      <td><code style="color:#c084fc;font-size:0.78rem">${e.path}</code></td>
+      <td><span style="color:${e.auth==='Sí'?'#f87171':'#4ade80'}">${e.auth}</span></td>
+      <td style="color:#94a3b8;font-size:0.78rem">${e.roles}</td>
+      <td style="color:#64748b;font-size:0.78rem">${e.desc}</td>
+    </tr>`).join('');
+    document.getElementById('content').innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:1.25rem">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem">
+          <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:0.6rem">Token JWT activo</div>
+          <div style="font-family:monospace;font-size:0.7rem;color:var(--green);word-break:break-all;background:var(--bg);padding:0.75rem;border-radius:6px;border:1px solid var(--border)">${token||'— sin token —'}</div>
+          <div style="margin-top:0.65rem;font-size:0.78rem;color:var(--muted)">
+            ID: <span style="color:var(--text)">${payload?.id||'—'}</span> &nbsp;·&nbsp;
+            Rol: <span style="color:var(--purple)">${payload?.role||'—'}</span> &nbsp;·&nbsp;
+            Expira: <span style="color:var(--yellow)">${exp}</span>
+          </div>
+          <div style="margin-top:0.85rem;font-size:0.78rem;color:var(--muted);margin-bottom:0.35rem">Header para usar en Postman / Thunder Client / curl:</div>
+          <div style="font-family:monospace;font-size:0.72rem;color:var(--blue);background:var(--bg);padding:0.5rem 0.75rem;border-radius:6px;border:1px solid var(--border)">Authorization: Bearer ${token||'&lt;token&gt;'}</div>
+        </div>
+        <div>
+          <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:0.6rem">${endpoints.length} endpoints disponibles</div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Método</th><th>Ruta</th><th>Auth</th><th>Roles</th><th>Descripción</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table></div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  try {
+    const endpoint = key === 'panic' ? '/panic' : `/${key}`;
+    currentData = await apiFetch(endpoint);
+    renderTable(key);
+  } catch(e) {
+    document.getElementById('content').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  }
+}
+
+function renderTable(key) {
+  const schema = schemas[key];
+  if (!schema) return;
+  const { cols, noEdit, noDelete, statusField, statusOptions, statusEndpoint, statusBody } = schema;
+
+  if (!currentData.length) {
+    document.getElementById('content').innerHTML = '<div class="empty">Sin registros todavía.</div>';
+    return;
+  }
+
+  const hasActions = !noEdit || !noDelete || statusField;
+  const allCols = hasActions ? [...cols, 'Acciones'] : cols;
+  const thead = allCols.map(c => `<th>${colLabel(c)}</th>`).join('');
+
+  const tbody = currentData.map(row => {
+    const cells = cols.map(c => `<td title="${String(row[c] ?? '')}">${cellVal(row, c)}</td>`).join('');
+    let actions = '';
+    if (statusField && statusOptions) {
+      const opts = statusOptions.map(o =>
+        `<option value="${o}" ${row[statusField] === o ? 'selected' : ''}>${o}</option>`
+      ).join('');
+      actions += `<select class="btn btn-ghost btn-sm" style="padding:0.3rem 0.5rem" onchange="changeStatus('${row.id}', this.value, '${key}')">${opts}</select>`;
+    }
+    if (!noEdit)   actions += `<button class="btn btn-ghost btn-sm" onclick="openEdit('${row.id}')">Editar</button>`;
+    if (!noDelete) actions += `<button class="btn btn-danger btn-sm" onclick="confirmDelete('${row.id}', '${key}')">Eliminar</button>`;
+    return `<tr>${cells}${hasActions ? `<td><div class="actions">${actions}</div></td>` : ''}</tr>`;
+  }).join('');
+
+  document.getElementById('content').innerHTML = `
+    <div style="margin-bottom:0.75rem;color:var(--muted);font-size:0.8rem">${currentData.length} registro(s)</div>
+    <div class="table-wrap"><table>
+      <thead><tr>${thead}</tr></thead>
+      <tbody>${tbody}</tbody>
+    </table></div>`;
+}
+
+// ── Status change ─────────────────────────────────────────────
+async function changeStatus(id, val, key) {
+  const schema = schemas[key];
+  try {
+    const endpoint = schema.statusEndpoint(id, val).replace(API, '');
+    await apiFetch(endpoint, { method: 'PATCH', body: JSON.stringify(schema.statusBody(val)) });
+    toast('Estado actualizado');
+    await load(key);
+  } catch(e) { toast(e.message, false); }
+}
+
+// ── Modal ─────────────────────────────────────────────────────
+function buildForm(schema, data = {}) {
+  return schema.fields.map(f => {
+    const val = data[f.key] ?? '';
+    let input;
+    if (f.type === 'select') {
+      const opts = f.options.map(o => `<option value="${o}" ${val === o ? 'selected' : ''}>${o}</option>`).join('');
+      input = `<select name="${f.key}">${opts}</select>`;
+    } else if (f.type === 'textarea') {
+      input = `<textarea name="${f.key}">${val}</textarea>`;
+    } else {
+      input = `<input type="${f.type}" name="${f.key}" value="${String(val).replace(/"/g,'&quot;')}" ${f.required ? 'required' : ''}>`;
+    }
+    return `<div class="form-group"><label>${f.label}${f.required ? ' *' : ''}</label>${input}</div>`;
+  }).join('');
+}
+
+function formData() {
+  const data = {};
+  document.getElementById('modal-body').querySelectorAll('[name]').forEach(el => {
+    if (el.value !== '') data[el.name] = el.value;
+  });
+  return data;
+}
+
+function openCreate() {
+  editingId = null;
+  document.getElementById('modal-title').textContent = `Nuevo — ${schemas[currentSection]?.label}`;
+  document.getElementById('modal-body').innerHTML = buildForm(schemas[currentSection]);
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+
+function openEdit(id) {
+  const row = currentData.find(r => String(r.id) === String(id));
+  if (!row) return;
+  editingId = id;
+  document.getElementById('modal-title').textContent = 'Editar registro';
+  document.getElementById('modal-body').innerHTML = buildForm(schemas[currentSection], row);
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.add('hidden');
+  editingId = null;
+}
+
+async function saveModal() {
+  const data = formData();
+  const key = currentSection;
+  const endpoint = key === 'panic' ? '/panic' : `/${key}`;
+  try {
+    if (editingId) {
+      await apiFetch(`${endpoint}/${editingId}`, { method: 'PUT', body: JSON.stringify(data) });
+      toast('Registro actualizado');
+    } else {
+      await apiFetch(endpoint, { method: 'POST', body: JSON.stringify(data) });
+      toast('Registro creado');
+    }
+    closeModal();
+    await load(key);
+  } catch(e) { toast(e.message, false); }
+}
+
+// ── Delete ────────────────────────────────────────────────────
+function confirmDelete(id, key) {
+  document.getElementById('confirm-overlay').classList.remove('hidden');
+  document.getElementById('confirm-ok').onclick = async () => {
+    closeConfirm();
+    const endpoint = key === 'panic' ? '/panic' : `/${key}`;
+    try {
+      await apiFetch(`${endpoint}/${id}`, { method: 'DELETE' });
+      toast('Eliminado');
+      await load(key);
+    } catch(e) { toast(e.message, false); }
+  };
+}
+
+function closeConfirm() { document.getElementById('confirm-overlay').classList.add('hidden'); }
+
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+
+// Enter key en el login
+document.getElementById('login-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// ── Init: verificar si ya hay token guardado ──────────────────
+(async () => {
+  if (!token) return; // mostrar login
+  try {
+    // verificar que el token siga siendo válido
+    const data = await apiFetch('/usuarios');
+    currentData = data;
+    // obtener info del usuario del token (decodificar payload)
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('sidebar-user').style.display = 'flex';
+    document.getElementById('sidebar-name').textContent = payload.name || 'Admin';
+    document.getElementById('sidebar-role').textContent = payload.role || '';
+    load('usuarios');
+  } catch {
+    // token inválido → mostrar login
+    localStorage.removeItem(TOKEN_KEY);
+    token = '';
+  }
+})();
+</script>
+</body>
+</html>
