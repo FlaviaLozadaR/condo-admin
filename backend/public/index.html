@@ -34,6 +34,15 @@
       transition: border-color 0.15s;
     }
     .login-field input:focus { border-color: var(--blue); }
+    .login-password-wrap { position: relative; }
+    .login-password-wrap input { width: 100%; padding-right: 2.5rem; box-sizing: border-box; }
+    .login-password-toggle {
+      position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%);
+      background: none; border: none; padding: 0.25rem; cursor: pointer; color: var(--muted);
+      display: flex; align-items: center;
+    }
+    .login-password-toggle:hover { color: var(--text); }
+    .login-password-toggle svg { width: 18px; height: 18px; }
     .login-error { color: var(--red); font-size: 0.8rem; min-height: 1rem; }
     #login-btn {
       background: var(--blue); color: #0f172a; border: none; border-radius: 8px;
@@ -152,7 +161,12 @@
     </div>
     <div class="login-field">
       <label>Contraseña</label>
-      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+      <div class="login-password-wrap">
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+        <button type="button" class="login-password-toggle" id="login-password-toggle" onclick="togglePasswordVisibility()" aria-label="Mostrar contraseña">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
     </div>
     <div class="login-error" id="login-error"></div>
     <button id="login-btn" onclick="doLogin()">Iniciar sesión</button>
@@ -239,6 +253,13 @@ let currentData = [];
 let editingId = null;
 let confirmCb = null;
 let searchQuery = '';
+
+function togglePasswordVisibility() {
+  const input = document.getElementById('login-password');
+  const showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  document.getElementById('login-password-toggle').setAttribute('aria-label', showing ? 'Mostrar contraseña' : 'Ocultar contraseña');
+}
 
 // ── Auth ─────────────────────────────────────────────────────
 async function doLogin() {
