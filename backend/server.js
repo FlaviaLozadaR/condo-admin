@@ -33,11 +33,12 @@ app.use(helmet({
 // ── CORS — only allow known origins ───────────────────────────
 const ALLOWED_ORIGINS = [
   process.env.FRONTEND_URL || 'http://localhost:5173',
+  process.env.APP_URL,      // el panel admin se sirve desde el propio backend
   'http://localhost:3001',
   'http://localhost:4173',
   'https://localhost',      // app móvil (Capacitor Android)
   'capacitor://localhost',  // app móvil (Capacitor iOS)
-];
+].filter(Boolean);
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
