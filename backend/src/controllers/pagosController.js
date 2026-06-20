@@ -3,7 +3,15 @@ const multer = require('multer');
 const { v4: uuid } = require('uuid');
 const db      = require('../data/db');
 const PagoDTO = require('../dto/pagoDto');
-const { uploadFile } = require('../services/supabase');
+const { uploadPrivateFile, getSignedUrl } = require('../services/supabase');
+
+// El comprobante se guarda como nombre de archivo (bucket privado) — al
+// devolver el pago al cliente se reemplaza por un link firmado, válido 10 minutos.
+async function withSignedComprobante(pago) {
+  if (!pago?.comprobante) return pago;
+  const signed = await getSignedUrl('comprobantes', pago.comprobante, 600).catch(() => '');
+  return { ...pago, comprobante: signed };
+}
 
 // Multer usa memoria — no toca el disco
 const fileFilter = (_req, file, cb) => {
@@ -21,28 +29,40 @@ const upload = multer({
 
 async function getAll(req, res) {
   try {
-    const { page, limit, estado, q, condo } = req.query;
+    const { page, limit, estado, q } = req.query;
+    // Solo Super Admin puede elegir condominio por query — el resto queda fijo al suyo.
+    const condo = req.user.role === 'Super Admin' ? (req.query.condo || undefined) : req.user.condo;
     if (page) {
       const result = await db.getPagosPaged({
         page:  Math.max(1, parseInt(page) || 1),
         limit: Math.min(100, Math.max(1, parseInt(limit) || 20)),
         estado, q, condo,
       });
-      return res.json({ ...result, data: result.data.map(PagoDTO.toResponse) });
+      const data = await Promise.all(result.data.map(PagoDTO.toResponse).map(withSignedComprobante));
+      return res.json({ ...result, data });
     }
-    res.json(await db.getPagos());
+    const pagos = (await db.getPagos(condo)).map(PagoDTO.toResponse);
+    res.json(await Promise.all(pagos.map(withSignedComprobante)));
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
 async function create(req, res) {
   try {
     const data = PagoDTO.fromRequest(req.body);
+
+    // Un residente solo puede registrar pagos a su propio nombre — el cuerpo
+    // de la petición no decide a nombre de quién queda el pago.
+    if (['Propietario', 'Inquilino'].includes(req.user.role)) {
+      const me = await db.getUsuarioById(req.user.id);
+      if (me?.name) { data.propietario = me.name; data.resident = me.name; }
+    }
+
     let comprobanteUrl = '';
 
     if (req.file) {
       const ext      = path.extname(req.file.originalname).toLowerCase();
       const filename = `${Date.now()}_${uuid()}${ext}`;
-      comprobanteUrl = await uploadFile(
+      comprobanteUrl = await uploadPrivateFile(
         req.file.buffer,
         'comprobantes',
         filename,
@@ -55,8 +75,9 @@ async function create(req, res) {
       ...data,
       comprobante:   comprobanteUrl,
       createdByRole: req.user?.role || '',
+      condo:         req.user?.condo || '',
     });
-    res.status(201).json(PagoDTO.toResponse(nuevo));
+    res.status(201).json(await withSignedComprobante(PagoDTO.toResponse(nuevo)));
   } catch (e) {
     res.status(400).json({ error: e.message });
   }
@@ -66,6 +87,12 @@ async function updateStatus(req, res) {
   try {
     const { estado, montoReal, saldoRestante, notaSaldo } = req.body || {};
     if (!estado) return res.status(400).json({ error: 'Estado requerido' });
+
+    const existing = await db.getPagoById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'No encontrado' });
+    if (req.user.role !== 'Super Admin' && existing.condo !== req.user.condo) {
+      return res.status(403).json({ error: 'No autorizado para este condominio' });
+    }
 
     // Si hay montoReal, actualizar el monto del pago además del estado
     let updated;
@@ -79,7 +106,10 @@ async function updateStatus(req, res) {
     // Si hay saldo restante, actualizarlo en la propiedad del propietario
     if (saldoRestante > 0 && updated.propietario) {
       const propiedades = await db.getPropiedades();
-      const propiedad   = propiedades.find(p => p.owner === updated.propietario || p.tenant === updated.propietario);
+      const propiedad   = propiedades.find(p =>
+        p.owner === updated.propietario ||
+        (Array.isArray(p.tenants) ? p.tenants.includes(updated.propietario) : p.tenant === updated.propietario)
+      );
       if (propiedad) {
         await db.updatePropiedad(propiedad.id, {
           debt:     Math.max(0, (Number(propiedad.debt) || 0) + saldoRestante),
@@ -88,7 +118,7 @@ async function updateStatus(req, res) {
       }
     }
 
-    res.json(PagoDTO.toResponse(updated));
+    res.json(await withSignedComprobante(PagoDTO.toResponse(updated)));
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 

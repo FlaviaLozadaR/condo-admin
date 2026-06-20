@@ -3,7 +3,15 @@ const multer = require('multer');
 const { v4: uuid } = require('uuid');
 const db             = require('../data/db');
 const CondominioDTO  = require('../dto/condominioDto');
-const { uploadFile, deleteFile } = require('../services/supabase');
+const { uploadPrivateFile, getSignedUrl, deleteFile } = require('../services/supabase');
+
+// El paymentQrUrl se guarda como nombre de archivo (bucket privado) — al
+// devolverlo al cliente se reemplaza por un link firmado, válido 10 minutos.
+async function withSignedQr(condo) {
+  if (!condo?.paymentQrUrl) return condo;
+  const signed = await getSignedUrl('payment-qr', condo.paymentQrUrl, 600).catch(() => '');
+  return { ...condo, paymentQrUrl: signed };
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -16,8 +24,12 @@ const upload = multer({
 });
 
 async function getAll(req, res) {
-  try { res.json(await db.getCondominios()); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  try {
+    // Administrador solo ve su propio condominio; Super Admin ve todos.
+    const condo = req.user.role === 'Super Admin' ? undefined : req.user.condo;
+    const condos = await db.getCondominios(condo);
+    res.json(await Promise.all(condos.map(withSignedQr)));
+  } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
 async function create(req, res) {
@@ -64,7 +76,7 @@ async function getMyPaymentQr(req, res) {
     const user   = await db.getUsuarioById(req.user.id);
     if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
     const condos = await db.getCondominios();
-    const condo  = condos.find(c => c.name === user.condo);
+    const condo  = await withSignedQr(condos.find(c => c.name === user.condo));
     res.json({
       paymentQrUrl:      condo?.paymentQrUrl      || '',
       expensasMensuales: Number(condo?.expensasMensuales) || 0,
@@ -82,18 +94,24 @@ async function asignarExpensas(req, res) {
       return res.status(400).json({ error: 'Faltan datos: monto y propiedadIds' });
     }
 
+    const condos = await db.getCondominios();
+    const condo  = condos.find(c => String(c.id) === String(id));
+    if (!condo) return res.status(404).json({ error: 'Condominio no encontrado' });
+
     if (req.user.role === 'Administrador') {
       const adminUser = await db.getUsuarioById(req.user.id);
-      const condos    = await db.getCondominios();
-      const condo     = condos.find(c => String(c.id) === String(id));
-      if (!condo || condo.name !== adminUser?.condo) {
+      if (condo.name !== adminUser?.condo) {
         return res.status(403).json({ error: 'Solo podés modificar tu propio condominio' });
       }
     }
 
+    // Solo se actualizan propiedades que realmente pertenecen a este condominio
+    // — un propiedadId de otro condominio no puede colarse en la lista.
+    const propiedadesDelCondo = new Set((await db.getPropiedades(condo.name)).map(p => String(p.id)));
     const montoNum = Math.max(0, Number(monto) || 0);
     const updated  = [];
     for (const propId of propiedadIds) {
+      if (!propiedadesDelCondo.has(String(propId))) continue;
       const result = await db.updatePropiedad(propId, { expensaMensual: montoNum });
       if (result) updated.push(result);
     }
@@ -126,10 +144,10 @@ async function uploadPaymentQr(req, res) {
 
     const ext      = path.extname(req.file.originalname).toLowerCase();
     const filename = `qr_${id}_${Date.now()}${ext}`;
-    const paymentQrUrl = await uploadFile(req.file.buffer, 'payment-qr', filename, req.file.mimetype);
+    const paymentQrUrl = await uploadPrivateFile(req.file.buffer, 'payment-qr', filename, req.file.mimetype);
 
     const updated = await db.updateCondominio(id, { paymentQrUrl });
-    res.json(CondominioDTO.toResponse(updated));
+    res.json(CondominioDTO.toResponse(await withSignedQr(updated)));
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 

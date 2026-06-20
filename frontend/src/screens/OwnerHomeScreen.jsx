@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function OwnerHomeScreen({
   user,
@@ -11,6 +11,9 @@ export default function OwnerHomeScreen({
   setActiveSection,
 }) {
   const [announcementCarouselIdx, setAnnouncementCarouselIdx] = useState(0);
+  const [carouselDragOffset, setCarouselDragOffset] = useState(0);
+  const [isDraggingCarousel, setIsDraggingCarousel] = useState(false);
+  const carouselDragStartXRef = useRef(0);
 
   const isTenant = user.role === "Inquilino";
 
@@ -54,7 +57,29 @@ export default function OwnerHomeScreen({
     return byRole && byCondo;
   });
 
-  const ownerRecentAnnouncements = visibleAnuncios.slice(0, 5);
+  const ownerRecentAnnouncements = visibleAnuncios.slice(0, 3);
+
+  // Permite deslizar (touch o mouse) el carrusel de anuncios manualmente,
+  // sin perder el auto-avance periódico.
+  const handleCarouselDragStart = (clientX) => {
+    carouselDragStartXRef.current = clientX;
+    setIsDraggingCarousel(true);
+  };
+  const handleCarouselDragMove = (clientX) => {
+    if (!isDraggingCarousel) return;
+    setCarouselDragOffset(clientX - carouselDragStartXRef.current);
+  };
+  const handleCarouselDragEnd = () => {
+    if (!isDraggingCarousel) return;
+    setIsDraggingCarousel(false);
+    const threshold = 50;
+    if (carouselDragOffset <= -threshold) {
+      setAnnouncementCarouselIdx(prev => (prev + 1) % ownerRecentAnnouncements.length);
+    } else if (carouselDragOffset >= threshold) {
+      setAnnouncementCarouselIdx(prev => (prev - 1 + ownerRecentAnnouncements.length) % ownerRecentAnnouncements.length);
+    }
+    setCarouselDragOffset(0);
+  };
 
   useEffect(() => {
     if (ownerRecentAnnouncements.length <= 1) return;
@@ -127,17 +152,19 @@ export default function OwnerHomeScreen({
           </div>
         </article>
 
-        <article className="owner-kpi-card">
-          <span className="owner-kpi-icon owner-kpi-icon-green" aria-hidden="true">
-            <svg viewBox="0 0 24 24">
-              <path d="M20 6L9 17L4 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-          <div>
-            <p>Estado de Pagos</p>
-            <strong className={paymentStatusClass}>{paymentStatus}</strong>
-          </div>
-        </article>
+        {!isTenant && (
+          <article className="owner-kpi-card">
+            <span className="owner-kpi-icon owner-kpi-icon-green" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M20 6L9 17L4 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <div>
+              <p>Estado de Pagos</p>
+              <strong className={paymentStatusClass}>{paymentStatus}</strong>
+            </div>
+          </article>
+        )}
 
         <article className="owner-kpi-card">
           <span className="owner-kpi-icon owner-kpi-icon-purple" aria-hidden="true">
@@ -204,7 +231,20 @@ export default function OwnerHomeScreen({
             <div className="announcement-carousel">
               <div
                 className="announcement-carousel-track"
-                style={{ transform: `translateX(-${announcementCarouselIdx * 100}%)` }}
+                style={{
+                  transform: `translateX(calc(-${announcementCarouselIdx * 100}% + ${carouselDragOffset}px))`,
+                  transition: isDraggingCarousel ? "none" : undefined,
+                  cursor: ownerRecentAnnouncements.length > 1 ? "grab" : undefined,
+                  touchAction: "pan-y",
+                  userSelect: isDraggingCarousel ? "none" : undefined,
+                }}
+                onTouchStart={(e) => handleCarouselDragStart(e.touches[0].clientX)}
+                onTouchMove={(e) => handleCarouselDragMove(e.touches[0].clientX)}
+                onTouchEnd={handleCarouselDragEnd}
+                onMouseDown={(e) => handleCarouselDragStart(e.clientX)}
+                onMouseMove={(e) => handleCarouselDragMove(e.clientX)}
+                onMouseUp={handleCarouselDragEnd}
+                onMouseLeave={handleCarouselDragEnd}
               >
                 {ownerRecentAnnouncements.map((anuncio) => (
                   <article key={anuncio.id} className="announcement-carousel-slide">
@@ -286,20 +326,22 @@ export default function OwnerHomeScreen({
         )}
       </section>
 
-      <section className="owner-last-payment-panel">
-        <h3>Último Pago</h3>
-        {myLastPago ? (
-          <>
-            <p className="owner-last-payment-label">{myLastPago.tipo} · {myLastPago.fecha}</p>
-            <div className="owner-last-payment-amount-wrap">
-              <strong>Bs. {Number(myLastPago.monto).toLocaleString()}</strong>
-              <span className="owner-payment-badge-approved">Aprobado</span>
-            </div>
-          </>
-        ) : (
-          <p className="owner-last-payment-label">Sin pagos aprobados aún.</p>
-        )}
-      </section>
+      {!isTenant && (
+        <section className="owner-last-payment-panel">
+          <h3>Último Pago</h3>
+          {myLastPago ? (
+            <>
+              <p className="owner-last-payment-label">{myLastPago.tipo} · {myLastPago.fecha}</p>
+              <div className="owner-last-payment-amount-wrap">
+                <strong>Bs. {Number(myLastPago.monto).toLocaleString()}</strong>
+                <span className="owner-payment-badge-approved">Aprobado</span>
+              </div>
+            </>
+          ) : (
+            <p className="owner-last-payment-label">Sin pagos aprobados aún.</p>
+          )}
+        </section>
+      )}
     </>
   );
 }

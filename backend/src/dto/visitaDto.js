@@ -26,7 +26,13 @@ class VisitaDTO {
   }
 
   static toResponse(visita) {
-    return { ...visita };
+    const { idDocumentFrontPath, idDocumentBackPath, platePhotoPath, ...rest } = visita;
+    return {
+      ...rest,
+      hasIdDocumentFront: !!idDocumentFrontPath,
+      hasIdDocumentBack: !!idDocumentBackPath,
+      hasPlatePhoto: !!platePhotoPath,
+    };
   }
 }
 

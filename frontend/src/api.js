@@ -88,6 +88,7 @@ export const uploadCondoPaymentQr = (condoId, formData) => request(`/condominios
 export const deleteCondoPaymentQr = (condoId) => request(`/condominios/${condoId}/payment-qr`, { method: 'DELETE' });
 export const asignarExpensas = (condoId, monto, propiedadIds) => request(`/condominios/${condoId}/asignar-expensas`, { method: 'PUT', body: { monto, propiedadIds } });
 export const getMyProperty = () => request('/propiedades/my-property');
+export const getMyProperties = () => request('/propiedades/my-properties');
 export const updateCargoExtra = (propId, cargoExtra, notaCargo) => request(`/propiedades/${propId}/cargo-extra`, { method: 'PUT', body: { cargoExtra, notaCargo } });
 
 // Usuarios
@@ -163,6 +164,9 @@ export const getUploadUrl = (relativePath) => `${SERVER_URL}/uploads/${relativeP
 export const getVisitas = () => request('/visitas');
 export const createVisita = (data) => request('/visitas', { method: 'POST', body: data });
 export const updateVisitaStatus = (id, status) => request(`/visitas/${id}/status`, { method: 'PATCH', body: { status } });
+export const updateVisita = (id, data) => request(`/visitas/${id}`, { method: 'PATCH', body: data });
+export const getVisitaDocumentUrl = (id, type) => request(`/visitas/${id}/document/${type}`);
+export const deleteVisitaDocument = (id, type) => request(`/visitas/${id}/document/${type}`, { method: 'DELETE' });
 
 // Verificar QR por código
 export const verifyVisita = (code) => request(`/visitas/verify/${encodeURIComponent(code)}`);
@@ -172,6 +176,7 @@ export const getVisitaVerifyUrl = (code) => `${SERVER_URL}/api/visitas/verify/${
 
 // Historial visitas
 export const getHistorialVisitas = () => request('/historial-visitas');
+export const getMyVisitHistory = () => request('/historial-visitas/my-visits');
 export const getHistorialVisitasPaged = (params = {}) => {
   const qs = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
@@ -180,11 +185,13 @@ export const getHistorialVisitasPaged = (params = {}) => {
   return request(`/historial-visitas?${qs.toString()}`);
 };
 export const createHistorialVisita = (data) => request('/historial-visitas', { method: 'POST', body: data });
+export const updateHistorialSalida = (id, salida) => request(`/historial-visitas/${id}/salida`, { method: 'PATCH', body: { salida } });
 
 // Botón de pánico
-export const getPanicAlerts = () => request('/panic');
+export const getPanicAlerts = (condo) => request(condo ? `/panic?condo=${encodeURIComponent(condo)}` : '/panic');
 export const createPanicAlert = (data) => request('/panic', { method: 'POST', body: data });
 export const updatePanicStatus = (id, status) => request(`/panic/${id}/status`, { method: 'PATCH', body: { status } });
+export const getSeguridadContacts = () => request('/usuarios/seguridad');
 
 // Áreas sociales
 export const getAreasSociales = () => request('/areas-sociales');

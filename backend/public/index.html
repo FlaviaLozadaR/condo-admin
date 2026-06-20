@@ -68,6 +68,12 @@
     main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
     header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem; background: var(--surface); }
     header h2 { font-size: 1rem; font-weight: 600; flex: 1; }
+    .search-input {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 7px;
+      color: var(--text); padding: 0.45rem 0.8rem; font-size: 0.83rem; outline: none;
+      width: 220px; transition: border-color 0.15s;
+    }
+    .search-input:focus { border-color: var(--blue); }
     .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.9rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.82rem; font-weight: 500; transition: opacity 0.15s; }
     .btn:hover { opacity: 0.85; }
     .btn-primary { background: var(--blue); color: #0f172a; }
@@ -187,6 +193,7 @@
 <main>
   <header>
     <h2 id="page-title">Seleccioná una sección</h2>
+    <input type="text" id="search-box" class="search-input hidden" placeholder="Buscar..." oninput="onSearchInput(this.value)" />
     <button class="btn btn-primary hidden" id="btn-new" onclick="openCreate()">+ Nuevo</button>
   </header>
   <div class="content" id="content">
@@ -231,6 +238,7 @@ let currentSection = null;
 let currentData = [];
 let editingId = null;
 let confirmCb = null;
+let searchQuery = '';
 
 // ── Auth ─────────────────────────────────────────────────────
 async function doLogin() {
@@ -250,8 +258,8 @@ async function doLogin() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
-    if (!['Super Admin', 'Administrador'].includes(data.user?.role)) {
-      throw new Error('Solo Super Admin o Administrador pueden acceder al panel.');
+    if (data.user?.role !== 'Super Admin') {
+      throw new Error('Solo Super Admin puede acceder al panel.');
     }
     token = data.token;
     localStorage.setItem(TOKEN_KEY, token);
@@ -459,6 +467,11 @@ async function load(key) {
   document.getElementById('btn-new').classList.toggle('hidden', key === 'health' || schema?.noCreate || !schema?.fields?.length);
   document.getElementById('content').innerHTML = '<div class="empty">Cargando…</div>';
 
+  searchQuery = '';
+  const searchBox = document.getElementById('search-box');
+  searchBox.value = '';
+  searchBox.classList.toggle('hidden', key === 'health' || key === 'apiinfo');
+
   if (key === 'health') {
     const data = await apiFetch('/health').catch(e => ({ error: e.message }));
     document.getElementById('content').innerHTML = `<div class="json-view">${JSON.stringify(data, null, 2)}</div>`;
@@ -545,6 +558,18 @@ async function load(key) {
   }
 }
 
+function onSearchInput(value) {
+  searchQuery = value;
+  renderTable(currentSection);
+}
+
+// Filtra por coincidencia de texto en cualquiera de las columnas visibles de la tabla
+function filterRows(data, cols) {
+  const q = searchQuery.trim().toLowerCase();
+  if (!q) return data;
+  return data.filter(row => cols.some(c => String(row[c] ?? '').toLowerCase().includes(q)));
+}
+
 function renderTable(key) {
   const schema = schemas[key];
   if (!schema) return;
@@ -555,11 +580,17 @@ function renderTable(key) {
     return;
   }
 
+  const rows = filterRows(currentData, cols);
+  if (!rows.length) {
+    document.getElementById('content').innerHTML = `<div class="empty">Ningún registro coincide con "${searchQuery}".</div>`;
+    return;
+  }
+
   const hasActions = !noEdit || !noDelete || statusField;
   const allCols = hasActions ? [...cols, 'Acciones'] : cols;
   const thead = allCols.map(c => `<th>${colLabel(c)}</th>`).join('');
 
-  const tbody = currentData.map(row => {
+  const tbody = rows.map(row => {
     const cells = cols.map(c => `<td title="${String(row[c] ?? '')}">${cellVal(row, c)}</td>`).join('');
     let actions = '';
     if (statusField && statusOptions) {
@@ -573,8 +604,11 @@ function renderTable(key) {
     return `<tr>${cells}${hasActions ? `<td><div class="actions">${actions}</div></td>` : ''}</tr>`;
   }).join('');
 
+  const countLabel = rows.length === currentData.length
+    ? `${currentData.length} registro(s)`
+    : `${rows.length} de ${currentData.length} registro(s)`;
   document.getElementById('content').innerHTML = `
-    <div style="margin-bottom:0.75rem;color:var(--muted);font-size:0.8rem">${currentData.length} registro(s)</div>
+    <div style="margin-bottom:0.75rem;color:var(--muted);font-size:0.8rem">${countLabel}</div>
     <div class="table-wrap"><table>
       <thead><tr>${thead}</tr></thead>
       <tbody>${tbody}</tbody>
@@ -689,6 +723,7 @@ document.getElementById('login-password').addEventListener('keydown', e => {
     currentData = data;
     // obtener info del usuario del token (decodificar payload)
     const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.role !== 'Super Admin') { doLogout(); return; }
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('sidebar-user').style.display = 'flex';
     document.getElementById('sidebar-name').textContent = payload.name || 'Admin';

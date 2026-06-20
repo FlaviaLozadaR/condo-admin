@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import * as api from "../api.js";
 import Pagination from "../components/Pagination.jsx";
+import { parseFecha } from "./dashboardUtils.js";
 
 const PAGE_SIZE = 20;
+const MESES_LARGOS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-export default function HistorialVisitasScreen({ user, isSuperAdministrator, condominiosData, historialVisitasData, onToast, exportToPDF }) {
+export default function HistorialVisitasScreen({ user, isSuperAdministrator, condominiosData, propiedadesData, historialVisitasData, onToast, exportToPDF }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("todos");
@@ -14,6 +16,8 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
   const [page, setPage] = useState(1);
   const [pageData, setPageData] = useState({ data: [], total: 0, totalPeatonales: 0, totalVehiculares: 0, totalPages: 1 });
   const [loading, setLoading] = useState(false);
+  const [exportMonthsFilter, setExportMonthsFilter] = useState(new Set());
+  const [exportMonthsDropdownOpen, setExportMonthsDropdownOpen] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchTerm), 400);
@@ -44,6 +48,42 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
       .finally(() => setLoading(false));
   }, [page, typeFilter, debouncedSearch, selectedCondoName]);
 
+  // Meses disponibles para exportar — derivados de las fechas reales de las visitas,
+  // desde la primera registrada hasta la más reciente.
+  const exportMonthOptions = (() => {
+    const map = new Map();
+    historialVisitasData.forEach((r) => {
+      const d = parseFecha(r.fecha);
+      if (!d || isNaN(d)) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (!map.has(key)) map.set(key, { key, year: d.getFullYear(), month: d.getMonth(), label: `${MESES_LARGOS[d.getMonth()]} ${d.getFullYear()}` });
+    });
+    return Array.from(map.values()).sort((a, b) => (b.year - a.year) || (b.month - a.month));
+  })();
+
+  const toggleExportMonth = (key) => {
+    setExportMonthsFilter((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+  const toggleAllExportMonths = () => {
+    setExportMonthsFilter((prev) =>
+      prev.size === exportMonthOptions.length ? new Set() : new Set(exportMonthOptions.map((o) => o.key))
+    );
+  };
+
+  const condoByPropLabel = new Map((propiedadesData || []).map((p) => [`${p.street} - ${p.code}`, p.condo]));
+  const resolveCondoDeVisita = (r) => condoByPropLabel.get(r.propiedad) || "";
+
+  const fmtRegistrado = (iso) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    return `${d.toLocaleDateString("es-AR")} ${d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}`;
+  };
+
   const handleExportHistorial = async (format) => {
     const query = searchTerm.toLowerCase().trim();
     const toExport = historialVisitasData.filter((item) => {
@@ -56,18 +96,31 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
       const matchesCondo =
         !selectedCondoName ||
         item.propiedad.toLowerCase().includes(selectedCondoName.toLowerCase());
-      return matchesQuery && matchesType && matchesCondo;
-    });
+      const matchesMonth = exportMonthsFilter.size === 0 || (() => {
+        const d = parseFecha(item.fecha);
+        if (!d || isNaN(d)) return false;
+        return exportMonthsFilter.has(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+      })();
+      return matchesQuery && matchesType && matchesCondo && matchesMonth;
+    }).sort((a, b) => (parseFecha(a.fecha) || 0) - (parseFecha(b.fecha) || 0));
 
     if (toExport.length === 0) {
-      onToast?.("No hay registros para exportar.", "warning");
+      onToast?.("No hay registros para exportar con los filtros seleccionados.", "warning");
       return;
     }
     const date = new Date().toISOString().slice(0, 10);
+    const periodoLabel = exportMonthsFilter.size === 0
+      ? "Todos los periodos"
+      : `Periodo: ${exportMonthOptions.filter((o) => exportMonthsFilter.has(o.key)).map((o) => o.label).join(", ")}`;
+
+    const peatonales  = toExport.filter((r) => !(r.placa && r.placa !== "-"));
+    const vehiculares = toExport.filter((r) => r.placa && r.placa !== "-");
+
     if (format === "excel") {
       // xlsx se carga bajo demanda: pesa ~400KB y solo se necesita al exportar
       const XLSX = await import("xlsx");
       const ws = XLSX.utils.json_to_sheet(toExport.map(r => ({
+        Condominio: resolveCondoDeVisita(r) || "—",
         Visitante:  r.visitante || "",
         Cédula:     r.cedula   || "",
         Propiedad:  r.propiedad || "",
@@ -78,25 +131,57 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
         Salida:     r.salida   || "-",
         Motivo:     r.motivo   || r.method || "",
         Guardia:    r.guard    || "",
+        "Registrado el": fmtRegistrado(r.insertedAt),
       })));
-      ws["!cols"] = [{ wch: 24 }, { wch: 14 }, { wch: 28 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 20 }, { wch: 18 }];
+      ws["!cols"] = [
+        { wch: 22 }, { wch: 24 }, { wch: 14 }, { wch: 28 }, { wch: 12 },
+        { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 20 }, { wch: 18 }, { wch: 18 },
+      ];
+
+      // Resumen por mes — cantidad de visitas peatonales/vehiculares de cada periodo
+      const resumenPorMes = new Map();
+      toExport.forEach((r) => {
+        const d   = parseFecha(r.fecha);
+        const key = d && !isNaN(d) ? `${MESES_LARGOS[d.getMonth()]} ${d.getFullYear()}` : "Sin fecha";
+        if (!resumenPorMes.has(key)) resumenPorMes.set(key, { mes: key, total: 0, peatonales: 0, vehiculares: 0 });
+        const r2 = resumenPorMes.get(key);
+        r2.total++;
+        (r.placa && r.placa !== "-") ? r2.vehiculares++ : r2.peatonales++;
+      });
+      const wsResumen = XLSX.utils.json_to_sheet([
+        ...Array.from(resumenPorMes.values()).map((r) => ({
+          Mes: r.mes,
+          "Total visitas": r.total,
+          Peatonales: r.peatonales,
+          Vehiculares: r.vehiculares,
+        })),
+        { Mes: "TOTAL", "Total visitas": toExport.length, Peatonales: peatonales.length, Vehiculares: vehiculares.length },
+      ]);
+      wsResumen["!cols"] = [{ wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Historial");
+      XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
       XLSX.writeFile(wb, `historial_visitas_${date}.xlsx`);
       onToast?.(`${toExport.length} registros exportados a Excel.`, "success");
     } else {
       exportToPDF({
         title:    "Historial de Visitas",
-        subtitle: `Generado el ${new Date().toLocaleDateString("es-AR")} · ${toExport.length} registros`,
-        headers:  ["Visitante", "Propiedad", "Tipo", "Placa", "Fecha", "Entrada", "Salida"],
+        subtitle: `Generado el ${new Date().toLocaleDateString("es-AR")} · ${toExport.length} registros · ${periodoLabel}`,
+        headers:  ["Condominio", "Visitante", "Cédula", "Propiedad", "Tipo", "Placa", "Fecha", "Entrada", "Salida", "Motivo", "Guardia", "Registrado el"],
         rows:     toExport.map(r => [
+          resolveCondoDeVisita(r) || "—",
           r.visitante  || "",
+          r.cedula     || "",
           r.propiedad  || "",
           (r.placa && r.placa !== "-") ? "Vehicular" : "Peatonal",
           r.placa      || "-",
           r.fecha      || "",
           r.entrada    || "",
           r.salida     || "-",
+          r.motivo     || r.method || "",
+          r.guard      || "",
+          fmtRegistrado(r.insertedAt),
         ]),
       });
     }
@@ -109,21 +194,67 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
           <h1>Historial de Visitas</h1>
           <p>Registro completo de entradas y salidas</p>
         </div>
-        <div className="export-btn-group">
-          <button type="button" className="export-btn export-btn-excel" onClick={() => handleExportHistorial("excel")} title="Exportar a Excel">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
-              <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>
-            </svg>
-            Excel
-          </button>
-          <button type="button" className="export-btn export-btn-pdf" onClick={() => handleExportHistorial("pdf")} title="Exportar a PDF">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
-              <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="11" y2="17"/>
-            </svg>
-            PDF
-          </button>
+        <div className="export-actions-wrap">
+          <div className="management-condo-field export-months-field">
+            <label>Período a exportar</label>
+            <div className="condo-dropdown" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setExportMonthsDropdownOpen(false); }} tabIndex={-1}>
+              <button
+                type="button"
+                className="condo-dropdown-trigger"
+                onClick={() => setExportMonthsDropdownOpen((o) => !o)}
+                aria-expanded={exportMonthsDropdownOpen}
+              >
+                <span className="condo-dropdown-value">
+                  {exportMonthsFilter.size === 0
+                    ? "Todos los meses"
+                    : `${exportMonthsFilter.size} mes${exportMonthsFilter.size !== 1 ? "es" : ""} seleccionado${exportMonthsFilter.size !== 1 ? "s" : ""}`}
+                </span>
+                <svg className={`condo-dropdown-chevron${exportMonthsDropdownOpen ? " open" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              {exportMonthsDropdownOpen && (
+                <ul className="condo-dropdown-list export-months-list" role="listbox">
+                  <li
+                    className="condo-dropdown-item export-months-item export-months-item-all"
+                    onMouseDown={(e) => { e.preventDefault(); toggleAllExportMonths(); }}
+                  >
+                    <input type="checkbox" readOnly checked={exportMonthOptions.length > 0 && exportMonthsFilter.size === exportMonthOptions.length} />
+                    <span>{exportMonthsFilter.size === exportMonthOptions.length ? "Quitar todos" : "Seleccionar todos"}</span>
+                  </li>
+                  {exportMonthOptions.length === 0 ? (
+                    <li className="export-months-empty">Sin visitas registradas todavía.</li>
+                  ) : exportMonthOptions.map((opt) => (
+                    <li
+                      key={opt.key}
+                      role="option"
+                      aria-selected={exportMonthsFilter.has(opt.key)}
+                      className="condo-dropdown-item export-months-item"
+                      onMouseDown={(e) => { e.preventDefault(); toggleExportMonth(opt.key); }}
+                    >
+                      <input type="checkbox" readOnly checked={exportMonthsFilter.has(opt.key)} />
+                      <span>{opt.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          <div className="export-btn-group">
+            <button type="button" className="export-btn export-btn-excel" onClick={() => handleExportHistorial("excel")} title="Exportar a Excel">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>
+              </svg>
+              Excel
+            </button>
+            <button type="button" className="export-btn export-btn-pdf" onClick={() => handleExportHistorial("pdf")} title="Exportar a PDF">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="11" y2="17"/>
+              </svg>
+              PDF
+            </button>
+          </div>
         </div>
       </header>
 
@@ -223,7 +354,7 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
       <section className="historial-kpi-grid">
         <article className="historial-kpi historial-kpi-total">
           <div className="historial-kpi-head">
-            <p>Total Visitas Hoy</p>
+            <p>Total Visitas Este Mes</p>
             <span className="historial-kpi-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24">
                 <path d="M12 8V12L15 14M3 12C3 16.97 7.03 21 12 21C16.97 21 21 16.97 21 12C21 7.03 16.97 3 12 3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -231,7 +362,7 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
             </span>
           </div>
           <strong>{pageData.total}</strong>
-          <small>visitantes registrados</small>
+          <small>visitantes registrados este mes</small>
         </article>
 
         <article className="historial-kpi historial-kpi-walk">
@@ -244,7 +375,7 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
             </span>
           </div>
           <strong>{pageData.totalPeatonales}</strong>
-          <small>accesos a pie</small>
+          <small>accesos a pie este mes</small>
         </article>
 
         <article className="historial-kpi historial-kpi-vehicle">
@@ -257,7 +388,7 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
             </span>
           </div>
           <strong>{pageData.totalVehiculares}</strong>
-          <small>accesos vehiculares</small>
+          <small>accesos vehiculares este mes</small>
         </article>
       </section>
 
@@ -270,6 +401,7 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
               <th>Propiedad</th>
               <th>Tipo</th>
               <th>Placa</th>
+              <th>Fecha</th>
               <th>Entrada</th>
               <th>Salida</th>
               <th>Motivo</th>
@@ -277,9 +409,9 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8}>Cargando...</td></tr>
+              <tr><td colSpan={9}>Cargando...</td></tr>
             ) : pageData.data.length === 0 ? (
-              <tr><td colSpan={8}>No se encontraron registros.</td></tr>
+              <tr><td colSpan={9}>No se encontraron registros.</td></tr>
             ) : pageData.data.map((item) => (
               <tr key={item.id}>
                 <td>{item.visitante}</td>
@@ -291,6 +423,7 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
                   </span>
                 </td>
                 <td>{item.placa}</td>
+                <td>{item.fecha}</td>
                 <td>{item.entrada}</td>
                 <td>
                   {(!item.salida || item.salida === '-' || item.salida === '') ? (

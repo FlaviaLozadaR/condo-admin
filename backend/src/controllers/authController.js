@@ -18,7 +18,8 @@ async function login(req, res) {
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(401).json({ error: 'Credenciales inválidas' });
 
-    const dbData    = await db.getDataForDashboard();
+    const condo     = user.role === 'Super Admin' ? undefined : user.condo;
+    const dbData    = await db.getDataForDashboard(condo);
     const dashboard = computeDashboard(user, dbData);
     const token     = jwt.sign({ id: user.id, role: user.role, condo: user.condo || null }, JWT_SECRET, { expiresIn: '24h' });
     const { password: _, ...userClean } = user;

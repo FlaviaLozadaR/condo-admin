@@ -282,12 +282,14 @@ export default function SuperAdminDashboardScreen({
               {selectedSuperAdminDashboard.debtors.length === 0 ? (
                 <p className="superadmin-empty-text">Sin morosos registrados.</p>
               ) : (
-                selectedSuperAdminDashboard.debtors.map((debtor) => (
-                  <div key={debtor.property} className="superadmin-debtor-item">
-                    <span>{debtor.property}</span>
-                    <strong>{formatAmount(debtor.debt)}</strong>
-                  </div>
-                ))
+                <div className="superadmin-debtors-list">
+                  {selectedSuperAdminDashboard.debtors.slice(0, 3).map((debtor) => (
+                    <div key={debtor.property} className="superadmin-debtor-item">
+                      <span>{debtor.property}</span>
+                      <strong>{formatAmount(debtor.debt)}</strong>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </article>

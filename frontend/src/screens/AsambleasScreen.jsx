@@ -62,13 +62,18 @@ export default function AsambleasScreen({
     setIsEditAsambleaModalOpen(true);
   };
 
-  const handleDeleteAsamblea = async (id) => {
-    if (!window.confirm("¿Eliminar esta asamblea? Esta acción no se puede deshacer.")) return;
+  const [deletingAsambleaId, setDeletingAsambleaId] = useState(null);
+
+  const confirmDeleteAsamblea = async () => {
+    if (!deletingAsambleaId) return;
     try {
-      await api.deleteAsamblea(id);
-      setAsambleasData((prev) => prev.filter((a) => String(a.id) !== String(id)));
+      await api.deleteAsamblea(deletingAsambleaId);
+      setAsambleasData((prev) => prev.filter((a) => String(a.id) !== String(deletingAsambleaId)));
     } catch (err) {
       console.error("Error eliminando asamblea:", err.message);
+      onToast?.(err.message || "Error al eliminar la asamblea.", "error");
+    } finally {
+      setDeletingAsambleaId(null);
     }
   };
 
@@ -132,14 +137,28 @@ export default function AsambleasScreen({
         </div>
       </section>
 
+      {loading && pageData.data.length > 0 && (
+        <div className="section-refresh-indicator">
+          <span className="section-refresh-spinner" aria-hidden="true" />
+          Actualizando...
+        </div>
+      )}
+
       <section className="asambleas-grid">
-        {loading ? (
+        {loading && pageData.data.length === 0 ? (
           <p>Cargando...</p>
         ) : pageData.data.length === 0 ? (
           <p>No hay asambleas.</p>
         ) : pageData.data.map((item) => {
           const userVoteKey = user.id || user.email;
           const myVote = asambleaVotes[item.id] || (item.userVotes && item.userVotes[userVoteKey]);
+          const isExpired = (() => {
+            if (!item.dueDate) return false;
+            const due = new Date(item.dueDate);
+            if (isNaN(due)) return false;
+            due.setHours(23, 59, 59, 999);
+            return due < new Date();
+          })();
           const fmtDate = (d) => {
             if (!d) return '';
             if (d.includes('T') || d.includes('-')) {
@@ -176,8 +195,12 @@ export default function AsambleasScreen({
                 </div>
                 {canManageAsambleas && (
                   <div className="asamblea-admin-actions">
-                    <button type="button" className="asamblea-admin-btn asamblea-admin-btn-edit" onClick={() => handleOpenEditAsamblea(item)}>Editar</button>
-                    <button type="button" className="asamblea-admin-btn asamblea-admin-btn-delete" onClick={() => handleDeleteAsamblea(item.id)}>Eliminar</button>
+                    <button type="button" className="anuncio-action-btn" title="Editar" onClick={() => handleOpenEditAsamblea(item)}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17.25V21H6.75L17.81 9.94L14.06 6.19L3 17.25Z"/></svg>
+                    </button>
+                    <button type="button" className="anuncio-action-btn anuncio-action-delete" title="Eliminar" onClick={() => setDeletingAsambleaId(item.id)}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V7H6V19ZM8 9H16V19H8V9ZM15.5 4L14.5 3H9.5L8.5 4H5V6H19V4H15.5Z"/></svg>
+                    </button>
                   </div>
                 )}
               </div>
@@ -231,6 +254,8 @@ export default function AsambleasScreen({
                   <div className="asamblea-voted-banner">
                     Ya has votado: {myVote === "favor" ? "A favor" : myVote === "contra" ? "En contra" : "Abstención"}
                   </div>
+                ) : isExpired ? (
+                  <div className="asamblea-expired-banner">Esta asamblea ya venció — ya no se puede votar.</div>
                 ) : (
                   <div className="asamblea-owner-actions">
                     {["favor", "contra", "abstencion"].map((tipo) => (
@@ -241,8 +266,10 @@ export default function AsambleasScreen({
                         onClick={async () => {
                           try {
                             await api.voteAsamblea(String(item.id), tipo, user.id || user.email);
-                          } catch {}
-                          setAsambleaVotes({ ...asambleaVotes, [item.id]: tipo });
+                            setAsambleaVotes({ ...asambleaVotes, [item.id]: tipo });
+                          } catch (err) {
+                            onToast?.(err.message || "Error al registrar el voto.", "error");
+                          }
                         }}
                       >
                         <span>{tipo === "favor" ? "👍" : tipo === "contra" ? "👎" : "–"}</span>
@@ -258,6 +285,20 @@ export default function AsambleasScreen({
       </section>
 
       <Pagination page={page} totalPages={pageData.totalPages} onPageChange={setPage} />
+
+      {deletingAsambleaId && (
+        <div className="modal-overlay modal-overlay-centered" onClick={() => setDeletingAsambleaId(null)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-modal-icon confirm-modal-icon-danger" aria-hidden="true">!</div>
+            <h2>¿Eliminar esta asamblea?</h2>
+            <p>Esta acción no se puede deshacer.</p>
+            <div className="confirm-modal-actions">
+              <button type="button" className="confirm-modal-cancel" onClick={() => setDeletingAsambleaId(null)}>Cancelar</button>
+              <button type="button" className="confirm-modal-accept confirm-modal-accept-danger" onClick={confirmDeleteAsamblea}>Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

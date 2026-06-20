@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import * as api from "../api.js";
+import { parseAreaImages } from "../utils/images.js";
 
 export default function ReservasScreen({
   user,
@@ -15,15 +16,53 @@ export default function ReservasScreen({
 }) {
   const [areasTab, setAreasTab] = useState('areas'); // 'areas' | 'reservas' | 'cambios'
   const [reservasCondoFilter, setReservasCondoFilter] = useState('todos');
+  const [reservasDateFilter, setReservasDateFilter] = useState('proximas'); // 'proximas' | 'pasadas'
   const [reservasCondoDropdownOpen, setReservasCondoDropdownOpen] = useState(false);
+  const [confirmPrompt, setConfirmPrompt] = useState(null); // { message, onAccept }
+  const [viewingArea, setViewingArea] = useState(null);
+  const [carouselIdx, setCarouselIdx] = useState(0);
+  const [carouselDragOffset, setCarouselDragOffset] = useState(0);
+  const [isDraggingCarousel, setIsDraggingCarousel] = useState(false);
+  const [zoomImageUrl, setZoomImageUrl] = useState(null);
+  const carouselDragStartXRef = useRef(0);
+  const carouselDraggedRef = useRef(false);
 
-  const handleDeleteArea = async (id) => {
-    if (!window.confirm('¿Eliminar esta área social?')) return;
-    try {
-      await api.deleteAreaSocial(id);
-      setAreasSociales(prev => prev.filter(a => a.id !== id));
-      setReservasAreas(prev => prev.filter(r => r.areaId !== id));
-    } catch (e) { alert('Error: ' + e.message); }
+  const askConfirm = (message, onAccept) => setConfirmPrompt({ message, onAccept });
+
+  const viewingAreaImages = viewingArea ? parseAreaImages(viewingArea.imagenUrl) : [];
+
+  // Carrusel de fotos del área (botones en laptop, deslizar en dispositivo)
+  const handleCarouselDragStart = (clientX) => {
+    carouselDragStartXRef.current = clientX;
+    carouselDraggedRef.current = false;
+    setIsDraggingCarousel(true);
+  };
+  const handleCarouselDragMove = (clientX) => {
+    if (!isDraggingCarousel) return;
+    const offset = clientX - carouselDragStartXRef.current;
+    if (Math.abs(offset) > 5) carouselDraggedRef.current = true;
+    setCarouselDragOffset(offset);
+  };
+  const handleCarouselDragEnd = () => {
+    if (!isDraggingCarousel) return;
+    setIsDraggingCarousel(false);
+    const threshold = 50;
+    if (carouselDragOffset <= -threshold) {
+      setCarouselIdx(prev => (prev + 1) % viewingAreaImages.length);
+    } else if (carouselDragOffset >= threshold) {
+      setCarouselIdx(prev => (prev - 1 + viewingAreaImages.length) % viewingAreaImages.length);
+    }
+    setCarouselDragOffset(0);
+  };
+
+  const handleDeleteArea = (id) => {
+    askConfirm('¿Eliminar esta área social? Esta acción no se puede deshacer.', async () => {
+      try {
+        await api.deleteAreaSocial(id);
+        setAreasSociales(prev => prev.filter(a => a.id !== id));
+        setReservasAreas(prev => prev.filter(r => r.areaId !== id));
+      } catch (e) { alert('Error: ' + e.message); }
+    });
   };
 
   const handleAprobarReserva = async (id, estado, nota = '') => {
@@ -33,12 +72,13 @@ export default function ReservasScreen({
     } catch (e) { alert('Error: ' + e.message); }
   };
 
-  const handleDeleteReservaArea = async (id) => {
-    if (!window.confirm('¿Eliminar esta reserva?')) return;
-    try {
-      await api.deleteReservaArea(id);
-      setReservasAreas(prev => prev.filter(r => r.id !== id));
-    } catch (e) { alert('Error: ' + e.message); }
+  const handleDeleteReservaArea = (id) => {
+    askConfirm('¿Eliminar esta reserva? Esta acción no se puede deshacer.', async () => {
+      try {
+        await api.deleteReservaArea(id);
+        setReservasAreas(prev => prev.filter(r => r.id !== id));
+      } catch (e) { alert('Error: ' + e.message); }
+    });
   };
 
   const handleResponderCambio = async (id, aprobado) => {
@@ -64,6 +104,13 @@ export default function ReservasScreen({
   const pendientes        = myReservas.filter(r => r.estado === 'pendiente');
   const cambiosPendientes = myReservas.filter(r => r.solicitudCambio?.estado === 'pendiente');
 
+  // Próximas vs pasadas (según fecha + hora de fin de la reserva)
+  const now               = new Date();
+  const esReservaPasada   = r => new Date(`${r.fecha}T${r.horaFin || '23:59'}`) < now;
+  const reservasProximas  = myReservas.filter(r => !esReservaPasada(r));
+  const reservasPasadas   = myReservas.filter(r => esReservaPasada(r)).sort((a, b) => `${b.fecha}T${b.horaFin}`.localeCompare(`${a.fecha}T${a.horaFin}`));
+  const reservasVisibles  = reservasDateFilter === 'pasadas' ? reservasPasadas : reservasProximas;
+
   return (
     <>
       <header className="dashboard-header dashboard-header-with-actions">
@@ -72,7 +119,7 @@ export default function ReservasScreen({
           <p>Gestiona las áreas sociales y las reservas del condominio.</p>
         </div>
         {areasTab === 'areas' && (
-          <button className="btn btn-primary" onClick={() => { setEditingArea(null); setAreaForm({ nombre: '', descripcion: '', precio: '', condo: '', imagen: null, imagenPreview: '' }); setAreaFormError(''); setIsCreateAreaModalOpen(true); }}>
+          <button className="btn btn-primary" onClick={() => { setEditingArea(null); setAreaForm({ nombre: '', descripcion: '', precio: '', condo: '', imagenesNuevas: [], imagenesExistentes: [] }); setAreaFormError(''); setIsCreateAreaModalOpen(true); }}>
             + Crear Área
           </button>
         )}
@@ -126,12 +173,15 @@ export default function ReservasScreen({
               <p className="empty-state-subtitle">Creá la primera área social para que los propietarios puedan reservar.</p>
             </div>
           )}
-          {myAreas.map(area => (
-            <article key={area.id} className="area-card">
+          {myAreas.map(area => {
+            const areaImages = parseAreaImages(area.imagenUrl);
+            return (
+            <article key={area.id} className="area-card area-card-clickable" onClick={() => { setViewingArea(area); setCarouselIdx(0); }}>
               <div className="area-card-img-wrap">
-                {area.imagenUrl ? <img src={area.imagenUrl} alt={area.nombre} className="area-card-img" /> : <div className="area-card-img-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>}
-                <div className="area-card-actions">
-                  <button className="area-card-btn" title="Editar" onClick={() => { setEditingArea(area); setAreaForm({ nombre: area.nombre, descripcion: area.descripcion || '', precio: String(area.precio || ''), condo: area.condo || '', imagen: null, imagenPreview: area.imagenUrl || '' }); setAreaFormError(''); setIsCreateAreaModalOpen(true); }}>
+                {areaImages[0] ? <img src={areaImages[0]} alt={area.nombre} className="area-card-img" /> : <div className="area-card-img-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>}
+                {areaImages.length > 1 && <span className="area-card-img-count">{areaImages.length} fotos</span>}
+                <div className="area-card-actions" onClick={(e) => e.stopPropagation()}>
+                  <button className="area-card-btn" title="Editar" onClick={() => { setEditingArea(area); setAreaForm({ nombre: area.nombre, descripcion: area.descripcion || '', precio: String(area.precio || ''), condo: area.condo || '', imagenesNuevas: [], imagenesExistentes: parseAreaImages(area.imagenUrl) }); setAreaFormError(''); setIsCreateAreaModalOpen(true); }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:14,height:14}}><path d="M3 17.25V21H6.75L17.81 9.94L14.06 6.19L3 17.25Z"/></svg>
                   </button>
                   <button className="area-card-btn area-card-btn-delete" title="Eliminar" onClick={() => handleDeleteArea(area.id)}>
@@ -146,17 +196,26 @@ export default function ReservasScreen({
                 <p className="area-card-reservas-count">{myReservas.filter(r => r.areaId === area.id && r.estado !== 'rechazada').length} reserva(s) activa(s)</p>
               </div>
             </article>
-          ))}
+          )})}
         </div>
       )}
 
       {/* Tab: Reservas */}
       {areasTab === 'reservas' && (
         <div className="reservas-areas-list">
-          {myReservas.length === 0 ? (
-            <div className="empty-state"><div className="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><p className="empty-state-title">Sin reservas</p><p className="empty-state-subtitle">Aún no hay solicitudes de reserva.</p></div>
-          ) : myReservas.map(r => {
-            const areaImg = areasSociales.find(a => a.id === r.areaId)?.imagenUrl || '';
+          <div className="areas-tabs" style={{marginBottom:'1rem'}}>
+            <button className={`areas-tab${reservasDateFilter === 'proximas' ? ' areas-tab-active' : ''}`} onClick={() => setReservasDateFilter('proximas')}>
+              Próximas{reservasProximas.length ? ` (${reservasProximas.length})` : ''}
+            </button>
+            <button className={`areas-tab${reservasDateFilter === 'pasadas' ? ' areas-tab-active' : ''}`} onClick={() => setReservasDateFilter('pasadas')}>
+              Pasadas{reservasPasadas.length ? ` (${reservasPasadas.length})` : ''}
+            </button>
+          </div>
+
+          {reservasVisibles.length === 0 ? (
+            <div className="empty-state"><div className="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><p className="empty-state-title">{reservasDateFilter === 'pasadas' ? 'Sin reservas pasadas' : 'Sin reservas próximas'}</p><p className="empty-state-subtitle">{reservasDateFilter === 'pasadas' ? 'Las reservas finalizadas aparecerán aquí.' : 'Aún no hay solicitudes de reserva próximas.'}</p></div>
+          ) : reservasVisibles.map(r => {
+            const areaImg = parseAreaImages(areasSociales.find(a => a.id === r.areaId)?.imagenUrl)[0] || '';
             return (
             <article key={r.id} className="reserva-area-card">
               {areaImg && <img src={areaImg} alt={r.areaNombre} className="reserva-area-card-img" />}
@@ -164,15 +223,31 @@ export default function ReservasScreen({
                 <div>
                   <p className="reserva-area-nombre">{r.areaNombre}</p>
                   <p className="reserva-area-meta">{r.propietario} · {r.propiedad}</p>
-                  <p className="reserva-area-horario">📅 {r.fecha} · ⏰ {r.horaInicio}–{r.horaFin}</p>
+                  <p className="reserva-area-horario">
+                    <span className="reserva-area-horario-item">
+                      <svg className="reserva-area-horario-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      {r.fecha}
+                    </span>
+                    <span className="reserva-area-horario-sep">·</span>
+                    <span className="reserva-area-horario-item">
+                      <svg className="reserva-area-horario-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+                      {r.horaInicio}–{r.horaFin}
+                    </span>
+                  </p>
                   {r.nota && <p className="reserva-area-nota">"{r.nota}"</p>}
                 </div>
                 <span className={`pagos-status-chip pagos-status-${r.estado}`}>{r.estado}</span>
               </div>
               {r.estado === 'pendiente' && (
-                <div className="reserva-area-card-actions">
-                  <button className="btn btn-primary" style={{fontSize:'0.82rem',padding:'0.3rem 0.8rem'}} onClick={() => handleAprobarReserva(r.id, 'aprobada')}>Aprobar</button>
-                  <button className="btn btn-secondary" style={{fontSize:'0.82rem',padding:'0.3rem 0.8rem'}} onClick={() => handleAprobarReserva(r.id, 'rechazada')}>Rechazar</button>
+                <div className="reserva-area-card-actions reserva-area-card-actions-row">
+                  <button className="btn btn-primary" style={{fontSize:'0.82rem',padding:'0.3rem 0.8rem'}}
+                    onClick={() => askConfirm('¿Confirmás aprobar esta reserva?', () => handleAprobarReserva(r.id, 'aprobada'))}>
+                    Aprobar
+                  </button>
+                  <button className="btn btn-secondary" style={{fontSize:'0.82rem',padding:'0.3rem 0.8rem'}}
+                    onClick={() => askConfirm('¿Confirmás rechazar esta reserva?', () => handleAprobarReserva(r.id, 'rechazada'))}>
+                    Rechazar
+                  </button>
                   <button className="area-card-btn area-card-btn-delete" onClick={() => handleDeleteReservaArea(r.id)} title="Eliminar">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:14,height:14}}><path d="M6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V7H6V19ZM8 9H16V19H8V9ZM15.5 4L14.5 3H9.5L8.5 4H5V6H19V4H15.5Z"/></svg>
                   </button>
@@ -193,7 +268,7 @@ export default function ReservasScreen({
           {cambiosPendientes.length === 0 ? (
             <div className="empty-state"><div className="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg></div><p className="empty-state-title">Sin solicitudes de cambio</p><p className="empty-state-subtitle">No hay cambios de horario pendientes.</p></div>
           ) : cambiosPendientes.map(r => {
-            const areaImg = areasSociales.find(a => a.id === r.areaId)?.imagenUrl || '';
+            const areaImg = parseAreaImages(areasSociales.find(a => a.id === r.areaId)?.imagenUrl)[0] || '';
             return (
             <article key={r.id} className="reserva-area-card">
               {areaImg && <img src={areaImg} alt={r.areaNombre} className="reserva-area-card-img" />}
@@ -212,6 +287,105 @@ export default function ReservasScreen({
             </article>
             );
           })}
+        </div>
+      )}
+
+      {viewingArea && (
+        <div className="modal-overlay" onClick={() => setViewingArea(null)}>
+          <div className="modal-content modal-edit-user" onClick={(e) => e.stopPropagation()}>
+            <h2>{viewingArea.nombre}</h2>
+            <div className="modal-body-simple">
+              {viewingAreaImages.length === 1 && (
+                <img src={viewingAreaImages[0]} alt={viewingArea.nombre} className="reserva-form-img"
+                  style={{cursor: 'zoom-in'}} onClick={() => setZoomImageUrl(viewingAreaImages[0])} />
+              )}
+
+              {viewingAreaImages.length > 1 && (
+                <div className="area-image-carousel">
+                  <div
+                    className="area-image-carousel-track"
+                    style={{
+                      transform: `translateX(calc(-${carouselIdx * 100}% + ${carouselDragOffset}px))`,
+                      transition: isDraggingCarousel ? "none" : undefined,
+                      touchAction: "pan-y",
+                      userSelect: isDraggingCarousel ? "none" : undefined,
+                    }}
+                    onTouchStart={(e) => handleCarouselDragStart(e.touches[0].clientX)}
+                    onTouchMove={(e) => handleCarouselDragMove(e.touches[0].clientX)}
+                    onTouchEnd={handleCarouselDragEnd}
+                    onMouseDown={(e) => handleCarouselDragStart(e.clientX)}
+                    onMouseMove={(e) => handleCarouselDragMove(e.clientX)}
+                    onMouseUp={handleCarouselDragEnd}
+                    onMouseLeave={handleCarouselDragEnd}
+                  >
+                    {viewingAreaImages.map((url, i) => (
+                      <img key={url} src={url} alt={`${viewingArea.nombre} ${i + 1}`} className="area-image-carousel-slide"
+                        style={{cursor: 'zoom-in'}}
+                        onClick={() => { if (!carouselDraggedRef.current) setZoomImageUrl(url); }} />
+                    ))}
+                  </div>
+
+                  <button type="button" className="area-image-carousel-arrow area-image-carousel-arrow-prev" aria-label="Foto anterior" onClick={() => setCarouselIdx(prev => (prev - 1 + viewingAreaImages.length) % viewingAreaImages.length)}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  </button>
+                  <button type="button" className="area-image-carousel-arrow area-image-carousel-arrow-next" aria-label="Foto siguiente" onClick={() => setCarouselIdx(prev => (prev + 1) % viewingAreaImages.length)}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+
+                  <div className="carousel-dots area-image-carousel-dots" role="tablist" aria-label="Fotos">
+                    {viewingAreaImages.map((_, i) => (
+                      <button key={i} type="button" role="tab" aria-selected={i === carouselIdx} aria-label={`Foto ${i + 1}`} className={`carousel-dot${i === carouselIdx ? ' carousel-dot-active' : ''}`} onClick={() => setCarouselIdx(i)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {viewingArea.descripcion && <p className="area-detail-desc">{viewingArea.descripcion}</p>}
+
+              <div className="propiedad-line-item">
+                <span>Condominio</span>
+                <strong>{viewingArea.condo || '—'}</strong>
+              </div>
+              <div className="propiedad-line-item">
+                <span>Precio</span>
+                <strong>{Number(viewingArea.precio) > 0 ? `Bs. ${Number(viewingArea.precio).toLocaleString()} por reserva` : 'Sin costo'}</strong>
+              </div>
+              <div className="propiedad-line-item">
+                <span>Estado</span>
+                <strong>{viewingArea.activo === false ? 'Inactiva' : 'Activa'}</strong>
+              </div>
+              <div className="propiedad-line-item">
+                <span>Reservas activas</span>
+                <strong>{myReservas.filter(r => r.areaId === viewingArea.id && r.estado !== 'rechazada').length}</strong>
+              </div>
+            </div>
+            <footer className="modal-footer-simple">
+              <button className="btn btn-secondary" onClick={() => setViewingArea(null)}>Cerrar</button>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {zoomImageUrl && (
+        <div className="qr-zoom-overlay" onClick={() => setZoomImageUrl(null)}>
+          <div className="qr-zoom-content" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="qr-zoom-close" onClick={() => setZoomImageUrl(null)} aria-label="Cerrar">✕</button>
+            <img src={zoomImageUrl} alt="Foto ampliada" className="qr-zoom-img" />
+          </div>
+        </div>
+      )}
+
+      {confirmPrompt && (
+        <div className="modal-overlay modal-overlay-centered" onClick={() => setConfirmPrompt(null)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-modal-icon" aria-hidden="true">?</div>
+            <h2>¿Estás seguro?</h2>
+            <p>{confirmPrompt.message}</p>
+            <div className="confirm-modal-actions">
+              <button type="button" className="confirm-modal-cancel" onClick={() => setConfirmPrompt(null)}>Cancelar</button>
+              <button type="button" className="confirm-modal-accept" onClick={() => { confirmPrompt.onAccept(); setConfirmPrompt(null); }}>Confirmar</button>
+            </div>
+          </div>
         </div>
       )}
     </>

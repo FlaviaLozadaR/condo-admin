@@ -3,6 +3,7 @@ import * as api from "../api.js";
 import Pagination from "../components/Pagination.jsx";
 
 const PAGE_SIZE = 20;
+const ROLE_ORDER = ["Super Admin", "Administrador", "Propietario", "Inquilino", "Seguridad"];
 
 export default function UsuariosScreen({
   user,
@@ -34,10 +35,18 @@ export default function UsuariosScreen({
   const [page, setPage] = useState(1);
   const [pageData, setPageData] = useState({ data: [], total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [selectedRole, setSelectedRole] = useState("");
+  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
 
   const condoParam = isSuperAdministrator
     ? (selectedManagementCondoId === 0 ? undefined : selectedManagementCondoName)
     : user.condo;
+
+  // Roles presentes en el condominio (o en todos, si no hay condominio seleccionado)
+  const availableRoles = ROLE_ORDER.filter(role =>
+    usuariosData.some(u => u.role === role && (!condoParam || u.condo === condoParam))
+  );
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchTerm), 400);
@@ -46,15 +55,20 @@ export default function UsuariosScreen({
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, condoParam]);
+  }, [debouncedSearch, condoParam, selectedRole]);
+
+  // Si cambia el condominio y el rol elegido ya no existe ahí, volver a "Todos"
+  useEffect(() => {
+    if (selectedRole && !availableRoles.includes(selectedRole)) setSelectedRole("");
+  }, [condoParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setLoading(true);
-    api.getUsuariosPaged({ page, limit: PAGE_SIZE, q: debouncedSearch, condo: condoParam })
+    api.getUsuariosPaged({ page, limit: PAGE_SIZE, q: debouncedSearch, condo: condoParam, role: selectedRole })
       .then(setPageData)
       .catch((err) => onToast?.(err.message, "error"))
       .finally(() => setLoading(false));
-  }, [page, debouncedSearch, condoParam, usuariosData]);
+  }, [page, debouncedSearch, condoParam, selectedRole, usuariosData]);
 
   const getRoleColor = (role) => {
     const colors = {
@@ -73,14 +87,17 @@ export default function UsuariosScreen({
     setIsDeleteCondoConfirmOpen(true);
   };
 
-  const deleteUser = async (id) => {
-    if (confirm("¿Estás seguro de que deseas eliminar este usuario?")) {
-      try {
-        await api.deleteUsuario(String(id));
-        setUsuariosData(usuariosData.filter(u => u.id !== id && String(u.id) !== String(id)));
-      } catch (err) {
-        console.error("Error eliminando usuario:", err.message);
-      }
+  const confirmDeleteUser = async () => {
+    if (!userToDelete?.id) return;
+    const id = userToDelete.id;
+    try {
+      await api.deleteUsuario(String(id));
+      setUsuariosData(usuariosData.filter(u => u.id !== id && String(u.id) !== String(id)));
+      onToast?.("Usuario eliminado.", "success");
+    } catch (err) {
+      onToast?.("Error al eliminar el usuario.", "error");
+    } finally {
+      setUserToDelete(null);
     }
   };
 
@@ -223,17 +240,28 @@ export default function UsuariosScreen({
           </div>
         )}
 
-        <div className="usuarios-search-wrap">
-          <svg className="usuarios-search-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M10 16C13.3 16 16 13.3 16 10C16 6.7 13.3 4 10 4C6.7 4 4 6.7 4 10C4 13.3 6.7 16 10 16ZM18 18L14.3 14.3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Buscar por nombre o email..."
-            className="usuarios-search-input"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="usuarios-filters-row">
+          <div className="usuarios-search-wrap">
+            <svg className="usuarios-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M10 16C13.3 16 16 13.3 16 10C16 6.7 13.3 4 10 4C6.7 4 4 6.7 4 10C4 13.3 6.7 16 10 16ZM18 18L14.3 14.3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Buscar por nombre o email..."
+              className="usuarios-search-input"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          {availableRoles.length > 1 && (
+            <RoleFilterField
+              selectedRole={selectedRole}
+              availableRoles={availableRoles}
+              open={roleDropdownOpen}
+              setOpen={setRoleDropdownOpen}
+              setSelectedRole={setSelectedRole}
+            />
+          )}
         </div>
 
         <div className="usuarios-table-wrap">
@@ -249,7 +277,7 @@ export default function UsuariosScreen({
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {loading && pageData.data.length === 0 ? (
                 <tr><td colSpan={6}>Cargando...</td></tr>
               ) : pageData.data.length === 0 ? (
                 <tr><td colSpan={6}>No se encontraron usuarios.</td></tr>
@@ -281,7 +309,7 @@ export default function UsuariosScreen({
                           <path d="M3 17.25V21H6.75L17.81 9.94L14.06 6.19L3 17.25Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </button>
-                      <button className="usuario-action-btn usuario-action-delete" title="Eliminar" type="button" onClick={() => deleteUser(usuario.id)}>
+                      <button className="usuario-action-btn usuario-action-delete" title="Eliminar" type="button" onClick={() => setUserToDelete(usuario)}>
                         <svg viewBox="0 0 24 24">
                           <path d="M6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V7H6V19ZM8 9H16V19H8V9ZM15.5 4L14.5 3H9.5L8.5 4H5V6H19V4H15.5Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
@@ -295,6 +323,77 @@ export default function UsuariosScreen({
           <Pagination page={page} totalPages={pageData.totalPages} onPageChange={setPage} />
         </div>
       </section>
+
+      {userToDelete && (
+        <div className="modal-overlay" onClick={() => setUserToDelete(null)}>
+          <div className="modal-content" style={{ maxWidth: "420px" }} onClick={e => e.stopPropagation()}>
+            <header className="modal-header">
+              <h2>Eliminar usuario</h2>
+              <button className="modal-close" type="button" onClick={() => setUserToDelete(null)}>✕</button>
+            </header>
+            <div className="modal-body-simple" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "1.75rem 1.5rem 0.75rem" }}>
+              <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(239,68,68,0.10)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "0.25rem" }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                </svg>
+              </div>
+              <p style={{ margin: "0 0 0.4rem", fontWeight: 700, fontSize: "1.05rem", width: "100%" }}>
+                ¿Eliminar a "{userToDelete.name}"?
+              </p>
+              <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--dash-text-2, #667085)", lineHeight: 1.5, width: "100%" }}>
+                Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <footer className="modal-footer">
+              <button className="btn btn-secondary" type="button" onClick={() => setUserToDelete(null)}>
+                Cancelar
+              </button>
+              <button
+                className="btn"
+                type="button"
+                style={{ background: "#ef4444", color: "#fff", border: "none" }}
+                onClick={confirmDeleteUser}
+              >
+                Sí, eliminar
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
     </>
+  );
+}
+
+function RoleFilterField({ selectedRole, availableRoles, open, setOpen, setSelectedRole }) {
+  return (
+    <div className="management-condo-field">
+      <label>Filtrar por Rol</label>
+      <div className="condo-dropdown" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false); }} tabIndex={-1}>
+        <button
+          type="button"
+          className="condo-dropdown-trigger"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+        >
+          <span className="condo-dropdown-value">{selectedRole || "— Todos —"}</span>
+          <svg className={`condo-dropdown-chevron${open ? " open" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        {open && (
+          <ul className="condo-dropdown-list" role="listbox">
+            {["", ...availableRoles].map((role) => (
+              <li
+                key={role || "todos"}
+                role="option"
+                aria-selected={selectedRole === role}
+                className={`condo-dropdown-item${selectedRole === role ? " selected" : ""}`}
+                onMouseDown={() => { setSelectedRole(role); setOpen(false); }}
+              >
+                {role || "— Todos —"}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }

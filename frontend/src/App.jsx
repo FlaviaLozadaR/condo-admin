@@ -21,9 +21,14 @@ import SuperAdminDashboardScreen from "./screens/SuperAdminDashboardScreen.jsx";
 import PerfilScreen from "./screens/PerfilScreen.jsx";
 import MisReservasScreen from "./screens/MisReservasScreen.jsx";
 import SecurityHistoryScreen from "./screens/SecurityHistoryScreen.jsx";
+import { onEnterKey } from "./utils/keyboard.js";
+import { parseFecha } from "./screens/dashboardUtils.js";
 
+const PHONE_PREFIX = "+591";
+const stripPhonePrefix = (phone) => (phone || "").replace(/^\+591[\s-]*/, "");
+const MAX_AREA_IMAGES = 6;
 
-function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode }) {
+function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: toggleDarkMode }) {
   const PANIC_ALERTS_STORAGE_KEY = "ignitel_panic_alerts";
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeSection, setActiveSection] = useState(
@@ -48,7 +53,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
   const [visitRegistrationForm, setVisitRegistrationForm] = useState({
     fullName: "",
     idNumber: "",
-    property: user.role === "Propietario" ? "Calle Principal - A-101" : "",
+    property: "",
     motive: "",
     plate: "",
     expiresAt: ""
@@ -125,7 +130,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
   const [reservasAreas, setReservasAreas] = useState([]);
   const [isCreateAreaModalOpen, setIsCreateAreaModalOpen] = useState(false);
   const [editingArea, setEditingArea] = useState(null);
-  const [areaForm, setAreaForm] = useState({ nombre: '', descripcion: '', precio: '', condo: '', imagen: null, imagenPreview: '' });
+  const [areaForm, setAreaForm] = useState({ nombre: '', descripcion: '', precio: '', condo: '', imagenesNuevas: [], imagenesExistentes: [] });
   const [areaCondoDropdownOpen, setAreaCondoDropdownOpen] = useState(false);
   const [areaFormLoading, setAreaFormLoading] = useState(false);
   const [areaFormError, setAreaFormError] = useState('');
@@ -159,6 +164,8 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
   const [residentPropId, setResidentPropId] = useState('');
   const [residentPropCode, setResidentPropCode] = useState('');
   const [residentPropStreet, setResidentPropStreet] = useState('');
+  // Propiedades donde el usuario es propietario o inquilino (pre-registro de visitas)
+  const [myProperties, setMyProperties] = useState([]);
   const [editingUser, setEditingUser] = useState(null);
   const [editRoleDropdownOpen, setEditRoleDropdownOpen] = useState(false);
   const [createRoleDropdownOpen, setCreateRoleDropdownOpen] = useState(false);
@@ -290,8 +297,9 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
   useEffect(() => {
     const loadAll = async () => {
       const safe = fn => fn().catch(() => []);
-      const isAdmin = ["Super Admin", "Administrador"].includes(user.role);
-      const isMgmt  = ["Super Admin", "Administrador", "Seguridad"].includes(user.role);
+      const isAdmin    = ["Super Admin", "Administrador"].includes(user.role);
+      const isMgmt     = ["Super Admin", "Administrador", "Seguridad"].includes(user.role);
+      const isResident = ["Propietario", "Inquilino"].includes(user.role);
 
       const [condos, usuarios, propiedades, pagos, anuncios, asambleas, visitas, historial, panic, areas, reservasAr] = await Promise.all([
         isAdmin ? safe(api.getCondominios)      : Promise.resolve([]),
@@ -301,7 +309,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
         safe(api.getAnuncios),
         safe(api.getAsambleas),
         safe(api.getVisitas),
-        isMgmt  ? safe(api.getHistorialVisitas) : Promise.resolve([]),
+        isMgmt  ? safe(api.getHistorialVisitas) : isResident ? safe(api.getMyVisitHistory) : Promise.resolve([]),
         safe(api.getPanicAlerts),
         !isMgmt || isAdmin ? safe(api.getAreasSociales)  : Promise.resolve([]),
         !isMgmt || isAdmin ? safe(api.getReservasAreas)  : Promise.resolve([]),
@@ -331,58 +339,51 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 6000);
   };
 
-  useEffect(() => {
-    if (user.role === "Seguridad") {
-      const condo = user.condo ? ` · ${user.condo}` : "";
-      setTimeout(() => addToast(`Bienvenido, ${user.name.split(" ")[0]}${condo}`, "visita"), 600);
-    }
-  }, []);
-
   // ── Utilidad PDF: abre ventana con tabla estilizada lista para imprimir ──────
-  const exportToPDF = ({ title, subtitle, headers, rows, totals }) => {
-    const win = window.open("", "_blank");
-    if (!win) { addToast("Permite ventanas emergentes para exportar PDF.", "warning"); return; }
-    const tableRows = rows.map(row =>
-      `<tr>${row.map(cell => `<td>${cell}</td>`).join("")}</tr>`
-    ).join("");
-    const totalsRow = totals
-      ? `<tfoot><tr class="totals-row">${totals.map(c => `<td>${c}</td>`).join("")}</tr></tfoot>`
-      : "";
-    win.document.write(`<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"><title>${title}</title>
-<style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Segoe UI',Arial,sans-serif;color:#0f172a;padding:2.5rem 2rem;font-size:13px}
-  .report-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:3px solid #4f57f7}
-  .report-header h1{font-size:1.35rem;color:#0f172a;font-weight:700}
-  .report-header .meta{font-size:0.78rem;color:#64748b;margin-top:0.3rem}
-  .report-header .logo{font-size:1.1rem;font-weight:800;color:#4f57f7;letter-spacing:-0.03em}
-  table{width:100%;border-collapse:collapse;margin-top:0.5rem}
-  thead th{background:#4f57f7;color:#fff;padding:0.55rem 0.75rem;text-align:left;font-weight:600;font-size:0.78rem;letter-spacing:0.03em;text-transform:uppercase}
-  tbody td{padding:0.5rem 0.75rem;border-bottom:1px solid #e2e8f0;color:#334155}
-  tbody tr:nth-child(even) td{background:#f8faff}
-  tbody tr:hover td{background:#eef2ff}
-  tfoot td{padding:0.55rem 0.75rem;font-weight:700;background:#f1f5f9;border-top:2px solid #cbd5e1}
-  .footer{margin-top:1.25rem;font-size:0.72rem;color:#94a3b8;text-align:right}
-  @media print{body{padding:1cm}.no-print{display:none}}
-</style></head>
-<body>
-  <div class="report-header">
-    <div>
-      <h1>${title}</h1>
-      <p class="meta">${subtitle}</p>
-    </div>
-    <span class="logo">Ignitel</span>
-  </div>
-  <table>
-    <thead><tr>${headers.map(h => `<th>${h}</th>`).join("")}</tr></thead>
-    <tbody>${tableRows}</tbody>
-    ${totalsRow}
-  </table>
-  <p class="footer">Total: ${rows.length} registros &nbsp;·&nbsp; ${new Date().toLocaleString("es-AR")}</p>
-  <script>setTimeout(()=>window.print(),400)</script>
-</body></html>`);
-    win.document.close();
+  const exportToPDF = async ({ title, subtitle, headers, rows, totals }) => {
+    try {
+      // jsPDF pesa ~350KB y solo se necesita al exportar — se carga bajo demanda
+      const { jsPDF }    = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
+
+      const doc = new jsPDF({ orientation: headers.length > 5 ? "landscape" : "portrait" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      doc.setFontSize(16);
+      doc.setTextColor(15, 23, 42);
+      doc.text(title, 14, 18);
+
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.text(subtitle, 14, 24);
+
+      doc.setFontSize(11);
+      doc.setTextColor(79, 87, 247);
+      doc.text("Ignitel", pageWidth - 14, 18, { align: "right" });
+
+      autoTable(doc, {
+        startY: 30,
+        head: [headers],
+        body: rows,
+        foot: totals ? [totals] : undefined,
+        styles: { fontSize: 8, cellPadding: 3, textColor: [51, 65, 85] },
+        headStyles: { fillColor: [79, 87, 247], textColor: 255, fontStyle: "bold" },
+        footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [248, 250, 255] },
+      });
+
+      const slug = title
+        .toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_|_$/g, "");
+      const date = new Date().toISOString().slice(0, 10);
+      doc.save(`${slug}_${date}.pdf`);
+      addToast(`${rows.length} registros exportados a PDF.`, "success");
+    } catch (err) {
+      console.error("Error exportando PDF:", err);
+      addToast("Error al generar el PDF.", "error");
+    }
   };
 
   // Polling en tiempo real cada 30 segundos
@@ -429,15 +430,12 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
           }
         }
 
-        // Visitas nuevas — Seguridad
+        // Visitas nuevas — Seguridad (sin toast: solo mantiene la lista al día)
         if (user.role === "Seguridad") {
           const visitas = await api.getVisitas();
           const newVisitas = visitas.filter(v => !knownVisitIdsRef.current.has(String(v.id)));
           if (newVisitas.length > 0) {
-            newVisitas.forEach(v => {
-              knownVisitIdsRef.current.add(String(v.id));
-              addToast(`Nuevo pase QR: ${v.fullName} — ${v.property}`, "visita");
-            });
+            newVisitas.forEach(v => knownVisitIdsRef.current.add(String(v.id)));
             setVisitPasses(visitas);
           }
         }
@@ -471,6 +469,13 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
 
   const clearBadge = (key) => setMenuBadges(prev => ({ ...prev, [key]: 0 }));
 
+  const handleCreateUserKeyDown = (e) => {
+    if (e.key === "Enter" && !createUserLoading) {
+      e.preventDefault();
+      handleCreateUser();
+    }
+  };
+
   const handleCreateUser = async () => {
     const { nombre, apellido, email, rol, telefono, contrasena, condoId } = newUserForm;
     if (!nombre.trim()) { setNewUserError("El nombre es obligatorio."); return; }
@@ -488,7 +493,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
       const newUser = await api.createUsuario({
         name:     fullName,
         email:    email.trim(),
-        phone:    telefono.trim(),
+        phone:    telefono.trim() ? `${PHONE_PREFIX} ${telefono.trim()}` : "",
         role:     rol,
         property: "-",
         condo,
@@ -523,7 +528,19 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
       setIsEditUserModalOpen(false);
     } catch (err) {
       console.error("Error actualizando usuario:", err.message);
+      addToast(err.message || "Error al actualizar el usuario.", "error");
     }
+  };
+
+  const handleAdminResetPassword = async () => {
+    const pw = document.getElementById("admin-reset-pw").value.trim();
+    if (!pw) return addToast("Ingresá la nueva contraseña", "warning");
+    if (pw.length < 8) return addToast("Mínimo 8 caracteres", "warning");
+    try {
+      await api.changePassword(String(editingUser.id), { newPassword: pw });
+      addToast(`Contraseña de ${editingUser.name} restablecida`, "success");
+      document.getElementById("admin-reset-pw").value = "";
+    } catch (e) { addToast(e.message, "error"); }
   };
 
   const selectedReservationCondoName =
@@ -539,6 +556,14 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
   });
 
   const residentProfile = usuariosData.find((item) => item.email === user.email) || { name: user.name, property: user.property || "-", phone: user.phone || "" };
+
+  // Refleja al instante los cambios guardados desde "Mi Perfil" — en la sesión
+  // actual (user) y en usuariosData si ya estaba cargado — para que pantallas
+  // como el Botón de Pánico no queden con el nombre/teléfono viejo hasta recargar.
+  const handleProfileUpdated = (updatedFields) => {
+    onUpdateUser?.(updatedFields);
+    setUsuariosData((prev) => prev.map((u) => (String(u.id) === String(user.id) ? { ...u, ...updatedFields } : u)));
+  };
   const residentProperty = (residentPropCode && residentPropCode !== '-')
     ? `${residentPropStreet} - ${residentPropCode}`
     : residentProfile.property || user.property || "-";
@@ -597,6 +622,12 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
           setResidentPropStreet(d.street || '');
         }
       }).catch(() => {});
+      api.getMyProperties().then(list => {
+        setMyProperties(list);
+        if (list.length > 0) {
+          setVisitRegistrationForm(prev => prev.property ? prev : { ...prev, property: list[0].label });
+        }
+      }).catch(() => {});
     }
   }, [user.role]);
 
@@ -611,18 +642,20 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
       fd.append('descripcion', areaForm.descripcion);
       fd.append('precio', areaForm.precio || '0');
       if (isSuperAdministrator && areaForm.condo) fd.append('condo', areaForm.condo);
-      if (areaForm.imagen) fd.append('imagen', areaForm.imagen);
+      areaForm.imagenesNuevas.forEach(({ file }) => fd.append('imagenes', file));
 
       if (editingArea) {
+        fd.append('imagenesActuales', JSON.stringify(areaForm.imagenesExistentes));
         const updated = await api.updateAreaSocial(editingArea.id, fd);
         setAreasSociales(prev => prev.map(a => a.id === editingArea.id ? updated : a));
       } else {
         const nueva = await api.createAreaSocial(fd);
         setAreasSociales(prev => [nueva, ...prev]);
       }
+      areaForm.imagenesNuevas.forEach(({ preview }) => URL.revokeObjectURL(preview));
       setIsCreateAreaModalOpen(false);
       setEditingArea(null);
-      setAreaForm({ nombre: '', descripcion: '', precio: '', imagen: null, imagenPreview: '' });
+      setAreaForm({ nombre: '', descripcion: '', precio: '', condo: '', imagenesNuevas: [], imagenesExistentes: [] });
     } catch (e) { setAreaFormError(e.message); }
     finally { setAreaFormLoading(false); }
   };
@@ -789,6 +822,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
       setIsCreatePropertyModalOpen(false);
     } catch (err) {
       console.error("Error creando propiedad:", err.message);
+      addToast(err.message || "Error al crear la propiedad.", "error");
     }
   };
 
@@ -813,6 +847,14 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
       setIsEditPropertyModalOpen(false);
     } catch (err) {
       console.error("Error actualizando propiedad:", err.message);
+      addToast(err.message || "Error al actualizar la propiedad.", "error");
+    }
+  };
+
+  const handleSavePropertyEditKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSavePropertyEdit();
     }
   };
 
@@ -877,6 +919,13 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
   const selectedManagementCondo = condominiosData.find((item) => item.id === selectedManagementCondoId) || null;
   const selectedManagementCondoName = selectedManagementCondo?.name || "";
 
+  const handleCreateCondoKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleCreateCondo();
+    }
+  };
+
   const handleCreateCondo = async () => {
     if (!newCondoForm.name.trim()) return;
     try {
@@ -915,6 +964,13 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
     }
   };
 
+  const handleSaveCondoEditKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSaveCondoEdit();
+    }
+  };
+
   const handleSaveCondoEdit = async () => {
     if (!editingCondo?.name?.trim()) return;
     try {
@@ -935,6 +991,17 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
   const adminCondoName = isSuperAdministrator ? selectedManagementCondoName : user.condo;
   const propietariosOptions = usuariosData.filter((u) => u.role === "Propietario" && (!adminCondoName || u.condo === adminCondoName));
   const inquilinosOptions   = usuariosData.filter((u) => u.role === "Inquilino"   && (!adminCondoName || u.condo === adminCondoName));
+
+  // Un inquilino solo puede estar asignado a una propiedad — excluye de las opciones
+  // a quienes ya son inquilinos de OTRA propiedad (excludePropertyId = la que se está editando, si aplica).
+  const getAvailableInquilinosOptions = (excludePropertyId) => {
+    const takenElsewhere = new Set(
+      propiedadesData
+        .filter((p) => !excludePropertyId || String(p.id) !== String(excludePropertyId))
+        .flatMap((p) => getPropertyTenants(p))
+    );
+    return inquilinosOptions.filter((item) => !takenElsewhere.has(item.name));
+  };
 
   const adminMenu = [
     {
@@ -998,6 +1065,15 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
       icon: (
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M6 3H14L18 7V21H6V3ZM14 3V7H18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+        </svg>
+      )
+    },
+    {
+      label: "Botón de Pánico",
+      icon: (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.8" />
+          <path d="M12 8V12M12 16H12.01" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       )
     }
@@ -1134,6 +1210,15 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
           <path d="M12 8V12L15 14M3 12C3 16.97 7.03 21 12 21C16.97 21 21 16.97 21 12C21 7.03 16.97 3 12 3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       )
+    },
+    {
+      label: "Botón de Pánico",
+      icon: (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.8" />
+          <path d="M12 8V12M12 16H12.01" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      )
     }
   ];
 
@@ -1142,6 +1227,22 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
   const isResidentRole = isOwner || isTenant;
   const isSecurity = user.role === "Seguridad";
   const menu = isOwner ? ownerMenu : isTenant ? tenantMenu : isSecurity ? securityMenu : adminMenu;
+
+  // Pases de visita de las propiedades del condominio del usuario de seguridad
+  // (filtra por las etiquetas "calle - código" de las propiedades de su condo)
+  const securityVisitPasses = (() => {
+    if (!user.condo) return visitPasses;
+    const propLabels = new Set(
+      propiedadesData.filter(p => p.condo === user.condo).map(p => `${p.street} - ${p.code}`)
+    );
+    return visitPasses.filter(v => propLabels.has(v.property));
+  })();
+
+  // "Cobrado" se reinicia cada mes — el resto de las métricas (En Mora, Morosos)
+  // queda acumulado, porque una deuda no desaparece sola al cambiar de mes.
+  const nowForDashboard  = new Date();
+  const curMonthDashboard = nowForDashboard.getMonth();
+  const curYearDashboard  = nowForDashboard.getFullYear();
 
   const superAdminDashboards = condominiosData
     .map((condo) => {
@@ -1159,8 +1260,12 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
       const approvedPayments = paymentsForCondo.filter(p => p.estado === 'aprobado');
       const pendingPayments  = paymentsForCondo.filter(p => p.estado === 'pendiente');
 
-      // Cobrado = suma de pagos aprobados
-      const collectedAmount = approvedPayments.reduce((s, p) => s + (Number(p.monto) || 0), 0);
+      // Cobrado = pagos aprobados del mes actual (se reinicia cada mes)
+      const approvedPaymentsThisMonth = approvedPayments.filter(p => {
+        const d = parseFecha(p.fecha);
+        return d && d.getMonth() === curMonthDashboard && d.getFullYear() === curYearDashboard;
+      });
+      const collectedAmount = approvedPaymentsThisMonth.reduce((s, p) => s + (Number(p.monto) || 0), 0);
 
       // Propietarios con pago aprobado (no son morosos)
       const approvedOwners = new Set(approvedPayments.map(p => p.propietario).filter(Boolean));
@@ -1190,7 +1295,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
       const owners  = new Set(propertiesForCondo.filter(p => p.owner && p.owner !== '-').map(p => p.owner));
       const tenants = new Set(propertiesForCondo.flatMap(p => getPropertyTenants(p)).filter(t => t && t !== '-'));
 
-      // Top 3 morosos
+      // Top 10 morosos
       const debtors = propertiesForCondo
         .map(p => {
           const label      = `${p.street} - ${p.code}`;
@@ -1202,7 +1307,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
         })
         .filter(d => d.debt > 0)
         .sort((a, b) => b.debt - a.debt)
-        .slice(0, 3);
+        .slice(0, 10);
 
       return {
         id:                    condo.id,
@@ -1380,6 +1485,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
             isSuperAdministrator={isSuperAdministrator}
             condominiosData={condominiosData}
             propiedadesData={propiedadesData}
+            setPropiedadesData={setPropiedadesData}
             selectedManagementCondoId={selectedManagementCondoId}
             setSelectedManagementCondoId={setSelectedManagementCondoId}
             selectedManagementCondoName={selectedManagementCondoName}
@@ -1394,6 +1500,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
             user={user}
             isSuperAdministrator={isSuperAdministrator}
             condominiosData={condominiosData}
+            propiedadesData={propiedadesData}
             historialVisitasData={historialVisitasData}
             onToast={addToast}
             exportToPDF={exportToPDF}
@@ -1457,6 +1564,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
             setProfilePhoto={setProfilePhoto}
             isDarkMode={isDarkMode}
             toggleDarkMode={toggleDarkMode}
+            onProfileUpdated={handleProfileUpdated}
           />
         ) : activeSection === "Mis Pagos" && !isTenant ? (
           <OwnerPaymentsScreen
@@ -1486,6 +1594,8 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
             pagosData={pagosData}
             historialVisitasData={historialVisitasData}
             visitPasses={visitPasses}
+            panicAlerts={panicAlerts}
+            setActiveSection={setActiveSection}
             exportToPDF={exportToPDF}
             onToast={addToast}
           />
@@ -1501,23 +1611,22 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
             visitPasses={visitPasses}
             setVisitPasses={setVisitPasses}
             setSelectedVisitPassId={setSelectedVisitPassId}
+            setHistorialVisitasData={setHistorialVisitasData}
             propiedadesData={propiedadesData}
+            onToast={addToast}
           />
         ) : activeSection === "Escanear QR" ? (
           <QrScannerScreen
-            visitPasses={user.condo
-              ? visitPasses.filter(v => v.property?.toLowerCase().includes(user.condo.toLowerCase()))
-              : visitPasses}
+            visitPasses={securityVisitPasses}
             setVisitPasses={setVisitPasses}
             selectedVisitPassId={selectedVisitPassId}
             setSelectedVisitPassId={setSelectedVisitPassId}
             historialVisitas={historialVisitasData}
             setHistorialVisitas={setHistorialVisitasData}
             guardName={user.name}
-            onToast={addToast}
           />
         ) : activeSection === "Historial" ? (
-          <SecurityHistoryScreen visitPasses={visitPasses} />
+          <SecurityHistoryScreen visitPasses={visitPasses} setVisitPasses={setVisitPasses} historialVisitasData={historialVisitasData} onToast={addToast} />
         ) : activeSection === "Pre-registro Visitas" ? (
           <PreRegisterVisitsScreen
             user={user}
@@ -1533,10 +1642,13 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
             setSelectedVisitPassId={setSelectedVisitPassId}
             historialVisitasData={historialVisitasData}
             setHistorialVisitasData={setHistorialVisitasData}
+            myProperties={myProperties}
           />
         ) : activeSection === "Botón de Pánico" ? (
           <PanicScreen
             user={user}
+            isSuperAdministrator={isSuperAdministrator}
+            condominiosData={condominiosData}
             panicAlerts={panicAlerts}
             setPanicAlerts={setPanicAlerts}
             residentProfile={residentProfile}
@@ -1567,7 +1679,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
       )}
 
       {isCreateUserModalOpen && (
-        <div className="modal-overlay" onClick={() => { setIsCreateUserModalOpen(false); setNewUserError(""); setNewUserSuccess(null); }}>
+        <div className="modal-overlay">
           <div className="modal-content modal-edit-user" onClick={(e) => e.stopPropagation()}>
             <header className="modal-header">
               <h2>{newUserSuccess ? "Usuario registrado" : "Registrar Usuario"}</h2>
@@ -1615,6 +1727,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                     type="text"
                     value={newUserForm.nombre}
                     onChange={(e) => setNewUserForm({ ...newUserForm, nombre: e.target.value })}
+                    onKeyDown={handleCreateUserKeyDown}
                     placeholder="Ej: Juan"
                     autoFocus
                   />
@@ -1625,6 +1738,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                     type="text"
                     value={newUserForm.apellido}
                     onChange={(e) => setNewUserForm({ ...newUserForm, apellido: e.target.value })}
+                    onKeyDown={handleCreateUserKeyDown}
                     placeholder="Ej: Pérez"
                   />
                 </div>
@@ -1636,6 +1750,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                   type="email"
                   value={newUserForm.email}
                   onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
+                  onKeyDown={handleCreateUserKeyDown}
                   placeholder="usuario@ejemplo.com"
                 />
               </div>
@@ -1674,12 +1789,16 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                 )}
                 <div className="form-group-simple">
                   <label>Teléfono</label>
-                  <input
-                    type="text"
-                    value={newUserForm.telefono}
-                    onChange={(e) => setNewUserForm({ ...newUserForm, telefono: e.target.value })}
-                    placeholder="Ej: 0991234567"
-                  />
+                  <div className="phone-input-group">
+                    <span className="phone-input-prefix">{PHONE_PREFIX}</span>
+                    <input
+                      type="text"
+                      value={newUserForm.telefono}
+                      onChange={(e) => setNewUserForm({ ...newUserForm, telefono: e.target.value })}
+                      onKeyDown={handleCreateUserKeyDown}
+                      placeholder="Ej: 69444833"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1693,7 +1812,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                     border: "1px solid rgba(99,102,241,0.25)",
                     fontSize: "0.88rem",
                     fontWeight: 600,
-                    color: "var(--text-main)",
+                    color: "var(--dash-text)",
                     display: "flex",
                     alignItems: "center",
                     gap: "0.5rem"
@@ -1760,6 +1879,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                     type="text"
                     value={newUserForm.contrasena}
                     onChange={(e) => setNewUserForm({ ...newUserForm, contrasena: e.target.value })}
+                    onKeyDown={handleCreateUserKeyDown}
                     placeholder="Contraseña temporal"
                     autoComplete="new-password"
                     style={{ paddingRight: "3rem", fontFamily: "monospace", letterSpacing: "0.05em" }}
@@ -1804,6 +1924,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                   type="text"
                   value={editingUser.name}
                   onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                  onKeyDown={onEnterKey(handleSaveUserEdit)}
                 />
               </div>
 
@@ -1813,16 +1934,21 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                   type="email"
                   value={editingUser.email}
                   onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                  onKeyDown={onEnterKey(handleSaveUserEdit)}
                 />
               </div>
 
               <div className="form-group-simple">
                 <label>Teléfono</label>
-                <input
-                  type="text"
-                  value={editingUser.phone}
-                  onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
-                />
+                <div className="phone-input-group">
+                  <span className="phone-input-prefix">{PHONE_PREFIX}</span>
+                  <input
+                    type="text"
+                    value={stripPhonePrefix(editingUser.phone)}
+                    onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value.trim() ? `${PHONE_PREFIX} ${e.target.value}` : "" })}
+                    onKeyDown={onEnterKey(handleSaveUserEdit)}
+                  />
+                </div>
               </div>
 
               <div className="form-group-simple">
@@ -1839,7 +1965,10 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                   </button>
                   {editRoleDropdownOpen && (
                     <ul className="condo-dropdown-list" role="listbox">
-                      {["Super Admin", "Administrador", "Propietario", "Inquilino", "Seguridad"].map((role) => (
+                      {(isSuperAdministrator
+                        ? ["Super Admin", "Administrador", "Propietario", "Inquilino", "Seguridad"]
+                        : ["Propietario", "Inquilino", "Seguridad"]
+                      ).map((role) => (
                         <li
                           key={role}
                           role="option"
@@ -1864,6 +1993,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                     id="admin-reset-pw"
                     placeholder="Nueva contraseña (mín. 8 caracteres)"
                     style={{ fontFamily: "monospace", letterSpacing: "0.05em", flex: 1 }}
+                    onKeyDown={onEnterKey(handleAdminResetPassword)}
                   />
                   <button
                     type="button"
@@ -1876,16 +2006,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                   type="button"
                   className="btn btn-secondary"
                   style={{ marginTop: "0.5rem", width: "100%" }}
-                  onClick={async () => {
-                    const pw = document.getElementById("admin-reset-pw").value.trim();
-                    if (!pw) return addToast("Ingresá la nueva contraseña", "warning");
-                    if (pw.length < 8) return addToast("Mínimo 8 caracteres", "warning");
-                    try {
-                      await api.changePassword(String(editingUser.id), { newPassword: pw });
-                      addToast(`Contraseña de ${editingUser.name} restablecida`, "success");
-                      document.getElementById("admin-reset-pw").value = "";
-                    } catch (e) { addToast(e.message, "error"); }
-                  }}
+                  onClick={handleAdminResetPassword}
                 >
                   Guardar nueva contraseña
                 </button>
@@ -1928,6 +2049,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                     placeholder="Ej: Torre Norte"
                     value={newCondoForm.name}
                     onChange={(e) => setNewCondoForm({ ...newCondoForm, name: e.target.value })}
+                    onKeyDown={handleCreateCondoKeyDown}
                     autoFocus
                   />
                 </div>
@@ -1939,6 +2061,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                   placeholder="Ej: Av. Principal 123, Ciudad"
                   value={newCondoForm.address}
                   onChange={(e) => setNewCondoForm({ ...newCondoForm, address: e.target.value })}
+                  onKeyDown={handleCreateCondoKeyDown}
                 />
               </div>
             </div>
@@ -1972,11 +2095,11 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
               </div>
               <div className="form-group-simple">
                 <label>Nombre <span style={{ color: "var(--danger)" }}>*</span></label>
-                <input type="text" value={editingCondo.name} onChange={e => setEditingCondo({ ...editingCondo, name: e.target.value })} placeholder="Ej: Torre Norte" />
+                <input type="text" value={editingCondo.name} onChange={e => setEditingCondo({ ...editingCondo, name: e.target.value })} onKeyDown={handleSaveCondoEditKeyDown} placeholder="Ej: Torre Norte" autoFocus />
               </div>
               <div className="form-group-simple">
                 <label>Dirección</label>
-                <input type="text" value={editingCondo.address || ""} onChange={e => setEditingCondo({ ...editingCondo, address: e.target.value })} placeholder="Ej: Av. Principal 123" />
+                <input type="text" value={editingCondo.address || ""} onChange={e => setEditingCondo({ ...editingCondo, address: e.target.value })} onKeyDown={handleSaveCondoEditKeyDown} placeholder="Ej: Av. Principal 123" />
               </div>
             </div>
             <footer className="modal-footer">
@@ -1995,16 +2118,16 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
               <h2>Eliminar condominio</h2>
               <button className="modal-close" type="button" onClick={() => { setIsDeleteCondoConfirmOpen(false); setCondoToDelete(null); }}>✕</button>
             </header>
-            <div className="modal-body-simple" style={{ textAlign: "center", padding: "1.75rem 1.5rem 0.75rem" }}>
-              <div style={{ width: 52, height: 52, borderRadius: "50%", background: "rgba(239,68,68,0.10)", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: "1rem" }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <div className="modal-body-simple" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "1.75rem 1.5rem 0.75rem" }}>
+              <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(239,68,68,0.10)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "0.25rem" }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
                 </svg>
               </div>
-              <p style={{ margin: "0 0 0.4rem", fontWeight: 700, fontSize: "1.05rem" }}>
+              <p style={{ margin: "0 0 0.4rem", fontWeight: 700, fontSize: "1.05rem", width: "100%" }}>
                 ¿Eliminar "{condoToDelete.name}"?
               </p>
-              <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--dash-text-2, #667085)", lineHeight: 1.5 }}>
+              <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--dash-text-2, #667085)", lineHeight: 1.5, width: "100%" }}>
                 Esta acción no se puede deshacer. Se eliminarán todos los datos asociados.
               </p>
             </div>
@@ -2085,6 +2208,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                           placeholder="Nombre de la calle"
                           value={createPropertyForm.calle}
                           onChange={(e) => setCreatePropertyForm({ ...createPropertyForm, calle: e.target.value })}
+                          onKeyDown={onEnterKey(handleCreateProperty)}
                         />
                       </div>
                       <div className="form-group-simple">
@@ -2094,6 +2218,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                           placeholder="Ej: A-101"
                           value={createPropertyForm.numero}
                           onChange={(e) => setCreatePropertyForm({ ...createPropertyForm, numero: e.target.value })}
+                          onKeyDown={onEnterKey(handleCreateProperty)}
                         />
                       </div>
                     </div>
@@ -2105,6 +2230,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                           placeholder="Ej: A"
                           value={createPropertyForm.bloque}
                           onChange={(e) => setCreatePropertyForm({ ...createPropertyForm, bloque: e.target.value })}
+                          onKeyDown={onEnterKey(handleCreateProperty)}
                         />
                       </div>
                     )}
@@ -2182,7 +2308,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                             >
                               Seleccionar inquilino
                             </li>
-                            {inquilinosOptions
+                            {getAvailableInquilinosOptions()
                               .filter(item => !createPropertyForm.inquilinos.includes(item.name) || item.name === inquilino)
                               .map((item) => (
                                 <li
@@ -2231,6 +2357,8 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                   type="text"
                   value={editingPropertyForm.calle}
                   onChange={(e) => setEditingPropertyForm({ ...editingPropertyForm, calle: e.target.value })}
+                  onKeyDown={handleSavePropertyEditKeyDown}
+                  autoFocus
                 />
               </div>
 
@@ -2240,6 +2368,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                   type="text"
                   value={editingPropertyForm.numero}
                   onChange={(e) => setEditingPropertyForm({ ...editingPropertyForm, numero: e.target.value })}
+                  onKeyDown={handleSavePropertyEditKeyDown}
                 />
               </div>
 
@@ -2249,6 +2378,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                   type="text"
                   value={editingPropertyForm.bloque}
                   onChange={(e) => setEditingPropertyForm({ ...editingPropertyForm, bloque: e.target.value })}
+                  onKeyDown={handleSavePropertyEditKeyDown}
                 />
               </div>
 
@@ -2316,7 +2446,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                               onMouseDown={() => { updateEditTenantField(index, ""); setEditTenantDropdownOpenIdx(null); }}>
                               Seleccionar inquilino
                             </li>
-                            {inquilinosOptions
+                            {getAvailableInquilinosOptions(editingPropertyForm.id)
                               .filter(item => !editingPropertyForm.inquilinos.includes(item.name) || item.name === inquilino)
                               .map((item) => (
                                 <li key={item.id} role="option" aria-selected={inquilino === item.name}
@@ -2343,6 +2473,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                   min="0"
                   value={editingPropertyForm.deuda}
                   onChange={(e) => setEditingPropertyForm({ ...editingPropertyForm, deuda: e.target.value })}
+                  onKeyDown={handleSavePropertyEditKeyDown}
                 />
               </div>
             </div>
@@ -2396,7 +2527,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
               )}
               <div className="form-group-simple">
                 <label>Nombre *</label>
-                <input type="text" placeholder="Ej: Salón de eventos" value={areaForm.nombre} onChange={e => setAreaForm(f => ({...f, nombre: e.target.value}))} autoFocus />
+                <input type="text" placeholder="Ej: Salón de eventos" value={areaForm.nombre} onChange={e => setAreaForm(f => ({...f, nombre: e.target.value}))} onKeyDown={onEnterKey(handleSaveArea, areaFormLoading)} autoFocus />
               </div>
               <div className="form-group-simple">
                 <label>Descripción</label>
@@ -2404,19 +2535,37 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
               </div>
               <div className="form-group-simple">
                 <label>Precio por reserva (Bs.) <span style={{color:'#9ca3af',fontWeight:400}}>— dejar en 0 si es gratuito</span></label>
-                <input type="number" min="0" placeholder="0" value={areaForm.precio} onChange={e => setAreaForm(f => ({...f, precio: e.target.value}))} />
+                <input type="number" min="0" placeholder="0" value={areaForm.precio} onChange={e => setAreaForm(f => ({...f, precio: e.target.value}))} onKeyDown={onEnterKey(handleSaveArea, areaFormLoading)} />
               </div>
               <div className="form-group-simple">
-                <label>Imagen {editingArea ? '(opcional — reemplaza la actual)' : '(opcional)'}</label>
-                {areaForm.imagenPreview && <img src={areaForm.imagenPreview} alt="preview" style={{width:'100%',borderRadius:8,marginBottom:'0.5rem',maxHeight:160,objectFit:'cover'}} />}
-                <label style={{display:'flex',alignItems:'center',gap:'0.5rem',cursor:'pointer',padding:'0.5rem 0.75rem',border:'1px dashed #d1d5db',borderRadius:8,background:'#f9fafb',fontSize:'0.85rem',color:'#6b7280'}}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:16,height:16}}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                  {areaForm.imagen ? areaForm.imagen.name : 'Seleccionar imagen'}
-                  <input type="file" accept="image/*" style={{display:'none'}} onChange={e => {
-                    const file = e.target.files?.[0];
-                    if (file) setAreaForm(f => ({...f, imagen: file, imagenPreview: URL.createObjectURL(file)}));
-                  }} />
-                </label>
+                <label>Fotos (opcional, máx. {MAX_AREA_IMAGES})</label>
+                <div className="area-form-images-grid">
+                  {areaForm.imagenesExistentes.map((url) => (
+                    <div key={url} className="area-form-image-thumb">
+                      <img src={url} alt="Foto del área" />
+                      <button type="button" className="area-form-image-remove" title="Quitar foto" onClick={() => setAreaForm(f => ({...f, imagenesExistentes: f.imagenesExistentes.filter(u => u !== url)}))}>✕</button>
+                    </div>
+                  ))}
+                  {areaForm.imagenesNuevas.map((img, idx) => (
+                    <div key={img.preview} className="area-form-image-thumb">
+                      <img src={img.preview} alt="Foto nueva" />
+                      <button type="button" className="area-form-image-remove" title="Quitar foto" onClick={() => { URL.revokeObjectURL(img.preview); setAreaForm(f => ({...f, imagenesNuevas: f.imagenesNuevas.filter((_, i) => i !== idx)})); }}>✕</button>
+                    </div>
+                  ))}
+                  {(areaForm.imagenesExistentes.length + areaForm.imagenesNuevas.length) < MAX_AREA_IMAGES && (
+                    <label className="area-form-image-add">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      <span>Agregar</span>
+                      <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={e => {
+                        const files = Array.from(e.target.files || []);
+                        const remaining = MAX_AREA_IMAGES - (areaForm.imagenesExistentes.length + areaForm.imagenesNuevas.length);
+                        const nuevas = files.slice(0, remaining).map(file => ({ file, preview: URL.createObjectURL(file) }));
+                        setAreaForm(f => ({...f, imagenesNuevas: [...f.imagenesNuevas, ...nuevas]}));
+                        e.target.value = '';
+                      }} />
+                    </label>
+                  )}
+                </div>
               </div>
               {areaFormError && <p style={{color:'var(--danger)',fontSize:'0.85rem',margin:0}}>{areaFormError}</p>}
             </div>
@@ -2485,6 +2634,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                   placeholder="Ej: Corte de agua"
                   value={newAnnouncementForm.title}
                   onChange={(e) => setNewAnnouncementForm({ ...newAnnouncementForm, title: e.target.value })}
+                  onKeyDown={onEnterKey(handleCreateAnnouncement, createAnnouncementLoading)}
                 />
               </div>
 
@@ -2579,7 +2729,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
 
               <div className="form-group-simple">
                 <label>Título</label>
-                <input type="text" value={editingAnuncio.title} onChange={(e) => setEditingAnuncio({ ...editingAnuncio, title: e.target.value })} />
+                <input type="text" value={editingAnuncio.title} onChange={(e) => setEditingAnuncio({ ...editingAnuncio, title: e.target.value })} onKeyDown={onEnterKey(handleSaveAnuncioEdit)} />
               </div>
               <div className="form-group-simple">
                 <label>Mensaje</label>
@@ -2738,6 +2888,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                   placeholder="Ej: Renovación de entrada principal"
                   value={newAsambleaForm.title}
                   onChange={(e) => setNewAsambleaForm({ ...newAsambleaForm, title: e.target.value })}
+                  onKeyDown={onEnterKey(handleCreateAsamblea, createAsambleaLoading)}
                 />
               </div>
 
@@ -2758,6 +2909,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                     type="date"
                     value={newAsambleaForm.startDate}
                     onChange={(e) => setNewAsambleaForm({ ...newAsambleaForm, startDate: e.target.value })}
+                    onKeyDown={onEnterKey(handleCreateAsamblea, createAsambleaLoading)}
                   />
                 </div>
                 <div className="form-group-simple">
@@ -2767,6 +2919,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                     value={newAsambleaForm.dueDate}
                     min={newAsambleaForm.startDate || undefined}
                     onChange={(e) => setNewAsambleaForm({ ...newAsambleaForm, dueDate: e.target.value })}
+                    onKeyDown={onEnterKey(handleCreateAsamblea, createAsambleaLoading)}
                   />
                 </div>
               </div>
@@ -2819,6 +2972,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                   type="text"
                   value={editAsambleaForm.title}
                   onChange={(e) => setEditAsambleaForm({ ...editAsambleaForm, title: e.target.value })}
+                  onKeyDown={onEnterKey(handleEditAsamblea)}
                 />
               </div>
 
@@ -2838,6 +2992,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                     type="date"
                     value={editAsambleaForm.startDate}
                     onChange={(e) => setEditAsambleaForm({ ...editAsambleaForm, startDate: e.target.value })}
+                    onKeyDown={onEnterKey(handleEditAsamblea)}
                   />
                 </div>
                 <div className="form-group-simple">
@@ -2847,6 +3002,7 @@ function Dashboard({ user, onLogout, isDarkMode, onToggleDark: toggleDarkMode })
                     value={editAsambleaForm.dueDate}
                     min={editAsambleaForm.startDate || undefined}
                     onChange={(e) => setEditAsambleaForm({ ...editAsambleaForm, dueDate: e.target.value })}
+                    onKeyDown={onEnterKey(handleEditAsamblea)}
                   />
                 </div>
               </div>
@@ -2947,6 +3103,7 @@ export default function App() {
     return (
       <Dashboard
         user={sessionUser}
+        onUpdateUser={(patch) => setSessionUser((prev) => (prev ? { ...prev, ...patch } : prev))}
         isDarkMode={isDarkMode}
         onToggleDark={toggleDarkMode}
         onLogout={() => {

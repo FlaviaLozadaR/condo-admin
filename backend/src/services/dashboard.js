@@ -94,11 +94,12 @@ function computeDashboard(user, db) {
   }
 
   if (user.role === 'Administrador') {
-    const condo   = user.condo || '';
-    const cProps  = propiedades.filter(p => !condo || p.condo === condo || p.street === condo);
-    const cPagos  = pagos.filter(p => !condo || (p.propiedad || '').toLowerCase().includes(condo.toLowerCase()));
-    const cVisitas = visitas.filter(v => !condo || (v.property || '').toLowerCase().includes(condo.toLowerCase()));
-    const cHistorial = historialVisitas.filter(h => !condo || (h.propiedad || '').toLowerCase().includes(condo.toLowerCase()));
+    // propiedades/pagos/visitas/historialVisitas ya vienen acotados a su
+    // propio condominio desde el backend (getDataForDashboard).
+    const cProps      = propiedades;
+    const cPagos      = pagos;
+    const cVisitas    = visitas;
+    const cHistorial  = historialVisitas;
     const collected = cPagos.filter(p => p.estado === 'aprobado').reduce((s, p) => s + Number(p.monto || 0), 0);
     const totalDebt = cProps.reduce((s, p) => s + Number(p.debt || 0), 0);
     const topDebtors = [...cProps]

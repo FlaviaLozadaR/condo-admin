@@ -18,6 +18,10 @@ const fs        = require('fs');
 
 const app = express();
 
+// Detrás de un solo proxy inverso (Render/Heroku/etc.) — sin esto, el rate
+// limiter ve la IP del proxy para todos los usuarios en vez de la real.
+app.set('trust proxy', 1);
+
 // ── Security headers ───────────────────────────────────────────
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },

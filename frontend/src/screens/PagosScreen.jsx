@@ -1,8 +1,11 @@
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import * as api from "../api.js";
 import Pagination from "../components/Pagination.jsx";
+import { getPropertyTenantsText, propertyHasTenant } from "../utils/tenants.js";
+import { parseFecha } from "./dashboardUtils.js";
 
 const PAGE_SIZE = 20;
+const MESES_LARGOS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 export default function PagosScreen({
   user,
@@ -22,6 +25,8 @@ export default function PagosScreen({
   const [paymentCondoFilter, setPaymentCondoFilter] = useState("todos");
   const [paymentSearchTerm, setPaymentSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [exportMonthsFilter, setExportMonthsFilter] = useState(new Set());
+  const [exportMonthsDropdownOpen, setExportMonthsDropdownOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [pageData, setPageData] = useState({
     data: [], total: 0,
@@ -35,12 +40,15 @@ export default function PagosScreen({
   const [reviewCumplio, setReviewCumplio] = useState(null); // 'si' | 'no'
   const [reviewMontoReal, setReviewMontoReal] = useState('');
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [confirmPrompt, setConfirmPrompt] = useState(null); // { message, onAccept }
 
   // Panel QR de pago
   const [qrUploadLoading, setQrUploadLoading] = useState(false);
   const [qrUploadMsg, setQrUploadMsg] = useState('');
   const [qrSelectedCondoId, setQrSelectedCondoId] = useState('');
   const [qrCondoDropdownOpen, setQrCondoDropdownOpen] = useState(false);
+  const [qrZoomOpen, setQrZoomOpen] = useState(false);
+  const [comprobanteZoomUrl, setComprobanteZoomUrl] = useState(null);
 
   // Panel gestión de expensas
   const [expensasInputVal, setExpensasInputVal] = useState('');
@@ -89,6 +97,43 @@ export default function PagosScreen({
   const approvedPaymentsTotal = pageData.approvedPaymentsTotal;
   const totalPaymentsCount    = pageData.totalPendientes + pageData.totalAprobados + pageData.totalRechazados;
 
+  // Meses disponibles para exportar — derivados de las fechas reales de los pagos,
+  // desde el primer pago registrado hasta el más reciente.
+  const exportMonthOptions = (() => {
+    const map = new Map();
+    pagosData.forEach((p) => {
+      const d = parseFecha(p.fecha);
+      if (!d || isNaN(d)) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (!map.has(key)) map.set(key, { key, year: d.getFullYear(), month: d.getMonth(), label: `${MESES_LARGOS[d.getMonth()]} ${d.getFullYear()}` });
+    });
+    return Array.from(map.values()).sort((a, b) => (b.year - a.year) || (b.month - a.month));
+  })();
+
+  const toggleExportMonth = (key) => {
+    setExportMonthsFilter((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+  const toggleAllExportMonths = () => {
+    setExportMonthsFilter((prev) =>
+      prev.size === exportMonthOptions.length ? new Set() : new Set(exportMonthOptions.map((o) => o.key))
+    );
+  };
+
+  const condoByPropLabel = new Map(propiedadesData.map((p) => [`${p.street} - ${p.code}`, p.condo]));
+  const resolveCondoDePago = (p) =>
+    condoByPropLabel.get(p.propiedad) || propiedadesData.find((pr) => pr.owner === p.propietario)?.condo || "";
+
+  const fmtRegistrado = (iso) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    return `${d.toLocaleDateString("es-AR")} ${d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}`;
+  };
+
   const handleExportPagos = async (format) => {
     const query = paymentSearchTerm.toLowerCase().trim();
     const toExport = pagosData.filter((item) => {
@@ -100,36 +145,113 @@ export default function PagosScreen({
         item.propietario.toLowerCase().includes(query) ||
         item.fecha.toLowerCase().includes(query) ||
         item.tipo.toLowerCase().includes(query);
-      return byCondo && byTab && byQuery;
-    });
-    if (toExport.length === 0) { onToast?.("No hay pagos para exportar.", "warning"); return; }
+      const byMonth = exportMonthsFilter.size === 0 || (() => {
+        const d = parseFecha(item.fecha);
+        if (!d || isNaN(d)) return false;
+        return exportMonthsFilter.has(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+      })();
+      return byCondo && byTab && byQuery && byMonth;
+    }).sort((a, b) => (parseFecha(a.fecha) || 0) - (parseFecha(b.fecha) || 0));
+
+    if (toExport.length === 0) { onToast?.("No hay pagos para exportar con los filtros seleccionados.", "warning"); return; }
+
     const date  = new Date().toISOString().slice(0, 10);
     const label = paymentTab === "todos" ? "todos" : paymentTab;
-    const totalMonto = toExport.reduce((s, p) => s + (Number(p.monto) || 0), 0);
+    const periodoLabel = exportMonthsFilter.size === 0
+      ? "Todos los periodos"
+      : `Periodo: ${exportMonthOptions.filter((o) => exportMonthsFilter.has(o.key)).map((o) => o.label).join(", ")}`;
+
+    const totalMonto     = toExport.reduce((s, p) => s + (Number(p.monto) || 0), 0);
+    const aprobados      = toExport.filter((p) => p.estado === "aprobado");
+    const pendientes     = toExport.filter((p) => p.estado === "pendiente");
+    const rechazados     = toExport.filter((p) => p.estado === "rechazado");
+    const totalAprobado  = aprobados.reduce((s, p) => s + (Number(p.monto) || 0), 0);
 
     if (format === "excel") {
       // xlsx se carga bajo demanda: pesa ~400KB y solo se necesita al exportar
       const XLSX = await import("xlsx");
-      const ws = XLSX.utils.json_to_sheet(toExport.map(p => ({
-        Propiedad:   p.propiedad,
-        Propietario: p.propietario,
-        Tipo:        p.tipo,
-        "Monto (Bs.)": p.monto,
-        Fecha:       p.fecha,
-        Estado:      p.estado,
+
+      const ws = XLSX.utils.json_to_sheet(toExport.map((p) => ({
+        Condominio:      resolveCondoDePago(p) || "—",
+        Propiedad:       p.propiedad,
+        Unidad:          p.unit || "—",
+        Propietario:     p.propietario,
+        Tipo:            p.tipo,
+        "Monto (Bs.)":   Number(p.monto) || 0,
+        Fecha:           p.fecha,
+        Vencimiento:     p.dueDate || "—",
+        Estado:          p.estado,
+        Referencia:      p.referencia || "—",
+        Comprobante:     p.comprobante ? "Sí" : "No",
+        "Registrado el": fmtRegistrado(p.insertedAt),
       })));
-      ws["!cols"] = [{ wch: 30 }, { wch: 22 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 12 }];
+      ws["!cols"] = [
+        { wch: 22 }, { wch: 26 }, { wch: 10 }, { wch: 22 }, { wch: 12 },
+        { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 18 },
+      ];
+
+      // Resumen por mes — para que de un vistazo se vea lo cobrado de cada periodo
+      const resumenPorMes = new Map();
+      toExport.forEach((p) => {
+        const d   = parseFecha(p.fecha);
+        const key = d && !isNaN(d) ? `${MESES_LARGOS[d.getMonth()]} ${d.getFullYear()}` : "Sin fecha";
+        if (!resumenPorMes.has(key)) {
+          resumenPorMes.set(key, { mes: key, cantidad: 0, aprobados: 0, pendientes: 0, rechazados: 0, montoAprobado: 0, montoTotal: 0 });
+        }
+        const r = resumenPorMes.get(key);
+        r.cantidad++;
+        r.montoTotal += Number(p.monto) || 0;
+        if (p.estado === "aprobado") { r.aprobados++; r.montoAprobado += Number(p.monto) || 0; }
+        else if (p.estado === "pendiente") r.pendientes++;
+        else if (p.estado === "rechazado") r.rechazados++;
+      });
+      const wsResumen = XLSX.utils.json_to_sheet([
+        ...Array.from(resumenPorMes.values()).map((r) => ({
+          Mes: r.mes,
+          "Cantidad de pagos": r.cantidad,
+          Aprobados: r.aprobados,
+          Pendientes: r.pendientes,
+          Rechazados: r.rechazados,
+          "Monto cobrado (Bs.)": r.montoAprobado,
+          "Monto total (Bs.)": r.montoTotal,
+        })),
+        {
+          Mes: "TOTAL",
+          "Cantidad de pagos": toExport.length,
+          Aprobados: aprobados.length,
+          Pendientes: pendientes.length,
+          Rechazados: rechazados.length,
+          "Monto cobrado (Bs.)": totalAprobado,
+          "Monto total (Bs.)": totalMonto,
+        },
+      ]);
+      wsResumen["!cols"] = [{ wch: 18 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 16 }];
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Pagos");
+      XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
       XLSX.writeFile(wb, `pagos_${label}_${date}.xlsx`);
       onToast?.(`${toExport.length} pagos exportados a Excel.`, "success");
     } else {
       exportToPDF({
         title:    `Reporte de Pagos — ${label.charAt(0).toUpperCase() + label.slice(1)}`,
-        subtitle: `Generado el ${new Date().toLocaleDateString("es-AR")} · ${toExport.length} registros`,
-        headers:  ["Propiedad", "Propietario", "Tipo", "Monto", "Fecha", "Estado"],
-        rows:     toExport.map(p => [p.propiedad, p.propietario, p.tipo, `Bs. ${p.monto}`, p.fecha, p.estado]),
-        totals:   ["", "", "", `Total: Bs. ${totalMonto.toLocaleString("es-AR")}`, "", ""],
+        subtitle: `Generado el ${new Date().toLocaleDateString("es-AR")} · ${toExport.length} registros · ${periodoLabel}`,
+        headers:  ["Condominio", "Propiedad", "Unidad", "Propietario", "Tipo", "Monto", "Fecha", "Vencimiento", "Estado", "Referencia", "Comprobante", "Registrado el"],
+        rows:     toExport.map((p) => [
+          resolveCondoDePago(p) || "—",
+          p.propiedad,
+          p.unit || "—",
+          p.propietario,
+          p.tipo,
+          `Bs. ${Number(p.monto) || 0}`,
+          p.fecha,
+          p.dueDate || "—",
+          p.estado,
+          p.referencia || "—",
+          p.comprobante ? "Sí" : "No",
+          fmtRegistrado(p.insertedAt),
+        ]),
+        totals: ["", "", "", "", "", `Bs. ${totalMonto.toLocaleString("es-AR")}`, "", "", "", "", "", ""],
       });
     }
   };
@@ -211,16 +333,18 @@ export default function PagosScreen({
     }
   };
 
-  const handleRevisarPago = async (pago) => {
-    if (!reviewCumplio) return;
+  const getExpensaTotal = (pago) => {
+    const prop = propiedadesData.find(p => p.owner === pago.propietario || propertyHasTenant(p, pago.propietario));
+    return (Number(prop?.expensaMensual) || 0) + (Number(prop?.cargoExtra) || 0) || Number(pago.monto) || 0;
+  };
+
+  const handleRevisarPago = async (pago, cumplio) => {
+    if (!cumplio) return;
     setReviewLoading(true);
     try {
-      const expensaTotal = (() => {
-        const prop = propiedadesData.find(p => p.owner === pago.propietario || p.tenant === pago.propietario);
-        return (Number(prop?.expensaMensual) || 0) + (Number(prop?.cargoExtra) || 0) || Number(pago.monto) || 0;
-      })();
+      const expensaTotal = getExpensaTotal(pago);
 
-      if (reviewCumplio === 'si') {
+      if (cumplio === 'si') {
         await api.updatePagoStatus(String(pago.id), 'aprobado');
         setPagosData(prev => prev.map(item => String(item.id) === String(pago.id) ? { ...item, estado: 'aprobado' } : item));
         setPageData(prev => ({ ...prev, data: prev.data.map(item => String(item.id) === String(pago.id) ? { ...item, estado: 'aprobado' } : item) }));
@@ -243,6 +367,38 @@ export default function PagosScreen({
     }
   };
 
+  const closeReviewModal = () => {
+    setReviewingPagoId(null);
+    setReviewCumplio(null);
+    setReviewMontoReal('');
+  };
+
+  const askConfirm = (message, onAccept) => setConfirmPrompt({ message, onAccept });
+
+  const handleClickSiCumplio = (pago) => {
+    const total = getExpensaTotal(pago);
+    askConfirm(
+      `¿Confirmás que ${pago.propietario} cumplió con el pago completo de Bs. ${total.toLocaleString()}?`,
+      () => handleRevisarPago(pago, 'si')
+    );
+  };
+
+  const handleClickNoCumplio = (pago) => {
+    askConfirm(
+      `¿Confirmás que ${pago.propietario} NO cumplió con el pago completo? Vas a poder indicar cuánto pagó realmente.`,
+      () => { setReviewCumplio('no'); setReviewMontoReal(''); }
+    );
+  };
+
+  const handleConfirmNoCumplio = (pago) => {
+    const montoReal = Math.max(0, parseFloat(reviewMontoReal) || 0);
+    const saldo      = Math.max(0, getExpensaTotal(pago) - montoReal);
+    const msg = saldo > 0
+      ? `¿Confirmás que ${pago.propietario} pagó Bs. ${montoReal.toLocaleString()}? Quedará un saldo pendiente de Bs. ${saldo.toLocaleString()}.`
+      : `¿Confirmás que ${pago.propietario} pagó Bs. ${montoReal.toLocaleString()}?`;
+    askConfirm(msg, () => handleRevisarPago(pago, 'no'));
+  };
+
   return (
     <>
       <header className="dashboard-header dashboard-header-with-actions">
@@ -250,21 +406,67 @@ export default function PagosScreen({
           <h1>Gestion de Pagos</h1>
           <p>Administra los pagos de expensas y reservas</p>
         </div>
-        <div className="export-btn-group">
-          <button type="button" className="export-btn export-btn-excel" onClick={() => handleExportPagos("excel")} title="Exportar a Excel">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
-              <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><polyline points="10 9 9 9 8 9"/>
-            </svg>
-            Excel
-          </button>
-          <button type="button" className="export-btn export-btn-pdf" onClick={() => handleExportPagos("pdf")} title="Exportar a PDF">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
-              <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="11" y2="17"/>
-            </svg>
-            PDF
-          </button>
+        <div className="export-actions-wrap">
+          <div className="management-condo-field export-months-field">
+            <label>Período a exportar</label>
+            <div className="condo-dropdown" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setExportMonthsDropdownOpen(false); }} tabIndex={-1}>
+              <button
+                type="button"
+                className="condo-dropdown-trigger"
+                onClick={() => setExportMonthsDropdownOpen((o) => !o)}
+                aria-expanded={exportMonthsDropdownOpen}
+              >
+                <span className="condo-dropdown-value">
+                  {exportMonthsFilter.size === 0
+                    ? "Todos los meses"
+                    : `${exportMonthsFilter.size} mes${exportMonthsFilter.size !== 1 ? "es" : ""} seleccionado${exportMonthsFilter.size !== 1 ? "s" : ""}`}
+                </span>
+                <svg className={`condo-dropdown-chevron${exportMonthsDropdownOpen ? " open" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              {exportMonthsDropdownOpen && (
+                <ul className="condo-dropdown-list export-months-list" role="listbox">
+                  <li
+                    className="condo-dropdown-item export-months-item export-months-item-all"
+                    onMouseDown={(e) => { e.preventDefault(); toggleAllExportMonths(); }}
+                  >
+                    <input type="checkbox" readOnly checked={exportMonthOptions.length > 0 && exportMonthsFilter.size === exportMonthOptions.length} />
+                    <span>{exportMonthsFilter.size === exportMonthOptions.length ? "Quitar todos" : "Seleccionar todos"}</span>
+                  </li>
+                  {exportMonthOptions.length === 0 ? (
+                    <li className="export-months-empty">Sin pagos registrados todavía.</li>
+                  ) : exportMonthOptions.map((opt) => (
+                    <li
+                      key={opt.key}
+                      role="option"
+                      aria-selected={exportMonthsFilter.has(opt.key)}
+                      className="condo-dropdown-item export-months-item"
+                      onMouseDown={(e) => { e.preventDefault(); toggleExportMonth(opt.key); }}
+                    >
+                      <input type="checkbox" readOnly checked={exportMonthsFilter.has(opt.key)} />
+                      <span>{opt.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          <div className="export-btn-group">
+            <button type="button" className="export-btn export-btn-excel" onClick={() => handleExportPagos("excel")} title="Exportar a Excel">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><polyline points="10 9 9 9 8 9"/>
+              </svg>
+              Excel
+            </button>
+            <button type="button" className="export-btn export-btn-pdf" onClick={() => handleExportPagos("pdf")} title="Exportar a PDF">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="11" y2="17"/>
+              </svg>
+              PDF
+            </button>
+          </div>
         </div>
       </header>
 
@@ -276,6 +478,7 @@ export default function PagosScreen({
         const activeCondo  = condominiosData.find(c => String(c.id) === adminCondoId);
         const currentQr    = activeCondo?.paymentQrUrl || '';
         return (
+          <>
           <section className="payment-qr-panel">
             <div className="payment-qr-panel-header">
               <div className="payment-qr-panel-title">
@@ -323,7 +526,16 @@ export default function PagosScreen({
             <div className="payment-qr-panel-body">
               <div className="payment-qr-preview-wrap">
                 {currentQr ? (
-                  <img src={currentQr} alt="QR de pago" className="payment-qr-img" />
+                  <img
+                    src={currentQr}
+                    alt="QR de pago"
+                    className="payment-qr-img"
+                    onClick={() => setQrZoomOpen(true)}
+                    role="button"
+                    tabIndex={0}
+                    title="Ver QR ampliado"
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setQrZoomOpen(true); } }}
+                  />
                 ) : (
                   <div className="payment-qr-empty">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -336,45 +548,39 @@ export default function PagosScreen({
               </div>
 
               <div className="payment-qr-actions">
-                {isSuperAdministrator ? (
-                  <p className="payment-qr-hint">
-                    Podés consultar el QR de cada condominio. Solo el administrador designado puede subir o modificar el QR.
-                  </p>
-                ) : (
-                  <>
-                    <p className="payment-qr-hint">
-                      Subí la imagen del QR de tu billetera o cuenta bancaria. Los residentes del condominio lo verán al hacer un pago.
-                    </p>
+                <p className="payment-qr-hint">
+                  {isSuperAdministrator
+                    ? 'Subí la imagen del QR de pago de cualquier condominio, o reemplazá/eliminá el que ya tenga configurado.'
+                    : 'Subí la imagen del QR de tu billetera o cuenta bancaria. Los residentes del condominio lo verán al hacer un pago.'}
+                </p>
 
-                    <label className="btn btn-primary payment-qr-upload-btn" style={{cursor: qrUploadLoading ? 'not-allowed' : 'pointer', opacity: qrUploadLoading ? 0.7 : 1}}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:16,height:16}}>
-                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                      </svg>
-                      {qrUploadLoading ? 'Subiendo…' : currentQr ? 'Reemplazar QR' : 'Subir QR'}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{display:'none'}}
-                        disabled={qrUploadLoading || !adminCondoId}
-                        onChange={e => {
-                          const file = e.target.files?.[0];
-                          if (file) handleUploadPaymentQr(adminCondoId, file);
-                          e.target.value = '';
-                        }}
-                      />
-                    </label>
+                <label className="btn btn-primary payment-qr-upload-btn" style={{cursor: qrUploadLoading ? 'not-allowed' : 'pointer', opacity: qrUploadLoading ? 0.7 : 1}}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:16,height:16}}>
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  {qrUploadLoading ? 'Subiendo…' : currentQr ? 'Reemplazar QR' : 'Subir QR'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{display:'none'}}
+                    disabled={qrUploadLoading || !adminCondoId}
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) handleUploadPaymentQr(adminCondoId, file);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
 
-                    {currentQr && (
-                      <button
-                        type="button"
-                        className="btn btn-secondary payment-qr-delete-btn"
-                        disabled={qrUploadLoading}
-                        onClick={() => { if (window.confirm('¿Eliminar el QR de pago?')) handleDeletePaymentQr(adminCondoId); }}
-                      >
-                        Eliminar QR
-                      </button>
-                    )}
-                  </>
+                {currentQr && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary payment-qr-delete-btn"
+                    disabled={qrUploadLoading}
+                    onClick={() => { if (window.confirm('¿Eliminar el QR de pago?')) handleDeletePaymentQr(adminCondoId); }}
+                  >
+                    Eliminar QR
+                  </button>
                 )}
 
                 {qrUploadMsg === 'success' && <p className="payment-qr-msg payment-qr-msg-ok">QR actualizado correctamente.</p>}
@@ -383,6 +589,16 @@ export default function PagosScreen({
               </div>
             </div>
           </section>
+
+          {qrZoomOpen && currentQr && (
+            <div className="qr-zoom-overlay" onClick={() => setQrZoomOpen(false)}>
+              <div className="qr-zoom-content" onClick={(e) => e.stopPropagation()}>
+                <button type="button" className="qr-zoom-close" onClick={() => setQrZoomOpen(false)} aria-label="Cerrar">✕</button>
+                <img src={currentQr} alt="QR de pago ampliado" className="qr-zoom-img" />
+              </div>
+            </div>
+          )}
+          </>
         );
       })()}
 
@@ -400,7 +616,7 @@ export default function PagosScreen({
           ? condoPropiedades.filter(p =>
               p.code?.toLowerCase().includes(cargoExtraSearch.toLowerCase()) ||
               p.owner?.toLowerCase().includes(cargoExtraSearch.toLowerCase()) ||
-              p.tenant?.toLowerCase().includes(cargoExtraSearch.toLowerCase())
+              getPropertyTenantsText(p).toLowerCase().includes(cargoExtraSearch.toLowerCase())
             )
           : condoPropiedades;
 
@@ -512,7 +728,7 @@ export default function PagosScreen({
                             </td>
                             <td><strong>{p.code}</strong>{p.block ? <span style={{color:'#9ca3af',fontSize:'0.78rem'}}> · {p.block}</span> : ''}</td>
                             <td>{p.owner || '—'}</td>
-                            <td style={{color:'#6b7280'}}>{p.tenant && p.tenant !== '-' ? p.tenant : '—'}</td>
+                            <td style={{color:'#6b7280'}}>{getPropertyTenantsText(p) !== '-' ? getPropertyTenantsText(p) : '—'}</td>
                             <td>
                               <span style={{color: expensaActual > 0 ? '#101828' : '#9ca3af', fontWeight: expensaActual > 0 ? 700 : 400}}>
                                 {expensaActual > 0 ? `Bs. ${expensaActual.toLocaleString()}` : '—'}
@@ -680,7 +896,8 @@ export default function PagosScreen({
             ) : pageData.data.length === 0 ? (
               <tr><td colSpan={7}>No se encontraron pagos.</td></tr>
             ) : pageData.data.map((item) => (
-              <Fragment key={item.id}><tr>
+              <tr key={item.id} className="pagos-row-clickable"
+                onClick={() => { setReviewingPagoId(item.id); setReviewCumplio(null); setReviewMontoReal(''); }}>
                 <td>{item.propiedad}</td>
                 <td>{item.propietario}</td>
                 <td>
@@ -695,7 +912,7 @@ export default function PagosScreen({
                     {item.estado}
                   </span>
                 </td>
-                <td>
+                <td onClick={(e) => e.stopPropagation()}>
                   <div className="pagos-actions">
                     {item.comprobante && (
                       <a
@@ -711,7 +928,7 @@ export default function PagosScreen({
                         </svg>
                       </a>
                     )}
-                    {item.estado === "pendiente" && reviewingPagoId !== item.id && (
+                    {item.estado === "pendiente" && (
                       <button type="button" className="pagos-action-btn pagos-action-approve" title="Revisar pago"
                         onClick={() => { setReviewingPagoId(item.id); setReviewCumplio(null); setReviewMontoReal(''); }}
                         style={{fontSize:'0.72rem',width:'auto',padding:'0 0.5rem',gap:'0.25rem',display:'flex',alignItems:'center'}}>
@@ -733,66 +950,131 @@ export default function PagosScreen({
                   </div>
                 </td>
               </tr>
-              {reviewingPagoId === item.id && (
-                <tr>
-                  <td colSpan={6} style={{padding:0}}>
-                    <div className="pago-revisar-panel">
-                      <p className="pago-revisar-label">
-                        ¿El propietario cumplió con el monto total?
-                        <strong style={{marginLeft:'0.5rem',color:'#374151'}}>
-                          Bs. {(() => {
-                            const prop = propiedadesData.find(p => p.owner === item.propietario || p.tenant === item.propietario);
-                            const total = (Number(prop?.expensaMensual) || 0) + (Number(prop?.cargoExtra) || 0);
-                            return total > 0 ? total.toLocaleString() : Number(item.monto).toLocaleString();
-                          })()}
-                        </strong>
-                      </p>
-                      <div className="pago-revisar-toggle">
-                        <button className={`pago-revisar-btn${reviewCumplio === 'si' ? ' active-si' : ''}`} onClick={() => { setReviewCumplio('si'); setReviewMontoReal(''); }}>✓ Sí, cumplió</button>
-                        <button className={`pago-revisar-btn${reviewCumplio === 'no' ? ' active-no' : ''}`} onClick={() => setReviewCumplio('no')}>✗ No cumplió</button>
-                      </div>
-                      {reviewCumplio === 'no' && (
-                        <div className="pago-revisar-monto">
-                          <label>¿Cuánto pagó realmente?</label>
-                          <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
-                            <span style={{fontWeight:600,color:'#374151'}}>Bs.</span>
-                            <input type="number" min="0" className="expensas-base-input" placeholder="0" value={reviewMontoReal}
-                              onChange={e => setReviewMontoReal(e.target.value)} autoFocus />
-                          </div>
-                          {reviewMontoReal && (() => {
-                            const prop = propiedadesData.find(p => p.owner === item.propietario || p.tenant === item.propietario);
-                            const total = (Number(prop?.expensaMensual) || 0) + (Number(prop?.cargoExtra) || 0) || Number(item.monto) || 0;
-                            const saldo = Math.max(0, total - parseFloat(reviewMontoReal));
-                            return saldo > 0 ? (
-                              <p style={{margin:'0.3rem 0 0',fontSize:'0.82rem',color:'#dc2626',fontWeight:600}}>
-                                Saldo restante: Bs. {saldo.toLocaleString()}
-                              </p>
-                            ) : null;
-                          })()}
-                        </div>
-                      )}
-                      <div style={{display:'flex',gap:'0.5rem',marginTop:'0.75rem'}}>
-                        <button className="btn btn-primary" style={{fontSize:'0.82rem',padding:'0.3rem 0.9rem'}}
-                          disabled={!reviewCumplio || (reviewCumplio === 'no' && !reviewMontoReal) || reviewLoading}
-                          onClick={() => handleRevisarPago(item)}>
-                          {reviewLoading ? 'Guardando…' : 'Confirmar'}
-                        </button>
-                        <button className="btn btn-secondary" style={{fontSize:'0.82rem',padding:'0.3rem 0.9rem'}}
-                          onClick={() => { setReviewingPagoId(null); setReviewCumplio(null); setReviewMontoReal(''); }}>
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              </Fragment>
             ))}
           </tbody>
         </table>
       </section>
 
       <Pagination page={page} totalPages={pageData.totalPages} onPageChange={setPage} />
+
+      {(() => {
+        const reviewingItem = pageData.data.find(i => String(i.id) === String(reviewingPagoId));
+        if (!reviewingItem) return null;
+        const total = getExpensaTotal(reviewingItem);
+        const saldo = reviewMontoReal ? Math.max(0, total - parseFloat(reviewMontoReal)) : 0;
+        return (
+          <div className="modal-overlay" onClick={closeReviewModal}>
+            <div className="modal-content modal-edit-user" onClick={e => e.stopPropagation()}>
+              <h2>Revisar pago</h2>
+              <div className="modal-body-simple">
+                <div className="propiedad-line-item"><span>Propiedad</span><strong>{reviewingItem.propiedad}</strong></div>
+                <div className="propiedad-line-item"><span>Propietario</span><strong>{reviewingItem.propietario}</strong></div>
+                <div className="propiedad-line-item">
+                  <span>Tipo</span>
+                  <span className={`pagos-type-chip ${reviewingItem.tipo.toLowerCase() === "reserva" ? "pagos-type-reserva" : "pagos-type-expensa"}`}>
+                    {reviewingItem.tipo}
+                  </span>
+                </div>
+                <div className="propiedad-line-item"><span>Monto</span><strong>Bs. {reviewingItem.monto}</strong></div>
+                <div className="propiedad-line-item"><span>Fecha</span><strong>{reviewingItem.fecha}</strong></div>
+                <div className="propiedad-line-item">
+                  <span>Estado</span>
+                  <span className={`pagos-status-chip pagos-status-${reviewingItem.estado}`}>{reviewingItem.estado}</span>
+                </div>
+
+                <div className="pago-comprobante-wrap">
+                  <span className="pago-comprobante-label">Comprobante</span>
+                  {reviewingItem.comprobante ? (
+                    (() => {
+                      const url = reviewingItem.comprobante?.startsWith('http')
+                        ? reviewingItem.comprobante
+                        : api.getUploadUrl(`comprobantes/${reviewingItem.comprobante}`);
+                      const isPdf = url.toLowerCase().endsWith('.pdf');
+                      return isPdf ? (
+                        <a href={url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary pago-comprobante-pdf-link">
+                          Ver comprobante (PDF)
+                        </a>
+                      ) : (
+                        <img src={url} alt="Comprobante de pago" className="pago-comprobante-img"
+                          onClick={() => setComprobanteZoomUrl(url)} title="Ver comprobante completo" />
+                      );
+                    })()
+                  ) : (
+                    <p className="pago-comprobante-empty">Sin comprobante adjunto.</p>
+                  )}
+                </div>
+
+                {reviewingItem.estado === 'pendiente' && (
+                  <>
+                    <hr className="pago-revisar-divider" />
+
+                    <p className="pago-revisar-label">
+                      ¿El propietario cumplió con el monto total?
+                      <strong style={{marginLeft:'0.5rem',color:'#374151'}}>Bs. {total.toLocaleString()}</strong>
+                    </p>
+                    <div className="pago-revisar-toggle">
+                      <button className={`pago-revisar-btn${reviewCumplio === 'si' ? ' active-si' : ''}`} disabled={reviewLoading}
+                        onClick={() => handleClickSiCumplio(reviewingItem)}>✓ Sí, cumplió</button>
+                      <button className={`pago-revisar-btn${reviewCumplio === 'no' ? ' active-no' : ''}`} disabled={reviewLoading}
+                        onClick={() => handleClickNoCumplio(reviewingItem)}>✗ No cumplió</button>
+                    </div>
+
+                    {reviewCumplio === 'no' && (
+                      <div className="pago-revisar-monto">
+                        <label>¿Cuánto pagó realmente?</label>
+                        <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
+                          <span style={{fontWeight:600,color:'#374151'}}>Bs.</span>
+                          <input type="number" min="0" className="expensas-base-input" placeholder="0" value={reviewMontoReal}
+                            onChange={e => setReviewMontoReal(e.target.value)} autoFocus />
+                        </div>
+                        {reviewMontoReal && saldo > 0 && (
+                          <p style={{margin:'0.3rem 0 0',fontSize:'0.82rem',color:'#dc2626',fontWeight:600}}>
+                            Saldo restante: Bs. {saldo.toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              <footer className="modal-footer-simple">
+                {reviewCumplio === 'no' && (
+                  <button className="btn btn-primary" disabled={!reviewMontoReal || reviewLoading}
+                    onClick={() => handleConfirmNoCumplio(reviewingItem)}>
+                    {reviewLoading ? 'Guardando…' : 'Confirmar'}
+                  </button>
+                )}
+                <button className="btn btn-secondary" onClick={closeReviewModal}>
+                  {reviewingItem.estado === 'pendiente' ? 'Cancelar' : 'Cerrar'}
+                </button>
+              </footer>
+            </div>
+          </div>
+        );
+      })()}
+
+      {comprobanteZoomUrl && (
+        <div className="qr-zoom-overlay" onClick={() => setComprobanteZoomUrl(null)}>
+          <div className="qr-zoom-content" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="qr-zoom-close" onClick={() => setComprobanteZoomUrl(null)} aria-label="Cerrar">✕</button>
+            <img src={comprobanteZoomUrl} alt="Comprobante de pago ampliado" className="qr-zoom-img" />
+          </div>
+        </div>
+      )}
+
+      {confirmPrompt && (
+        <div className="modal-overlay modal-overlay-centered" onClick={() => setConfirmPrompt(null)}>
+          <div className="confirm-modal" onClick={e => e.stopPropagation()}>
+            <div className="confirm-modal-icon" aria-hidden="true">?</div>
+            <h2>¿Estás seguro?</h2>
+            <p>{confirmPrompt.message}</p>
+            <div className="confirm-modal-actions">
+              <button type="button" className="confirm-modal-cancel" onClick={() => setConfirmPrompt(null)}>Cancelar</button>
+              <button type="button" className="confirm-modal-accept" onClick={() => { confirmPrompt.onAccept(); setConfirmPrompt(null); }}>Confirmar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

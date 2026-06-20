@@ -16,10 +16,12 @@ export default function PreRegisterVisitsScreen({
   setSelectedVisitPassId,
   historialVisitasData,
   setHistorialVisitasData,
+  myProperties = [],
 }) {
   const [qrScanMsg, setQrScanMsg] = useState('');
   const [securityActionLoading, setSecurityActionLoading] = useState(false);
   const [visitSuggestions, setVisitSuggestions] = useState([]);
+  const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
 
   const isSecurity = user.role === "Seguridad";
 
@@ -81,8 +83,8 @@ export default function PreRegisterVisitsScreen({
     setSecurityActionLoading(true);
     try {
       const now = new Date();
-      const horaActual = now.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' });
-      const fechaActual = now.toLocaleDateString('es-BO');
+      const horaActual = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+      const fechaActual = now.toLocaleDateString('es-ES');
       const entry = await api.createHistorialVisita({
         visitante: selectedVisitPass.fullName,
         cedula:    selectedVisitPass.idNumber,
@@ -107,20 +109,9 @@ export default function PreRegisterVisitsScreen({
     setSecurityActionLoading(true);
     try {
       const now = new Date();
-      const horaActual = now.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' });
-      // Actualizar historial con la hora de salida
-      await api.createHistorialVisita({
-        visitante: selectedVisitPass.fullName,
-        cedula:    selectedVisitPass.idNumber,
-        propiedad: selectedVisitPass.property,
-        tipo:      'peatonal',
-        placa:     selectedVisitPass.plate || '-',
-        fecha:     openHistorialEntry.fecha,
-        entrada:   openHistorialEntry.entrada,
-        salida:    horaActual,
-        motivo:    selectedVisitPass.motive || '-',
-        guard:     user.name,
-      });
+      const horaActual = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+      // Actualizar la salida sobre el mismo registro de historial (sin duplicar)
+      await api.updateHistorialSalida(openHistorialEntry.id, horaActual);
       // Marcar la visita como Inactivo
       await api.updateVisitaStatus(String(selectedVisitPass.id), 'Inactivo');
       setVisitPasses(prev => prev.map(p => p.id === selectedVisitPass.id ? { ...p, status: 'Inactivo' } : p));
@@ -314,8 +305,43 @@ export default function PreRegisterVisitsScreen({
               )}
               <label className="visit-form-field visit-form-full">
                 <span>Propiedad</span>
-                <input type="text" value={visitRegistrationForm.property} onChange={(e) => setVisitRegistrationForm({ ...visitRegistrationForm, property: e.target.value })} placeholder="Calle Principal - A-101" />
-                <small>Esta información se toma automáticamente de tu perfil</small>
+                {myProperties.length > 1 ? (
+                  <div className="condo-dropdown" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setPropertyDropdownOpen(false); }} tabIndex={-1}>
+                    <button
+                      type="button"
+                      className="condo-dropdown-trigger"
+                      onClick={() => setPropertyDropdownOpen((o) => !o)}
+                      aria-expanded={propertyDropdownOpen}
+                    >
+                      <span className="condo-dropdown-value">
+                        {visitRegistrationForm.property || "Seleccioná una propiedad"}
+                      </span>
+                      <svg className={`condo-dropdown-chevron${propertyDropdownOpen ? " open" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    {propertyDropdownOpen && (
+                      <ul className="condo-dropdown-list" role="listbox">
+                        {myProperties.map((p) => (
+                          <li
+                            key={p.id}
+                            role="option"
+                            aria-selected={visitRegistrationForm.property === p.label}
+                            className={`condo-dropdown-item${visitRegistrationForm.property === p.label ? " selected" : ""}`}
+                            onMouseDown={() => { setVisitRegistrationForm({ ...visitRegistrationForm, property: p.label }); setPropertyDropdownOpen(false); }}
+                          >
+                            {p.label}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <input type="text" value={visitRegistrationForm.property} readOnly disabled placeholder="Sin propiedad asignada" />
+                )}
+                <small>
+                  {myProperties.length > 1
+                    ? "Solo podés registrar visitas para las propiedades asignadas a tu perfil"
+                    : "Esta información se toma automáticamente de tu perfil"}
+                </small>
               </label>
               <label className="visit-form-field visit-form-full">
                 <span>Motivo de Visita *</span>

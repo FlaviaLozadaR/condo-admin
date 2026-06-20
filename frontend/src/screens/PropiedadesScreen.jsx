@@ -9,6 +9,7 @@ export default function PropiedadesScreen({
   isSuperAdministrator,
   condominiosData,
   propiedadesData,
+  setPropiedadesData,
   selectedManagementCondoId,
   setSelectedManagementCondoId,
   selectedManagementCondoName,
@@ -24,6 +25,7 @@ export default function PropiedadesScreen({
   const [pageData, setPageData] = useState({ data: [], total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(false);
   const [propertyCondoDropdownOpen, setPropertyCondoDropdownOpen] = useState(false);
+  const [propertyToDelete, setPropertyToDelete] = useState(null);
 
   const condoParam = isSuperAdministrator
     ? (selectedManagementCondoId === 0 ? undefined : selectedManagementCondoName)
@@ -75,11 +77,36 @@ export default function PropiedadesScreen({
     setIsEditPropertyModalOpen(true);
   };
 
+  const confirmDeleteProperty = async () => {
+    if (!propertyToDelete?.id) return;
+    const id = propertyToDelete.id;
+    try {
+      await api.deletePropiedad(String(id));
+      setPropiedadesData(propiedadesData.filter(p => String(p.id) !== String(id)));
+      onToast?.("Propiedad eliminada.", "success");
+    } catch (err) {
+      onToast?.(err.message || "Error al eliminar la propiedad.", "error");
+    } finally {
+      setPropertyToDelete(null);
+    }
+  };
+
   return (
     <>
-      <header className="dashboard-header">
-        <h1>Gestion de Propiedades</h1>
-        <p>Gestiona las propiedades del condominio seleccionado.</p>
+      <header className="dashboard-header dashboard-header-with-actions">
+        <div>
+          <h1>Gestion de Propiedades</h1>
+          <p>Gestiona las propiedades del condominio seleccionado.</p>
+        </div>
+        <button className="btn btn-primary" type="button" onClick={() => {
+          const defaultCondoId = isSuperAdministrator
+            ? String(selectedManagementCondoId || "")
+            : String(condominiosData.find(c => c.name === user.condo || c.name === selectedManagementCondoName)?.id || selectedManagementCondoId || "");
+          setCreatePropertyForm({ calle: "", numero: "", bloque: "", propietario: "", inquilinos: [""], condoId: defaultCondoId });
+          setIsCreatePropertyModalOpen(true);
+        }}>
+          <span>+</span> Crear Propiedad
+        </button>
       </header>
 
       <section className="propiedades-section">
@@ -130,18 +157,6 @@ export default function PropiedadesScreen({
           </div>
         </div>
 
-        <div className="propiedades-top-bar">
-          <button className="btn btn-primary" type="button" onClick={() => {
-            const defaultCondoId = isSuperAdministrator
-              ? String(selectedManagementCondoId || "")
-              : String(condominiosData.find(c => c.name === user.condo || c.name === selectedManagementCondoName)?.id || selectedManagementCondoId || "");
-            setCreatePropertyForm({ calle: "", numero: "", bloque: "", propietario: "", inquilinos: [""], condoId: defaultCondoId });
-            setIsCreatePropertyModalOpen(true);
-          }}>
-            <span>+</span> Crear Propiedad
-          </button>
-        </div>
-
         <div className="propiedades-search-wrap">
           <svg className="propiedades-search-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M10 16C13.3 16 16 13.3 16 10C16 6.7 13.3 4 10 4C6.7 4 4 6.7 4 10C4 13.3 6.7 16 10 16ZM18 18L14.3 14.3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -156,7 +171,7 @@ export default function PropiedadesScreen({
         </div>
 
         <div className="propiedades-grid">
-          {loading ? (
+          {loading && pageData.data.length === 0 ? (
             <p>Cargando...</p>
           ) : pageData.data.length === 0 ? (
             <p>No se encontraron propiedades.</p>
@@ -175,11 +190,18 @@ export default function PropiedadesScreen({
                   </div>
                 </div>
 
-                <button className="propiedad-edit-btn" type="button" title="Editar propiedad" onClick={() => openEditPropertyModal(propiedad)}>
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M3 17.25V21H6.75L17.81 9.94L14.06 6.19L3 17.25Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
+                <div className="propiedad-card-actions">
+                  <button className="propiedad-edit-btn" type="button" title="Editar propiedad" onClick={() => openEditPropertyModal(propiedad)}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M3 17.25V21H6.75L17.81 9.94L14.06 6.19L3 17.25Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  <button className="propiedad-edit-btn propiedad-delete-btn" type="button" title="Eliminar propiedad" onClick={() => setPropertyToDelete(propiedad)}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V7H6V19ZM8 9H16V19H8V9ZM15.5 4L14.5 3H9.5L8.5 4H5V6H19V4H15.5Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               <div className="propiedad-card-body">
@@ -202,6 +224,43 @@ export default function PropiedadesScreen({
 
         <Pagination page={page} totalPages={pageData.totalPages} onPageChange={setPage} />
       </section>
+
+      {propertyToDelete && (
+        <div className="modal-overlay" onClick={() => setPropertyToDelete(null)}>
+          <div className="modal-content" style={{ maxWidth: "420px" }} onClick={e => e.stopPropagation()}>
+            <header className="modal-header">
+              <h2>Eliminar propiedad</h2>
+              <button className="modal-close" type="button" onClick={() => setPropertyToDelete(null)}>✕</button>
+            </header>
+            <div className="modal-body-simple" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "1.75rem 1.5rem 0.75rem" }}>
+              <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(239,68,68,0.10)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "0.25rem" }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                </svg>
+              </div>
+              <p style={{ margin: "0 0 0.4rem", fontWeight: 700, fontSize: "1.05rem", width: "100%" }}>
+                ¿Eliminar la propiedad "{propertyToDelete.street} - {propertyToDelete.code}"?
+              </p>
+              <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--dash-text-2, #667085)", lineHeight: 1.5, width: "100%" }}>
+                Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <footer className="modal-footer">
+              <button className="btn btn-secondary" type="button" onClick={() => setPropertyToDelete(null)}>
+                Cancelar
+              </button>
+              <button
+                className="btn"
+                type="button"
+                style={{ background: "#ef4444", color: "#fff", border: "none" }}
+                onClick={confirmDeleteProperty}
+              >
+                Sí, eliminar
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
     </>
   );
 }

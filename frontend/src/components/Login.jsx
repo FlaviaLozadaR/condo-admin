@@ -50,7 +50,7 @@ export default function Login({ onBack, onLogin, expiredMsg }) {
         <div className="login-card">
 
           <div className="login-brand">
-            <img src="/images/logo-ignitel.png" alt="Ignitel" className="login-logo" />
+            <img src="/images/logo-ignitel-tight.png" alt="Ignitel" className="login-logo" />
           </div>
 
           {mode === "login" && (

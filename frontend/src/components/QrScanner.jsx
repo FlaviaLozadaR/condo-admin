@@ -1,20 +1,57 @@
 import { useState, useEffect, useRef } from "react";
 import * as api from "../api.js";
 
-export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPassId, setSelectedVisitPassId, historialVisitas = [], setHistorialVisitas, guardName = "", onToast }) {
+const LONG_STAY_MS = 2 * 60 * 60 * 1000; // 2 horas
+
+// Combina fecha (DD/MM/YYYY) + hora (HH:MM) de un registro de historial en un Date
+const parseEntryDateTime = (h) => {
+  const dateParts = (h.fecha || '').split('/');
+  const timeParts = (h.entrada || '').split(':');
+  if (dateParts.length !== 3 || timeParts.length !== 2) return null;
+  const [d, m, y] = dateParts.map(Number);
+  const [hh, mm] = timeParts.map(Number);
+  if ([d, m, y, hh, mm].some(Number.isNaN)) return null;
+  return new Date(y, m - 1, d, hh, mm);
+};
+
+export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPassId, setSelectedVisitPassId, historialVisitas = [], setHistorialVisitas, guardName = "" }) {
   const [scannerActive, setScannerActive]   = useState(false);
   const [manualCode, setManualCode]         = useState("");
   const [scannedPass, setScannedPass]       = useState(null);
   const [scanError, setScanError]           = useState("");
   const [actionMsg, setActionMsg]           = useState("");
   const [actionLoading, setActionLoading]   = useState(false);
+  const [busyEntryId, setBusyEntryId]       = useState(null);
+  const [qrValidationError, setQrValidationError] = useState(null); // { title, message }
   const html5QrRef        = useRef(null);
   const scannerRunningRef = useRef(false);
 
+  // Respaldo a prueba de fallos: apaga directamente los tracks de la cámara
+  // del <video> que dejó la librería, sin depender de su estado interno.
+  // html5-qrcode a veces lanza una excepción síncrona en stop() si todavía no
+  // terminó de marcar el escaneo como "iniciado" — sin esto, en ese caso la
+  // cámara queda prendida sin que nadie la libere.
+  const releaseCameraTracks = () => {
+    document.querySelectorAll('#qr-camera-reader video').forEach((videoEl) => {
+      const stream = videoEl.srcObject;
+      if (stream && typeof stream.getTracks === 'function') {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      videoEl.srcObject = null;
+    });
+  };
+
   const stopScanner = () => {
-    if (html5QrRef.current && scannerRunningRef.current) {
-      scannerRunningRef.current = false;
-      html5QrRef.current.stop().catch(() => {});
+    scannerRunningRef.current = false;
+    const scanner = html5QrRef.current;
+    if (scanner) {
+      try {
+        scanner.stop().then(() => scanner.clear()).catch(() => {}).finally(releaseCameraTracks);
+      } catch {
+        releaseCameraTracks();
+      }
+    } else {
+      releaseCameraTracks();
     }
   };
 
@@ -27,14 +64,14 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
     const clean = code.replace(/.*\/verify\//, "").trim();
     setScanError("");
     setScannedPass(null);
+    setManualCode("");
     try {
       const pass = await api.verifyVisita(clean);
       setScannedPass(pass);
       setSelectedVisitPassId(pass.id);
-      showMsg(`✓ QR leído: ${pass.fullName}`);
-      onToast?.(`✅ QR cargado: ${pass.fullName}`, "visita");
-    } catch {
-      setScanError(`Pase no encontrado: ${clean}`);
+      await autoRegister(pass);
+    } catch (err) {
+      setScanError(err.message || `Pase no encontrado: ${clean}`);
     }
   };
 
@@ -55,8 +92,20 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
         { fps: 30, qrbox: { width: qrboxSize, height: qrboxSize }, aspectRatio: 1.0, disableFlip: false },
         (decodedText) => { stopScanner(); setScannerActive(false); lookupCode(decodedText); },
         () => {}
-      ).then(() => { if (!cancelled) scannerRunningRef.current = true; })
-       .catch(() => { setScanError("No se pudo acceder a la cámara. Usá el ingreso manual."); setScannerActive(false); });
+      ).then(() => {
+        if (cancelled) {
+          // El componente ya pidió detener la cámara mientras todavía estaba
+          // iniciando (start() es async) — liberarla recién ahora que terminó,
+          // si no, el navegador la deja prendida sin que la app se entere.
+          try {
+            scanner.stop().then(() => scanner.clear()).catch(() => {}).finally(releaseCameraTracks);
+          } catch {
+            releaseCameraTracks();
+          }
+        } else {
+          scannerRunningRef.current = true;
+        }
+      }).catch(() => { setScanError("No se pudo acceder a la cámara. Usá el ingreso manual."); setScannerActive(false); });
     });
     return () => { cancelled = true; stopScanner(); };
   }, [scannerActive]);
@@ -71,28 +120,110 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
       )
     : null;
 
+  // Visitantes actualmente dentro (sin salida registrada), del más antiguo al más reciente
+  const insideVisitors = historialVisitas
+    .filter(h => !h.salida || h.salida === '-')
+    .map(h => ({ ...h, _entered: parseEntryDateTime(h) }))
+    .sort((a, b) => (a._entered?.getTime() ?? 0) - (b._entered?.getTime() ?? 0));
+
+  // Marca la salida de un registro de historial y, si corresponde, desactiva su pase QR.
+  // `passIdOverride` permite indicar directamente el pase a desactivar (p.ej. el pase
+  // recién escaneado), sin depender de que esté presente en `visitPasses`.
+  const performSalida = async (entry, passIdOverride) => {
+    const now  = new Date();
+    const hora = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    await api.updateHistorialSalida(entry.id, hora);
+    setHistorialVisitas?.(prev => prev.map(h => h.id === entry.id ? { ...h, salida: hora } : h));
+
+    const matchingPassId = passIdOverride ?? visitPasses.find(p =>
+      (p.fullName === entry.visitante || p.idNumber === entry.cedula) && p.status !== 'Inactivo'
+    )?.id;
+
+    if (matchingPassId) {
+      await api.updateVisitaStatus(String(matchingPassId), 'Inactivo');
+      setVisitPasses(prev => prev.map(v => String(v.id) === String(matchingPassId) ? { ...v, status: 'Inactivo' } : v));
+      setScannedPass(prev => prev && String(prev.id) === String(matchingPassId) ? { ...prev, status: 'Inactivo' } : prev);
+    }
+    return hora;
+  };
+
+  // Registra el ingreso de un pase en el historial (entrada = ahora)
+  const registerIngreso = async (pass) => {
+    const now = new Date();
+    const hora  = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const fecha = now.toLocaleDateString('es-ES');
+    const entry = await api.createHistorialVisita({
+      visitante: pass.fullName,
+      cedula:    pass.idNumber,
+      propiedad: pass.property,
+      tipo:      pass.mode === 'vehicular' ? 'vehicular' : 'peatonal',
+      placa:     pass.plate || '-',
+      fecha,
+      entrada:   hora,
+      salida:    '-',
+      motivo:    pass.motive || '-',
+      guard:     guardName,
+    });
+    setHistorialVisitas?.(prev => [entry, ...prev]);
+    showMsg(`✓ Ingreso registrado: ${pass.fullName} — ${hora}`);
+  };
+
+  // Al escanear (o ingresar manualmente) un código válido, registra automáticamente
+  // el ingreso o la salida del visitante según corresponda.
+  const autoRegister = async (pass) => {
+    if (pass.status === 'Inactivo') {
+      setQrValidationError({
+        title: 'QR desactivado',
+        message: `Este código ya fue usado — la visita de ${pass.fullName} ya finalizó.`,
+      });
+      return;
+    }
+    if (pass.expiresAt && new Date(pass.expiresAt + 'T23:59:59') < new Date()) {
+      const vencio = new Date(pass.expiresAt + 'T00:00:00').toLocaleDateString('es-BO');
+      setQrValidationError({
+        title: 'QR vencido',
+        message: `El pase de ${pass.fullName} venció el ${vencio} y ya no es válido. No se registró el ingreso.`,
+      });
+      return;
+    }
+
+    const open = historialVisitas.find(h =>
+      (h.visitante === pass.fullName || h.cedula === pass.idNumber) &&
+      (!h.salida || h.salida === '-')
+    );
+
+    setActionLoading(true);
+    try {
+      if (!open) {
+        await registerIngreso(pass);
+      } else {
+        const hora = await performSalida(open, pass.id);
+        showMsg(`✓ Salida registrada: ${pass.fullName} — ${hora}. QR desactivado.`);
+      }
+    } catch (e) {
+      showMsg('Error: ' + e.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleMarkSalida = async (entry) => {
+    setBusyEntryId(entry.id);
+    try {
+      const hora = await performSalida(entry);
+      showMsg(`✓ Salida registrada: ${entry.visitante} — ${hora}`);
+    } catch (e) {
+      showMsg('Error: ' + e.message);
+    } finally {
+      setBusyEntryId(null);
+    }
+  };
+
   const handleIngreso = async () => {
     if (!selected) return;
     setActionLoading(true);
     try {
-      const now = new Date();
-      const hora = now.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' });
-      const fecha = now.toLocaleDateString('es-BO');
-      const entry = await api.createHistorialVisita({
-        visitante: selected.fullName,
-        cedula:    selected.idNumber,
-        propiedad: selected.property,
-        tipo:      selected.mode === 'vehicular' ? 'vehicular' : 'peatonal',
-        placa:     selected.plate || '-',
-        fecha,
-        entrada:   hora,
-        salida:    '-',
-        motivo:    selected.motive || '-',
-        guard:     guardName,
-      });
-      setHistorialVisitas?.(prev => [entry, ...prev]);
-      showMsg(`✓ Ingreso registrado: ${selected.fullName} — ${hora}`);
-      onToast?.(`→ Ingreso: ${selected.fullName}`, "visita");
+      await registerIngreso(selected);
     } catch (e) { showMsg('Error: ' + e.message); }
     finally { setActionLoading(false); }
   };
@@ -101,26 +232,8 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
     if (!selected || !openEntry) return;
     setActionLoading(true);
     try {
-      const now = new Date();
-      const hora = now.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' });
-      await api.createHistorialVisita({
-        visitante: selected.fullName,
-        cedula:    selected.idNumber,
-        propiedad: selected.property,
-        tipo:      selected.mode === 'vehicular' ? 'vehicular' : 'peatonal',
-        placa:     selected.plate || '-',
-        fecha:     openEntry.fecha,
-        entrada:   openEntry.entrada,
-        salida:    hora,
-        motivo:    selected.motive || '-',
-        guard:     guardName,
-      });
-      await api.updateVisitaStatus(String(selected.id), 'Inactivo');
-      setVisitPasses(prev => prev.map(v => String(v.id) === String(selected.id) ? { ...v, status: 'Inactivo' } : v));
-      setHistorialVisitas?.(prev => prev.map(h => h.id === openEntry.id ? { ...h, salida: hora } : h));
-      setScannedPass(prev => prev ? { ...prev, status: 'Inactivo' } : prev);
+      const hora = await performSalida(openEntry);
       showMsg(`✓ Salida registrada: ${selected.fullName} — ${hora}. QR desactivado.`);
-      onToast?.(`← Salida: ${selected.fullName} — QR desactivado`, "visita");
     } catch (e) { showMsg('Error: ' + e.message); }
     finally { setActionLoading(false); }
   };
@@ -133,6 +246,39 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
           <p>Escaneá el QR del visitante con la cámara o ingresá el código manualmente</p>
         </div>
       </header>
+
+      <article className="visit-security-card visit-inside-card">
+        <h2>
+          Visitantes Dentro
+          {insideVisitors.length > 0 && <span className="visit-inside-count">{insideVisitors.length}</span>}
+        </h2>
+        {insideVisitors.length === 0 ? (
+          <p className="visit-inside-empty">No hay visitantes dentro del condominio.</p>
+        ) : (
+          <div className="visit-inside-list">
+            {insideVisitors.map((entry) => {
+              const longStay = entry._entered && (Date.now() - entry._entered.getTime()) > LONG_STAY_MS;
+              return (
+                <div key={entry.id} className={`visit-inside-item${longStay ? " visit-inside-item-warn" : ""}`}>
+                  <div className="visit-inside-info">
+                    <strong>{entry.visitante}</strong>
+                    <span>{entry.propiedad} · {entry.tipo === 'vehicular' ? `Vehicular (${entry.placa})` : 'Peatonal'}</span>
+                    <small>Ingresó a las {entry.entrada}{longStay ? " · hace más de 2 hs" : ""}</small>
+                  </div>
+                  <button
+                    type="button"
+                    className="visit-inside-salida-btn"
+                    disabled={busyEntryId === entry.id}
+                    onClick={() => handleMarkSalida(entry)}
+                  >
+                    {busyEntryId === entry.id ? "..." : "Marcar Salida"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </article>
 
       <section className="visit-security-layout">
         <article className="visit-security-card visit-qr-card">
@@ -153,6 +299,7 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
 
             <div id="qr-camera-reader" style={{ width:"100%", borderRadius:"10px", overflow:"hidden", minHeight: scannerActive ? "260px" : "0", background:"#000" }} />
 
+            <small style={{ color:"#9ca3af", fontSize:"12px" }}>O ingresá el código del pase manualmente:</small>
             <div style={{ display:"flex", gap:"8px" }}>
               <input
                 type="text"
@@ -186,17 +333,20 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
         <article className="visit-security-card visit-data-card">
           <h2>Datos del Visitante</h2>
 
-          {actionMsg && (
-            <div style={{
-              background: actionMsg.includes('Salida') || actionMsg.includes('Error') ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.12)',
-              border: `1px solid ${actionMsg.includes('Salida') || actionMsg.includes('Error') ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
-              borderRadius:10, padding:'0.6rem 0.85rem', marginBottom:'0.75rem',
-              fontWeight:600, fontSize:'0.84rem',
-              color: actionMsg.includes('Salida') || actionMsg.includes('Error') ? '#ef4444' : '#16a34a'
-            }}>
-              {actionMsg}
-            </div>
-          )}
+          {actionMsg && (() => {
+            const isWarn = /Salida|Error|desactivado|vencido|no encontrado/i.test(actionMsg);
+            return (
+              <div style={{
+                background: isWarn ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.12)',
+                border: `1px solid ${isWarn ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
+                borderRadius:10, padding:'0.6rem 0.85rem', marginBottom:'0.75rem',
+                fontWeight:600, fontSize:'0.84rem',
+                color: isWarn ? '#ef4444' : '#16a34a'
+              }}>
+                {actionMsg}
+              </div>
+            );
+          })()}
 
           {selected ? (
             <>
@@ -240,6 +390,21 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
           )}
         </article>
       </section>
+
+      {qrValidationError && (
+        <div className="modal-overlay modal-overlay-centered">
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-modal-icon confirm-modal-icon-danger" aria-hidden="true">!</div>
+            <h2>{qrValidationError.title}</h2>
+            <p>{qrValidationError.message}</p>
+            <div className="confirm-modal-actions">
+              <button type="button" className="confirm-modal-accept" style={{width:'100%'}} onClick={() => setQrValidationError(null)}>
+                Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

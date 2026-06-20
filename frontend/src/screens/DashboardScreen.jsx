@@ -12,6 +12,7 @@ import {
   barGap,
   barBaseX,
 } from "./dashboardUtils.js";
+import { getPropertyTenantsText } from "../utils/tenants.js";
 
 export default function DashboardScreen({
   user,
@@ -20,6 +21,8 @@ export default function DashboardScreen({
   pagosData,
   historialVisitasData,
   visitPasses,
+  panicAlerts = [],
+  setActiveSection,
   exportToPDF,
   onToast,
 }) {
@@ -42,7 +45,7 @@ export default function DashboardScreen({
         Unidad:        p.code,
         Bloque:        p.block,
         Propietario:   p.owner,
-        Inquilino:     p.tenant !== "-" ? p.tenant : "",
+        Inquilino:     getPropertyTenantsText(p) !== "-" ? getPropertyTenantsText(p) : "",
         "Deuda ($)":   p.debt,
       })));
       ws["!cols"] = [{ wch: 22 }, { wch: 10 }, { wch: 8 }, { wch: 22 }, { wch: 22 }, { wch: 10 }];
@@ -57,7 +60,7 @@ export default function DashboardScreen({
         headers:  ["Condominio", "Unidad", "Bloque", "Propietario", "Inquilino", "Deuda"],
         rows:     morososList.map(p => [
           p.condo || p.street, p.code, p.block, p.owner,
-          p.tenant !== "-" ? p.tenant : "-", `Bs. ${p.debt}`,
+          getPropertyTenantsText(p), `Bs. ${p.debt}`,
         ]),
         totals:   ["", "", "", "", "Total en mora:", `Bs. ${totalDeuda.toLocaleString("es-AR")}`],
       });
@@ -283,39 +286,70 @@ export default function DashboardScreen({
         ))}
       </section>
 
-      <section className="dashboard-grid">
-        <article className="dashboard-panel">
-          <h2>Pagos Mensuales</h2>
-          {monthlyPayments.every(p => (p.value || 0) === 0) && (
-            <p style={{ fontSize: "0.8rem", color: "var(--text-muted,#94a3b8)", marginBottom: "0.5rem" }}>Sin pagos registrados aún</p>
-          )}
-          <div className="chart-wrap" role="img" aria-label="Pagos mensuales del usuario">
-            <svg viewBox="0 0 620 260" className="chart-svg" aria-hidden="true">
-              {gridValues.map((gridValue, index) => {
-                const y = chartTop + chartHeight - (gridValue / barMax) * chartHeight;
-                return (
-                  <g key={`bar-grid-${gridValue}`}>
-                    <line x1={chartLeft} y1={y} x2={chartLeft + chartWidth} y2={y} className="chart-grid-line" />
-                    <text x={chartLeft - 8} y={y + 4} className="chart-axis-label chart-axis-label-y">{gridValue}</text>
-                    {index === 0 && <line x1={chartLeft} y1={y} x2={chartLeft + chartWidth} y2={y} className="chart-axis-base" />}
-                  </g>
-                );
-              })}
+      {user.role === 'Seguridad' && (() => {
+        const activePanicAlerts = panicAlerts.filter((a) => a.status !== 'Atendida').slice(0, 3);
+        return (
+          <section className="panic-security-panel dashboard-panic-widget">
+            <h2>🚨 Alertas de Pánico Activas</h2>
+            <p>Personas que activaron el botón de pánico y requieren asistencia inmediata.</p>
+            {activePanicAlerts.length === 0 ? (
+              <div className="panic-empty">No hay alertas activas en este momento.</div>
+            ) : (
+              <div className="panic-alert-list">
+                {activePanicAlerts.map((alert) => (
+                  <article key={alert.id} className="panic-alert-item">
+                    <div>
+                      <strong>{alert.resident}</strong>
+                      <p>{alert.address} - {alert.unit}</p>
+                      <small>Tel: {alert.phone} · {alert.createdAt}</small>
+                    </div>
+                    <span className={`panic-alert-status panic-alert-status-${alert.status === "Pendiente" ? "pending" : "way"}`}>{alert.status}</span>
+                  </article>
+                ))}
+              </div>
+            )}
+            <button type="button" className="btn btn-secondary dashboard-panic-widget-link" onClick={() => setActiveSection?.("Botón de Pánico")}>
+              Ver todas las alertas →
+            </button>
+          </section>
+        );
+      })()}
 
-              {monthlyPayments.map((item, index) => {
-                const x = barBaseX + index * (barWidth + barGap);
-                const height = (item.value / barMax) * chartHeight;
-                const y = chartTop + chartHeight - height;
-                return (
-                  <g key={item.label}>
-                    <rect x={x} y={y} width={barWidth} height={Math.max(height, 1)} className="bar-rect" />
-                    <text x={x + barWidth / 2} y={chartTop + chartHeight + 18} className="chart-axis-label chart-axis-label-x">{item.label}</text>
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
-        </article>
+      <section className="dashboard-grid">
+        {user.role !== 'Seguridad' && (
+          <article className="dashboard-panel">
+            <h2>Pagos Mensuales</h2>
+            {monthlyPayments.every(p => (p.value || 0) === 0) && (
+              <p style={{ fontSize: "0.8rem", color: "var(--text-muted,#94a3b8)", marginBottom: "0.5rem" }}>Sin pagos registrados aún</p>
+            )}
+            <div className="chart-wrap" role="img" aria-label="Pagos mensuales del usuario">
+              <svg viewBox="0 0 620 260" className="chart-svg" aria-hidden="true">
+                {gridValues.map((gridValue, index) => {
+                  const y = chartTop + chartHeight - (gridValue / barMax) * chartHeight;
+                  return (
+                    <g key={`bar-grid-${gridValue}`}>
+                      <line x1={chartLeft} y1={y} x2={chartLeft + chartWidth} y2={y} className="chart-grid-line" />
+                      <text x={chartLeft - 8} y={y + 4} className="chart-axis-label chart-axis-label-y">{gridValue}</text>
+                      {index === 0 && <line x1={chartLeft} y1={y} x2={chartLeft + chartWidth} y2={y} className="chart-axis-base" />}
+                    </g>
+                  );
+                })}
+
+                {monthlyPayments.map((item, index) => {
+                  const x = barBaseX + index * (barWidth + barGap);
+                  const height = (item.value / barMax) * chartHeight;
+                  const y = chartTop + chartHeight - height;
+                  return (
+                    <g key={item.label}>
+                      <rect x={x} y={y} width={barWidth} height={Math.max(height, 1)} className="bar-rect" />
+                      <text x={x + barWidth / 2} y={chartTop + chartHeight + 18} className="chart-axis-label chart-axis-label-x">{item.label}</text>
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
+          </article>
+        )}
 
         <article className="dashboard-panel">
           <h2>Visitas por Dia</h2>
@@ -395,41 +429,43 @@ export default function DashboardScreen({
           )}
         </article>
 
-        <article className="dashboard-panel">
-          <div className="panel-header-with-actions">
-            <h2>Lista de Morosos</h2>
-            <div className="export-btn-group export-btn-group-sm">
-              <button type="button" className="export-btn export-btn-excel" onClick={() => handleExportMorosos("excel")} title="Exportar a Excel">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
-                </svg>
-                Excel
-              </button>
-              <button type="button" className="export-btn export-btn-pdf" onClick={() => handleExportMorosos("pdf")} title="Exportar a PDF">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
-                </svg>
-                PDF
-              </button>
-            </div>
-          </div>
-          <div className="debtor-list">
-            {debtors.length === 0 ? (
-              <p style={{ fontSize: "0.85rem", color: "var(--text-muted,#94a3b8)", padding: "0.5rem 0" }}>Sin morosos registrados</p>
-            ) : debtors.map((debtor) => (
-              <div className="debtor-item" key={debtor.property}>
-                <div>
-                  <strong>{debtor.property}</strong>
-                  <p>{debtor.block}</p>
-                </div>
-                <span>
-                  {debtor.debt}
-                  <small>en mora</small>
-                </span>
+        {user.role !== 'Seguridad' && (
+          <article className="dashboard-panel">
+            <div className="panel-header-with-actions">
+              <h2>Lista de Morosos</h2>
+              <div className="export-btn-group export-btn-group-sm">
+                <button type="button" className="export-btn export-btn-excel" onClick={() => handleExportMorosos("excel")} title="Exportar a Excel">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                  </svg>
+                  Excel
+                </button>
+                <button type="button" className="export-btn export-btn-pdf" onClick={() => handleExportMorosos("pdf")} title="Exportar a PDF">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                  </svg>
+                  PDF
+                </button>
               </div>
-            ))}
-          </div>
-        </article>
+            </div>
+            <div className="debtor-list">
+              {debtors.length === 0 ? (
+                <p style={{ fontSize: "0.85rem", color: "var(--text-muted,#94a3b8)", padding: "0.5rem 0" }}>Sin morosos registrados</p>
+              ) : debtors.map((debtor) => (
+                <div className="debtor-item" key={debtor.property}>
+                  <div>
+                    <strong>{debtor.property}</strong>
+                    <p>{debtor.block}</p>
+                  </div>
+                  <span>
+                    {debtor.debt}
+                    <small>en mora</small>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </article>
+        )}
       </section>
 
       <section className="dashboard-panel recent-visits-panel">

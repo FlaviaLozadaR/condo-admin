@@ -68,11 +68,15 @@ async function updateEstado(req, res) {
     if (!['aprobada', 'rechazada'].includes(estado)) {
       return res.status(400).json({ error: 'Estado debe ser aprobada o rechazada' });
     }
+    const reserva = (await db.getReservasAreas()).find(r => String(r.id) === String(id));
+    if (!reserva) return res.status(404).json({ error: 'Reserva no encontrada' });
+    if (req.user.role !== 'Super Admin' && reserva.condo !== req.user.condo) {
+      return res.status(403).json({ error: 'No autorizado para este condominio' });
+    }
     const updated = await db.updateReservaArea(id, {
       estado,
       ...(nota !== undefined && { nota }),
     });
-    if (!updated) return res.status(404).json({ error: 'Reserva no encontrada' });
     res.json(updated);
   } catch (e) { res.status(400).json({ error: e.message }); }
 }
@@ -91,6 +95,10 @@ async function requestCambio(req, res) {
     const reservas = await db.getReservasAreas();
     const reserva  = reservas.find(r => String(r.id) === String(id));
     if (!reserva) return res.status(404).json({ error: 'Reserva no encontrada' });
+    const user = await db.getUsuarioById(req.user.id);
+    if (reserva.propietario !== user?.name) {
+      return res.status(403).json({ error: 'Solo podés modificar tu propia reserva' });
+    }
 
     const conflict = reservas.find(r =>
       r.id      !== id &&
@@ -118,6 +126,9 @@ async function responderCambio(req, res) {
     const reservas = await db.getReservasAreas();
     const reserva  = reservas.find(r => String(r.id) === String(id));
     if (!reserva?.solicitudCambio) return res.status(404).json({ error: 'Solicitud no encontrada' });
+    if (req.user.role !== 'Super Admin' && reserva.condo !== req.user.condo) {
+      return res.status(403).json({ error: 'No autorizado para este condominio' });
+    }
 
     const sc = reserva.solicitudCambio;
     const changes = aprobado
@@ -131,6 +142,11 @@ async function responderCambio(req, res) {
 
 async function remove(req, res) {
   try {
+    const reserva = (await db.getReservasAreas()).find(r => String(r.id) === String(req.params.id));
+    if (!reserva) return res.status(404).json({ error: 'Reserva no encontrada' });
+    if (req.user.role !== 'Super Admin' && reserva.condo !== req.user.condo) {
+      return res.status(403).json({ error: 'No autorizado para este condominio' });
+    }
     await db.deleteReservaArea(req.params.id);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }

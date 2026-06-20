@@ -1,5 +1,9 @@
 import { useState } from "react";
 import * as api from "../api.js";
+import { onEnterKey } from "../utils/keyboard.js";
+
+const PHONE_PREFIX = "+591";
+const stripPhonePrefix = (phone) => (phone || "").replace(/^\+591[\s-]*/, "");
 
 export default function PerfilScreen({
   user,
@@ -7,8 +11,9 @@ export default function PerfilScreen({
   setProfilePhoto,
   isDarkMode,
   toggleDarkMode,
+  onProfileUpdated,
 }) {
-  const [profileForm, setProfileForm] = useState({ name: user?.name || "", email: user?.email || "", phone: user?.phone || "" });
+  const [profileForm, setProfileForm] = useState({ name: user?.name || "", email: user?.email || "", phone: stripPhonePrefix(user?.phone) });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState("");
   const [pwForm, setPwForm]   = useState({ current: "", next: "", confirm: "" });
@@ -31,7 +36,9 @@ export default function PerfilScreen({
     setProfileSaving(true);
     setProfileMsg("");
     try {
-      await api.updateUsuario(String(user.id || ""), { name: profileForm.name, email: profileForm.email, phone: profileForm.phone });
+      const phone = profileForm.phone.trim() ? `${PHONE_PREFIX} ${profileForm.phone.trim()}` : "";
+      await api.updateUsuario(String(user.id || ""), { name: profileForm.name, email: profileForm.email, phone });
+      onProfileUpdated?.({ name: profileForm.name, email: profileForm.email, phone });
       setProfileMsg("Datos actualizados correctamente.");
     } catch (err) {
       setProfileMsg("Error al guardar: " + (err.message || "intenta de nuevo."));
@@ -92,15 +99,18 @@ export default function PerfilScreen({
           <div className="perfil-form-grid">
             <div className="form-group-simple">
               <label>Nombre completo</label>
-              <input type="text" value={profileForm.name} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} placeholder="Tu nombre" />
+              <input type="text" value={profileForm.name} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} onKeyDown={onEnterKey(handleSaveProfile, profileSaving)} placeholder="Tu nombre" />
             </div>
             <div className="form-group-simple">
               <label>Correo electrónico</label>
-              <input type="email" value={profileForm.email} onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })} placeholder="correo@ejemplo.com" />
+              <input type="email" value={profileForm.email} onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })} onKeyDown={onEnterKey(handleSaveProfile, profileSaving)} placeholder="correo@ejemplo.com" />
             </div>
             <div className="form-group-simple">
               <label>Teléfono</label>
-              <input type="text" value={profileForm.phone} onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })} placeholder="Ej: 0991234567" />
+              <div className="phone-input-group">
+                <span className="phone-input-prefix">{PHONE_PREFIX}</span>
+                <input type="text" inputMode="numeric" value={profileForm.phone} onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value.replace(/\D/g, "") })} onKeyDown={onEnterKey(handleSaveProfile, profileSaving)} placeholder="Ej: 69444833" />
+              </div>
             </div>
             <div className="form-group-simple">
               <label>Rol</label>
@@ -123,15 +133,15 @@ export default function PerfilScreen({
           <div className="perfil-form-grid">
             <div className="form-group-simple" style={{ gridColumn: "1 / -1" }}>
               <label>Contraseña actual</label>
-              <input type="password" value={pwForm.current} onChange={e => setPwForm({ ...pwForm, current: e.target.value })} placeholder="Tu contraseña actual" />
+              <input type="password" value={pwForm.current} onChange={e => setPwForm({ ...pwForm, current: e.target.value })} onKeyDown={onEnterKey(handleChangePassword, pwSaving)} placeholder="Tu contraseña actual" />
             </div>
             <div className="form-group-simple">
               <label>Nueva contraseña</label>
-              <input type="password" value={pwForm.next} onChange={e => setPwForm({ ...pwForm, next: e.target.value })} placeholder="Mínimo 8 caracteres" />
+              <input type="password" value={pwForm.next} onChange={e => setPwForm({ ...pwForm, next: e.target.value })} onKeyDown={onEnterKey(handleChangePassword, pwSaving)} placeholder="Mínimo 8 caracteres" />
             </div>
             <div className="form-group-simple">
               <label>Confirmar nueva contraseña</label>
-              <input type="password" value={pwForm.confirm} onChange={e => setPwForm({ ...pwForm, confirm: e.target.value })} placeholder="Repetí la nueva contraseña" />
+              <input type="password" value={pwForm.confirm} onChange={e => setPwForm({ ...pwForm, confirm: e.target.value })} onKeyDown={onEnterKey(handleChangePassword, pwSaving)} placeholder="Repetí la nueva contraseña" />
             </div>
           </div>
           {pwMsg && (

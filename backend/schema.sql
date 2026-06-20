@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS pagos (
   comprobante TEXT DEFAULT '',
   due_date TEXT DEFAULT '',
   created_by_role TEXT DEFAULT '',
+  condo TEXT DEFAULT '',
   inserted_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -67,6 +68,7 @@ CREATE TABLE IF NOT EXISTS pagos (
 -- (ORDER BY inserted_at DESC + filtro por estado) sea eficiente.
 CREATE INDEX IF NOT EXISTS idx_pagos_inserted_at ON pagos (inserted_at DESC);
 CREATE INDEX IF NOT EXISTS idx_pagos_estado ON pagos (estado);
+CREATE INDEX IF NOT EXISTS idx_pagos_condo ON pagos (condo);
 
 CREATE TABLE IF NOT EXISTS anuncios (
   id TEXT PRIMARY KEY,
@@ -120,12 +122,18 @@ CREATE TABLE IF NOT EXISTS visitas (
   plate TEXT DEFAULT '-',
   id_document_name TEXT DEFAULT '',
   plate_photo_name TEXT DEFAULT '',
+  id_document_front_path TEXT DEFAULT '',
+  id_document_back_path TEXT DEFAULT '',
+  plate_photo_path TEXT DEFAULT '',
   created_by TEXT DEFAULT '',
   created_at TEXT DEFAULT '',
   status TEXT DEFAULT 'Activo',
   expires_at DATE DEFAULT NULL,
+  condo TEXT DEFAULT '',
   inserted_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_visitas_condo ON visitas (condo);
 
 CREATE TABLE IF NOT EXISTS historial_visitas (
   id TEXT PRIMARY KEY,
@@ -139,6 +147,7 @@ CREATE TABLE IF NOT EXISTS historial_visitas (
   salida TEXT DEFAULT '-',
   motivo TEXT DEFAULT '',
   guard TEXT DEFAULT '',
+  condo TEXT DEFAULT '',
   inserted_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -146,6 +155,7 @@ CREATE TABLE IF NOT EXISTS historial_visitas (
 -- (ORDER BY inserted_at DESC + filtro por tipo) no se degrade con el tiempo.
 CREATE INDEX IF NOT EXISTS idx_historial_visitas_inserted_at ON historial_visitas (inserted_at DESC);
 CREATE INDEX IF NOT EXISTS idx_historial_visitas_tipo ON historial_visitas (tipo);
+CREATE INDEX IF NOT EXISTS idx_historial_visitas_condo ON historial_visitas (condo);
 
 CREATE TABLE IF NOT EXISTS panic_alerts (
   id TEXT PRIMARY KEY,
@@ -153,6 +163,7 @@ CREATE TABLE IF NOT EXISTS panic_alerts (
   phone TEXT DEFAULT '',
   address TEXT DEFAULT '',
   unit TEXT DEFAULT '',
+  condo TEXT DEFAULT '',
   status TEXT DEFAULT 'Pendiente',
   created_at TEXT DEFAULT '',
   inserted_at TIMESTAMPTZ DEFAULT NOW()
