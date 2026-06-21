@@ -2230,6 +2230,8 @@ h2,
   border-radius: 10px;
   background: #f9fafb;
   cursor: zoom-in;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
 }
 
 .pago-comprobante-pdf-link {
@@ -2539,6 +2541,8 @@ h2,
   display: block;
   cursor: zoom-in;
   transition: transform 0.15s ease;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
 }
 
 .payment-qr-img:hover {
