@@ -112,9 +112,7 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
         item.cedula.toLowerCase().includes(query) ||
         item.placa.toLowerCase().includes(query);
       const matchesType = typeFilter === "todos" || item.tipo === typeFilter;
-      const matchesCondo =
-        !selectedCondoName ||
-        item.propiedad.toLowerCase().includes(selectedCondoName.toLowerCase());
+      const matchesCondo = !selectedCondoName || (item.condo || resolveCondoDeVisita(item)) === selectedCondoName;
       const matchesMonth = exportMonthsFilter.size === 0 || (() => {
         const d = parseFecha(item.fecha);
         if (!d || isNaN(d)) return false;

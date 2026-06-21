@@ -137,7 +137,7 @@ export default function PagosScreen({
   const handleExportPagos = async (format) => {
     const query = paymentSearchTerm.toLowerCase().trim();
     const toExport = pagosData.filter((item) => {
-      const byCondo = !selectedPaymentCondoName || item.propiedad.toLowerCase().includes(selectedPaymentCondoName.toLowerCase());
+      const byCondo = !selectedPaymentCondoName || (item.condo || resolveCondoDePago(item)) === selectedPaymentCondoName;
       const byTab = paymentTab === "todos" || item.estado === paymentTab;
       const byQuery =
         !query ||
