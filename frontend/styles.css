@@ -2448,6 +2448,7 @@ h2,
 
 .expensas-props-table {
   width: 100%;
+  min-width: 760px;
   border-collapse: collapse;
   font-size: 0.85rem;
 }
@@ -2474,6 +2475,13 @@ h2,
 
 .expensas-props-table tr:last-child td { border-bottom: none; }
 .expensas-props-table tr:hover td { background: #fafafa; }
+
+.expensas-editable-value {
+  cursor: pointer;
+  border-bottom: 1px dashed #c7d2fe;
+  padding-bottom: 1px;
+}
+.expensas-editable-value:hover { color: #4f46e5 !important; border-bottom-color: #4f46e5; }
 
 /* ── Panel QR admin ─────────────────────────────────────────── */
 .payment-qr-panel {

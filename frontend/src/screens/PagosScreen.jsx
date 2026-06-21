@@ -60,6 +60,9 @@ export default function PagosScreen({
   const [cargoExtraVal, setCargoExtraVal] = useState('');
   const [cargoNotaVal, setCargoNotaVal] = useState('');
   const [cargoExtraLoading, setCargoExtraLoading] = useState(false);
+  const [editingExpensaId, setEditingExpensaId] = useState(null);
+  const [expensaEditVal, setExpensaEditVal] = useState('');
+  const [expensaEditLoading, setExpensaEditLoading] = useState(false);
 
   const selectedPaymentCondoName =
     paymentCondoFilter === "todos"
@@ -319,6 +322,21 @@ export default function PagosScreen({
       setExpensasMsg('error:' + e.message);
     } finally {
       setExpensasLoading(false);
+    }
+  };
+
+  const handleSaveExpensaActual = async (propId, condoId) => {
+    const monto = parseFloat(expensaEditVal);
+    if (isNaN(monto) || monto < 0) return;
+    setExpensaEditLoading(true);
+    try {
+      await api.asignarExpensas(condoId, monto, [propId]);
+      setPropiedadesData(prev => prev.map(p => String(p.id) === String(propId) ? { ...p, expensaMensual: monto } : p));
+      setEditingExpensaId(null);
+    } catch (e) {
+      onToast?.(e.message || 'No se pudo actualizar la expensa.', 'error');
+    } finally {
+      setExpensaEditLoading(false);
     }
   };
 
@@ -757,9 +775,24 @@ export default function PagosScreen({
                             <td>{p.owner || '—'}</td>
                             <td style={{color:'#6b7280'}}>{getPropertyTenantsText(p) !== '-' ? getPropertyTenantsText(p) : '—'}</td>
                             <td>
-                              <span style={{color: expensaActual > 0 ? '#101828' : '#9ca3af', fontWeight: expensaActual > 0 ? 700 : 400}}>
-                                {expensaActual > 0 ? `Bs. ${expensaActual.toLocaleString()}` : '—'}
-                              </span>
+                              {editingExpensaId === p.id ? (
+                                <div style={{display:'flex',gap:'0.3rem',alignItems:'center'}}>
+                                  <input type="number" min="0" className="expensas-base-input" style={{width:80}} value={expensaEditVal} onChange={e => setExpensaEditVal(e.target.value)} autoFocus />
+                                  <button className="btn btn-primary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} disabled={expensaEditLoading} onClick={() => handleSaveExpensaActual(p.id, adminCondoId)}>
+                                    {expensaEditLoading ? '…' : 'OK'}
+                                  </button>
+                                  <button className="btn btn-secondary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} onClick={() => setEditingExpensaId(null)}>✕</button>
+                                </div>
+                              ) : (
+                                <span
+                                  className="expensas-editable-value"
+                                  title="Click para corregir la expensa de esta propiedad"
+                                  onClick={() => { setEditingExpensaId(p.id); setExpensaEditVal(String(expensaActual)); }}
+                                  style={{color: expensaActual > 0 ? '#101828' : '#9ca3af', fontWeight: expensaActual > 0 ? 700 : 400}}
+                                >
+                                  {expensaActual > 0 ? `Bs. ${expensaActual.toLocaleString()}` : '—'}
+                                </span>
+                              )}
                             </td>
                             <td>
                               {isEditing ? (
