@@ -288,6 +288,22 @@ export default function PagosScreen({
     }
   };
 
+  const handleDownloadQr = async (url, condoName) => {
+    try {
+      const res  = await fetch(url);
+      const blob = await res.blob();
+      const ext  = (blob.type.split('/')[1] || 'png').split('+')[0];
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = `qr-pago-${(condoName || 'condominio').toLowerCase().replace(/\s+/g, '-')}.${ext}`;
+      a.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      onToast?.('No se pudo descargar el QR.', 'error');
+    }
+  };
+
   const handleSaveExpensas = async (condoId) => {
     const monto = parseFloat(expensasInputVal);
     if (isNaN(monto) || monto < 0 || expensasSelectedIds.size === 0) return;
@@ -526,16 +542,27 @@ export default function PagosScreen({
             <div className="payment-qr-panel-body">
               <div className="payment-qr-preview-wrap">
                 {currentQr ? (
-                  <img
-                    src={currentQr}
-                    alt="QR de pago"
-                    className="payment-qr-img"
-                    onClick={() => setQrZoomOpen(true)}
-                    role="button"
-                    tabIndex={0}
-                    title="Ver QR ampliado"
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setQrZoomOpen(true); } }}
-                  />
+                  <>
+                    <img
+                      src={currentQr}
+                      alt="QR de pago"
+                      className="payment-qr-img"
+                      onClick={() => setQrZoomOpen(true)}
+                      role="button"
+                      tabIndex={0}
+                      title="Ver QR ampliado"
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setQrZoomOpen(true); } }}
+                    />
+                    <button
+                      type="button"
+                      className="payment-qr-download-btn"
+                      onClick={() => handleDownloadQr(currentQr, activeCondo?.name)}
+                      title="Descargar QR"
+                      aria-label="Descargar QR"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </button>
+                  </>
                 ) : (
                   <div className="payment-qr-empty">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -577,7 +604,7 @@ export default function PagosScreen({
                     type="button"
                     className="btn btn-secondary payment-qr-delete-btn"
                     disabled={qrUploadLoading}
-                    onClick={() => { if (window.confirm('¿Eliminar el QR de pago?')) handleDeletePaymentQr(adminCondoId); }}
+                    onClick={() => askConfirm('¿Eliminar el QR de pago?', () => handleDeletePaymentQr(adminCondoId))}
                   >
                     Eliminar QR
                   </button>

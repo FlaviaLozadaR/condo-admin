@@ -2529,7 +2529,30 @@ h2,
 
 .payment-qr-preview-wrap {
   flex-shrink: 0;
+  position: relative;
+  width: 150px;
+  height: 150px;
 }
+
+.payment-qr-download-btn {
+  position: absolute;
+  bottom: -10px;
+  right: -10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent, #5b5cff);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(91, 92, 255, 0.4);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.payment-qr-download-btn svg { width: 16px; height: 16px; }
+.payment-qr-download-btn:hover { background: var(--accent-dark, #4338ca); transform: scale(1.08); }
 
 .payment-qr-img {
   width: 150px;
