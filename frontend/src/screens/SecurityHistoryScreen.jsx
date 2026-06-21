@@ -35,9 +35,34 @@ export default function SecurityHistoryScreen({ visitPasses, setVisitPasses, his
   // por nombre+cédula, que se rompía con duplicados o registros fuera de orden.
   const historialByPassId = (() => {
     const map = new Map();
+    const sinEnlace = [];
     historialVisitasData.forEach((h) => {
       if (h.visitaId) map.set(h.visitaId, h);
+      else sinEnlace.push(h);
     });
+
+    // Plan B para historial de antes de tener esta relación directa: adivinar
+    // por nombre+cédula y orden de creación, solo para lo que quedó sin enlazar.
+    if (sinEnlace.length) {
+      const groups = new Map();
+      [...sinEnlace]
+        .sort((a, b) => new Date(a.insertedAt) - new Date(b.insertedAt))
+        .forEach((h) => {
+          const key = `${h.visitante}|${h.cedula}`;
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(h);
+        });
+
+      [...visitPasses]
+        .filter((p) => !map.has(p.id))
+        .sort((a, b) => new Date(a.insertedAt) - new Date(b.insertedAt))
+        .forEach((p) => {
+          const key = `${p.fullName}|${p.idNumber}`;
+          const list = groups.get(key);
+          if (list?.length) map.set(p.id, list.shift());
+        });
+    }
+
     return map;
   })();
 

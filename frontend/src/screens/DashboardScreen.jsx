@@ -30,12 +30,10 @@ export default function DashboardScreen({
 
   // ── Exportar Morosos ──────────────────────────────────────────────────────────
   const handleExportMorosos = async (format) => {
-    const morososList = propiedadesData
-      .filter(p => (!adminCondoName || p.condo === adminCondoName) && (Number(p.debt) || 0) > 0)
-      .sort((a, b) => (Number(b.debt) || 0) - (Number(a.debt) || 0));
+    const morososList = moroseProps;
     if (morososList.length === 0) { onToast("No hay morosos para exportar.", "warning"); return; }
     const date       = new Date().toISOString().slice(0, 10);
-    const totalDeuda = morososList.reduce((s, p) => s + (Number(p.debt) || 0), 0);
+    const totalDeuda = morososList.reduce((s, p) => s + p.totalDebt, 0);
 
     if (format === "excel") {
       // xlsx se carga bajo demanda: pesa ~400KB y solo se necesita al exportar
@@ -46,7 +44,7 @@ export default function DashboardScreen({
         Bloque:        p.block,
         Propietario:   p.owner,
         Inquilino:     getPropertyTenantsText(p) !== "-" ? getPropertyTenantsText(p) : "",
-        "Deuda ($)":   p.debt,
+        "Deuda ($)":   p.totalDebt,
       })));
       ws["!cols"] = [{ wch: 22 }, { wch: 10 }, { wch: 8 }, { wch: 22 }, { wch: 22 }, { wch: 10 }];
       const wb = XLSX.utils.book_new();
@@ -60,7 +58,7 @@ export default function DashboardScreen({
         headers:  ["Condominio", "Unidad", "Bloque", "Propietario", "Inquilino", "Deuda"],
         rows:     morososList.map(p => [
           p.condo || p.street, p.code, p.block, p.owner,
-          getPropertyTenantsText(p), `Bs. ${p.debt}`,
+          getPropertyTenantsText(p), `Bs. ${p.totalDebt.toLocaleString()}`,
         ]),
         totals:   ["", "", "", "", "Total en mora:", `Bs. ${totalDeuda.toLocaleString("es-AR")}`],
       });
@@ -164,7 +162,11 @@ export default function DashboardScreen({
   const morososCount = morososSet.size;
 
   // Lista morosos — propiedades con deuda o sin pago aprobado
-  const debtors = adminProps
+  // Deuda total real por propiedad: pagos pendientes + expensa/cargo extra sin
+  // pago aprobado + deuda directa. Se usa tanto para la tarjeta en pantalla
+  // como para el export de PDF/Excel — antes el export solo miraba p.debt y
+  // se perdía casi todos los morosos.
+  const moroseProps = adminProps
     .map(p => {
       const label      = `${p.street} - ${p.code}`;
       const pending    = pendingPagos.filter(pay => pay.propiedad === label || pay.propietario === p.owner);
@@ -173,11 +175,16 @@ export default function DashboardScreen({
         ? (Number(p.expensaMensual) || 0) + (Number(p.cargoExtra) || 0)
         : 0;
       const totalDebt  = pendingAmt + sinPago + (Number(p.debt) || 0);
-      return { property: label, block: p.block, debt: totalDebt };
+      return { ...p, label, totalDebt };
     })
-    .filter(d => d.debt > 0)
-    .sort((a, b) => b.debt - a.debt)
-    .map(d => ({ ...d, debt: `Bs. ${d.debt.toLocaleString()}` }));
+    .filter(p => p.totalDebt > 0)
+    .sort((a, b) => b.totalDebt - a.totalDebt);
+
+  const debtors = moroseProps.map(p => ({
+    property: p.label,
+    block:    p.block,
+    debt:     `Bs. ${p.totalDebt.toLocaleString()}`,
+  }));
 
   // KPIs de seguridad
   const todayKey        = nowDate.toDateString();
