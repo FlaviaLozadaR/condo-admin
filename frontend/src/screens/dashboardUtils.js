@@ -22,9 +22,28 @@ const polarToCartesian = (centerX, centerY, radius, angleInDegrees) => {
 };
 
 export const describeSector = (centerX, centerY, radius, startAngle, endAngle) => {
+  const span = endAngle - startAngle;
+
+  // Sin ángulo: nada que dibujar (evita el "puntito" que queda al cerrar
+  // un camino degenerado de centro→borde→borde→centro).
+  if (span <= 0) return "";
+
+  // Círculo completo (100%): un solo arco no se puede dibujar porque el
+  // punto de inicio y fin coinciden — hay que partirlo en dos mitades.
+  if (span >= 360) {
+    const mid = polarToCartesian(centerX, centerY, radius, startAngle + 180);
+    const end = polarToCartesian(centerX, centerY, radius, startAngle);
+    return [
+      `M ${end.x} ${end.y}`,
+      `A ${radius} ${radius} 0 1 0 ${mid.x} ${mid.y}`,
+      `A ${radius} ${radius} 0 1 0 ${end.x} ${end.y}`,
+      "Z"
+    ].join(" ");
+  }
+
   const start = polarToCartesian(centerX, centerY, radius, endAngle);
   const end = polarToCartesian(centerX, centerY, radius, startAngle);
-  const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+  const largeArcFlag = span <= 180 ? "0" : "1";
 
   return [
     `M ${centerX} ${centerY}`,
