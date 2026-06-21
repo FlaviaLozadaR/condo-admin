@@ -68,6 +68,34 @@ body {
   padding: 0;
 }
 
+/* Sensación de app nativa: sin rebote elástico en los bordes y sin resaltado
+   gris al tocar. El contenido (textos, mensajes) sigue siendo seleccionable. */
+html, body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Solo el "chrome" de la app (menú, encabezado, botones) no se selecciona al
+   arrastrar el dedo — el contenido real nunca pierde la posibilidad de copiarse. */
+.dashboard-sidebar, .dashboard-header, nav, button, .btn, [role="button"] {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, a, .btn, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Ocultar la barra de scroll visualmente sin desactivar el scroll en sí */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
 body {
   min-height: 100vh;
   font-family: "Manrope", "Segoe UI", sans-serif;
