@@ -354,6 +354,7 @@ export default function PreRegisterVisitsScreen({
                   type="date"
                   value={visitRegistrationForm.expiresAt}
                   min={new Date().toISOString().split('T')[0]}
+                  max={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
                   onChange={(e) => setVisitRegistrationForm({ ...visitRegistrationForm, expiresAt: e.target.value })}
                 />
               </label>

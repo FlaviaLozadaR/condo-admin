@@ -18,6 +18,25 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
   const [loading, setLoading] = useState(false);
   const [exportMonthsFilter, setExportMonthsFilter] = useState(new Set());
   const [exportMonthsDropdownOpen, setExportMonthsDropdownOpen] = useState(false);
+  const [deletingHistorialId, setDeletingHistorialId] = useState(null);
+  const canDeleteHistorial = ["Super Admin", "Administrador", "Seguridad"].includes(user.role);
+
+  const confirmDeleteHistorial = async () => {
+    if (!deletingHistorialId) return;
+    try {
+      await api.deleteHistorialVisita(String(deletingHistorialId));
+      setPageData((prev) => ({
+        ...prev,
+        data: prev.data.filter((h) => h.id !== deletingHistorialId),
+        total: Math.max(0, prev.total - 1),
+      }));
+      onToast?.("Registro eliminado.", "success");
+    } catch (err) {
+      onToast?.(err.message || "No se pudo eliminar el registro.", "error");
+    } finally {
+      setDeletingHistorialId(null);
+    }
+  };
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchTerm), 400);
@@ -405,13 +424,14 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
               <th>Entrada</th>
               <th>Salida</th>
               <th>Motivo</th>
+              {canDeleteHistorial && <th>Acciones</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={9}>Cargando...</td></tr>
+              <tr><td colSpan={canDeleteHistorial ? 10 : 9}>Cargando...</td></tr>
             ) : pageData.data.length === 0 ? (
-              <tr><td colSpan={9}>No se encontraron registros.</td></tr>
+              <tr><td colSpan={canDeleteHistorial ? 10 : 9}>No se encontraron registros.</td></tr>
             ) : pageData.data.map((item) => (
               <tr key={item.id}>
                 <td>{item.visitante}</td>
@@ -431,11 +451,32 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
                   ) : item.salida}
                 </td>
                 <td>{item.motivo}</td>
+                {canDeleteHistorial && (
+                  <td>
+                    <button type="button" className="historial-delete-btn" title="Eliminar registro" onClick={() => setDeletingHistorialId(item.id)}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V7H6V19ZM8 9H16V19H8V9ZM15.5 4L14.5 3H9.5L8.5 4H5V6H19V4H15.5Z"/></svg>
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </section>
+
+      {deletingHistorialId && (
+        <div className="modal-overlay modal-overlay-centered" onClick={() => setDeletingHistorialId(null)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-modal-icon confirm-modal-icon-danger" aria-hidden="true">!</div>
+            <h2>¿Eliminar este registro?</h2>
+            <p>Esta acción no se puede deshacer — usalo solo si fue un duplicado o un error de registro.</p>
+            <div className="confirm-modal-actions">
+              <button type="button" className="confirm-modal-cancel" onClick={() => setDeletingHistorialId(null)}>Cancelar</button>
+              <button type="button" className="confirm-modal-accept confirm-modal-accept-danger" onClick={confirmDeleteHistorial}>Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Pagination page={page} totalPages={pageData.totalPages} onPageChange={setPage} />
     </>

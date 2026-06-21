@@ -148,8 +148,11 @@ CREATE TABLE IF NOT EXISTS historial_visitas (
   motivo TEXT DEFAULT '',
   guard TEXT DEFAULT '',
   condo TEXT DEFAULT '',
+  visita_id TEXT DEFAULT '',
   inserted_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_historial_visitas_visita_id ON historial_visitas (visita_id);
 
 -- Tabla de crecimiento continuo: índices para que la paginación
 -- (ORDER BY inserted_at DESC + filtro por tipo) no se degrade con el tiempo.

@@ -4398,6 +4398,28 @@ h2,
   color: #344054;
 }
 
+.historial-delete-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #6b7280;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  padding: 0;
+  flex-shrink: 0;
+}
+.historial-delete-btn svg { width: 14px; height: 14px; }
+.historial-delete-btn:hover {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
 .historial-type-chip {
   display: inline-flex;
   align-items: center;
@@ -8596,6 +8618,9 @@ h2,
 [data-theme="dark"] .modal-header h3 { color: #ffffff; font-weight: 600; }
 [data-theme="dark"] .modal-header p { color: #737373; }
 [data-theme="dark"] .modal-edit-user h2 { color: #ffffff; }
+[data-theme="dark"] .visit-data-grid div { background: #262626; border-color: #363636; }
+[data-theme="dark"] .visit-data-grid span { color: #a8a8a8; }
+[data-theme="dark"] .visit-data-grid strong { color: #ffffff; }
 [data-theme="dark"] .modal-footer {
   background: #1a1a1a;
   border-top: 1px solid #262626;

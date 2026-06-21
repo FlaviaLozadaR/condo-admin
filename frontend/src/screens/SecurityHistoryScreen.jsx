@@ -13,27 +13,14 @@ export default function SecurityHistoryScreen({ visitPasses, setVisitPasses, his
   const [editForm, setEditForm] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  // Empareja cada pase con su registro de historial (entrada/salida) por
-  // identidad y orden de creación: cada registro "Registrado" crea su
-  // historial al mismo tiempo, así que el más antiguo de cada uno coincide.
+  // Empareja cada pase con su registro de historial por la relación directa
+  // (visitaId) que queda guardada al crear el historial — ya no se adivina
+  // por nombre+cédula, que se rompía con duplicados o registros fuera de orden.
   const historialByPassId = (() => {
-    const groups = new Map();
-    [...historialVisitasData]
-      .sort((a, b) => new Date(a.insertedAt) - new Date(b.insertedAt))
-      .forEach((h) => {
-        const key = `${h.visitante}|${h.cedula}`;
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push(h);
-      });
-
     const map = new Map();
-    [...visitPasses]
-      .sort((a, b) => new Date(a.insertedAt) - new Date(b.insertedAt))
-      .forEach((p) => {
-        const key = `${p.fullName}|${p.idNumber}`;
-        const list = groups.get(key);
-        if (list?.length) map.set(p.id, list.shift());
-      });
+    historialVisitasData.forEach((h) => {
+      if (h.visitaId) map.set(h.visitaId, h);
+    });
     return map;
   })();
 

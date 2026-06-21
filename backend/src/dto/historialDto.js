@@ -1,6 +1,6 @@
 class HistorialDTO {
   static fromRequest(body = {}) {
-    const { visitante, visitorName, cedula, propiedad, unit, tipo, action, placa, guard, motivo, fecha, entrada, salida } = body;
+    const { visitante, visitorName, cedula, propiedad, unit, tipo, action, placa, guard, motivo, fecha, entrada, salida, visitaId } = body;
     const now  = new Date();
     const horaActual  = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     const fechaActual = now.toLocaleDateString('es-ES');
@@ -15,6 +15,7 @@ class HistorialDTO {
       fecha:     fecha    || fechaActual,
       entrada:   entrada  || horaActual,
       salida:    salida   || '-',
+      visitaId:  visitaId || '',
     };
   }
 

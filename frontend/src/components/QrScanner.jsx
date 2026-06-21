@@ -163,6 +163,7 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
       salida:    '-',
       motivo:    pass.motive || '-',
       guard:     guardName,
+      visitaId:  pass.id,
     });
     setHistorialVisitas?.(prev => [entry, ...prev]);
     showMsg(`✓ Ingreso registrado: ${pass.fullName} — ${hora}`);
@@ -183,6 +184,15 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
       setQrValidationError({
         title: 'QR vencido',
         message: `El pase de ${pass.fullName} venció el ${vencio} y ya no es válido. No se registró el ingreso.`,
+      });
+      return;
+    }
+    // Tope absoluto: ningún QR es válido más de 24hs después de creado,
+    // sin importar el vencimiento que se le haya puesto (o si no tiene).
+    if (pass.insertedAt && Date.now() - new Date(pass.insertedAt).getTime() > 24 * 60 * 60 * 1000) {
+      setQrValidationError({
+        title: 'QR vencido',
+        message: `El pase de ${pass.fullName} fue generado hace más de 24 horas — el máximo permitido — y ya no es válido. No se registró el ingreso.`,
       });
       return;
     }

@@ -41,6 +41,18 @@ async function updateSalida(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
+async function remove(req, res) {
+  try {
+    const existing = await db.getHistorialById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'No encontrado' });
+    if (req.user.role !== 'Super Admin' && existing.condo !== req.user.condo) {
+      return res.status(403).json({ error: 'No autorizado para este condominio' });
+    }
+    await db.deleteHistorial(req.params.id);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+}
+
 // GET /historial-visitas/my-visits — historial de visitas de las propiedades
 // donde el usuario logueado es propietario o inquilino.
 async function getMyVisits(req, res) {
@@ -64,4 +76,4 @@ async function getMyVisits(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
-module.exports = { getAll, create, updateSalida, getMyVisits };
+module.exports = { getAll, create, updateSalida, remove, getMyVisits };

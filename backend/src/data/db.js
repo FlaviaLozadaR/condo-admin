@@ -507,6 +507,9 @@ async function getHistorialById(id) {
 async function updateHistorial(id, changes) {
   return rowToApp(await q(supabase.from('historial_visitas').update(appToRow(changes)).eq('id', id).select().single()));
 }
+async function deleteHistorial(id) {
+  await q(supabase.from('historial_visitas').delete().eq('id', id));
+}
 
 // PANIC ALERTS
 async function getPanicAlerts(condo) {
@@ -585,7 +588,7 @@ module.exports = {
   getAnuncios, createAnuncio, updateAnuncio, deleteAnuncio, getAnunciosPaged,
   getAsambleas, getAsambleaById, createAsamblea, updateAsamblea, deleteAsamblea, voteAsamblea, getAsambleasPaged,
   getVisitas, createVisita, getVisitaByCode, updateVisitaStatus, getVisitaById, updateVisita,
-  getHistorial, getHistorialPaged, createHistorial, getHistorialById, updateHistorial,
+  getHistorial, getHistorialPaged, createHistorial, getHistorialById, updateHistorial, deleteHistorial,
   getPanicAlerts, createPanicAlert, getPanicAlertById, updatePanicStatus,
   createResetToken, getResetToken, markTokenUsed,
   getDataForDashboard,

@@ -72,6 +72,7 @@ async function create(req, res) {
         placa:     data.plate,
         guard:     data.createdBy,
         motivo:    data.motive,
+        visitaId:  nuevo.id,
       });
       historialEntry = HistorialDTO.toResponse(await db.createHistorial({ id: uuid(), ...historialData, condo: req.user?.condo || '' }));
     }

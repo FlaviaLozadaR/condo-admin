@@ -186,6 +186,7 @@ export const getHistorialVisitasPaged = (params = {}) => {
 };
 export const createHistorialVisita = (data) => request('/historial-visitas', { method: 'POST', body: data });
 export const updateHistorialSalida = (id, salida) => request(`/historial-visitas/${id}/salida`, { method: 'PATCH', body: { salida } });
+export const deleteHistorialVisita = (id) => request(`/historial-visitas/${id}`, { method: 'DELETE' });
 
 // Botón de pánico
 export const getPanicAlerts = (condo) => request(condo ? `/panic?condo=${encodeURIComponent(condo)}` : '/panic');
