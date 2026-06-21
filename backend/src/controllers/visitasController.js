@@ -181,4 +181,22 @@ async function deleteDocument(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
-module.exports = { upload, getAll, create, verify, update, updateStatus, getDocumentUrl, deleteDocument };
+async function remove(req, res) {
+  try {
+    const visita = await db.getVisitaById(req.params.id);
+    if (!visita) return res.status(404).json({ error: 'No encontrado' });
+    if (req.user.role !== 'Super Admin' && visita.condo !== req.user.condo) {
+      return res.status(403).json({ error: 'No autorizado para este condominio' });
+    }
+    // Limpia las fotos subidas (carnet, placa) para no dejar archivos huérfanos.
+    await Promise.all(
+      Object.values(TYPE_FIELDS)
+        .filter((field) => visita[field])
+        .map((field) => deleteFile(BUCKET, visita[field]).catch(() => {}))
+    );
+    await db.deleteVisita(req.params.id);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+}
+
+module.exports = { upload, getAll, create, verify, update, updateStatus, getDocumentUrl, deleteDocument, remove };

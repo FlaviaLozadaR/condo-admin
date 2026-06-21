@@ -167,6 +167,7 @@ export const updateVisitaStatus = (id, status) => request(`/visitas/${id}/status
 export const updateVisita = (id, data) => request(`/visitas/${id}`, { method: 'PATCH', body: data });
 export const getVisitaDocumentUrl = (id, type) => request(`/visitas/${id}/document/${type}`);
 export const deleteVisitaDocument = (id, type) => request(`/visitas/${id}/document/${type}`, { method: 'DELETE' });
+export const deleteVisita = (id) => request(`/visitas/${id}`, { method: 'DELETE' });
 
 // Verificar QR por código
 export const verifyVisita = (code) => request(`/visitas/verify/${encodeURIComponent(code)}`);

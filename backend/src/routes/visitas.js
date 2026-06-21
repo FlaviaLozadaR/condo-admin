@@ -19,5 +19,6 @@ router.patch('/:id', requireAuth, requireRole(...MGMT), ctrl.update);
 
 router.get('/:id/document/:type',    requireAuth, requireRole(...MGMT), ctrl.getDocumentUrl);
 router.delete('/:id/document/:type', requireAuth, requireRole(...MGMT), ctrl.deleteDocument);
+router.delete('/:id',                requireAuth, requireRole(...MGMT), ctrl.remove);
 
 module.exports = router;

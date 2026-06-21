@@ -12,6 +12,23 @@ export default function SecurityHistoryScreen({ visitPasses, setVisitPasses, his
   const [detailItem, setDetailItem] = useState(null);
   const [editForm, setEditForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [deletingVisitaId, setDeletingVisitaId] = useState(null);
+  const [deletingVisitaBusy, setDeletingVisitaBusy] = useState(false);
+
+  const confirmDeleteVisita = async () => {
+    if (!deletingVisitaId) return;
+    setDeletingVisitaBusy(true);
+    try {
+      await api.deleteVisita(String(deletingVisitaId));
+      setVisitPasses((prev) => prev.filter((v) => v.id !== deletingVisitaId));
+      onToast?.("Pase eliminado.", "success");
+    } catch (err) {
+      onToast?.(err.message || "No se pudo eliminar el pase.", "error");
+    } finally {
+      setDeletingVisitaBusy(false);
+      setDeletingVisitaId(null);
+    }
+  };
 
   // Empareja cada pase con su registro de historial por la relación directa
   // (visitaId) que queda guardada al crear el historial — ya no se adivina
@@ -124,6 +141,7 @@ export default function SecurityHistoryScreen({ visitPasses, setVisitPasses, his
                   <th key={doc.type}>{doc.label}</th>
                 ))}
                 <th>Detalle</th>
+                <th>Eliminar</th>
               </tr>
             </thead>
             <tbody>
@@ -185,6 +203,16 @@ export default function SecurityHistoryScreen({ visitPasses, setVisitPasses, his
                       title="Ver detalle del visitante"
                     >
                       Ver detalle
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="visit-doc-btn visit-doc-btn-danger"
+                      onClick={() => setDeletingVisitaId(item.id)}
+                      title="Eliminar este pase"
+                    >
+                      Eliminar
                     </button>
                   </td>
                 </tr>
@@ -274,6 +302,22 @@ export default function SecurityHistoryScreen({ visitPasses, setVisitPasses, his
                 </>
               )}
             </footer>
+          </div>
+        </div>
+      )}
+
+      {deletingVisitaId && (
+        <div className="modal-overlay modal-overlay-centered" onClick={() => !deletingVisitaBusy && setDeletingVisitaId(null)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-modal-icon confirm-modal-icon-danger" aria-hidden="true">!</div>
+            <h2>¿Eliminar este pase?</h2>
+            <p>Esta acción no se puede deshacer — también se borran sus fotos de documento, si tiene.</p>
+            <div className="confirm-modal-actions">
+              <button type="button" className="confirm-modal-cancel" disabled={deletingVisitaBusy} onClick={() => setDeletingVisitaId(null)}>Cancelar</button>
+              <button type="button" className="confirm-modal-accept confirm-modal-accept-danger" disabled={deletingVisitaBusy} onClick={confirmDeleteVisita}>
+                {deletingVisitaBusy ? "Eliminando…" : "Eliminar"}
+              </button>
+            </div>
           </div>
         </div>
       )}
