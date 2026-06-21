@@ -272,7 +272,15 @@ export default function AsambleasScreen({
                           }
                         }}
                       >
-                        <span>{tipo === "favor" ? "👍" : tipo === "contra" ? "👎" : "–"}</span>
+                        <span className="asamblea-owner-btn-icon" aria-hidden="true">
+                          {tipo === "favor" ? (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M7 11v10H4a1 1 0 01-1-1v-8a1 1 0 011-1h3zm0 0l4.5-8a2 2 0 013.6 1.2L14 9h5.5a2 2 0 012 2.4l-1.6 7A2 2 0 0117.9 20H10a3 3 0 01-3-3v-6z"/></svg>
+                          ) : tipo === "contra" ? (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 13V3h3a1 1 0 011 1v8a1 1 0 01-1 1h-3zm0 0l-4.5 8a2 2 0 01-3.6-1.2L10 15H4.5a2 2 0 01-2-2.4l1.6-7A2 2 0 016.1 4H14a3 3 0 013 3v6z"/></svg>
+                          ) : (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                          )}
+                        </span>
                         <span>{tipo === "favor" ? "A Favor" : tipo === "contra" ? "En Contra" : "Abstención"}</span>
                       </button>
                     ))}

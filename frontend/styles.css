@@ -5300,9 +5300,14 @@ h2,
   color: #475467;
 }
 
-.asamblea-owner-btn span:first-child {
-  font-size: 1.4rem;
-  line-height: 1;
+.asamblea-owner-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.asamblea-owner-btn-icon svg {
+  width: 22px;
+  height: 22px;
 }
 
 .asamblea-owner-btn span:last-child {
