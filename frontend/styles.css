@@ -68,11 +68,14 @@ body {
   padding: 0;
 }
 
-/* Sensación de app nativa: sin rebote elástico en los bordes y sin resaltado
-   gris al tocar. El contenido (textos, mensajes) sigue siendo seleccionable. */
+/* Sensación de app nativa: sin rebote elástico en los bordes, sin resaltado
+   gris al tocar, y sin pinch-zoom (el viewport del HTML ya lo pide, esto lo
+   refuerza a nivel CSS porque algunos navegadores móviles lo ignoran solo con
+   el meta tag). pan-x/pan-y deja el scroll normal intacto. */
 html, body {
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
+  touch-action: pan-x pan-y;
 }
 
 /* Solo el "chrome" de la app (menú, encabezado, botones) no se selecciona al
@@ -7924,7 +7927,7 @@ h2,
     position: fixed !important;
     top: 0;
     left: -100%;
-    width: 280px !important;
+    width: clamp(240px, 80vw, 320px) !important;
     height: 100dvh;
     z-index: 300;
     transition: left 0.25s cubic-bezier(0.4,0,0.2,1);
@@ -8321,11 +8324,7 @@ h2,
      Layer 3  #363636  dropdowns / elevated surfaces
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── Scrollbars ──────────────────────────────────────────────── */
-[data-theme="dark"] ::-webkit-scrollbar { width: 5px; height: 5px; }
-[data-theme="dark"] ::-webkit-scrollbar-track { background: #000000; }
-[data-theme="dark"] ::-webkit-scrollbar-thumb { background: #363636; border-radius: 99px; }
-[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #4a4a4a; }
+/* ── Scrollbars: ocultas en toda la app (ver regla global cerca del tope) ── */
 
 /* ── Base ────────────────────────────────────────────────────── */
 [data-theme="dark"] body { background: #000000; color: #ffffff; }
@@ -8334,8 +8333,8 @@ h2,
 
 /* ── Sidebar ─────────────────────────────────────────────────── */
 [data-theme="dark"] .dashboard-sidebar {
-  background: #000000;
-  border-right: 1px solid #1a1a1a;
+  background: #000000 !important;
+  border-right: 1px solid #1a1a1a !important;
   box-shadow: none;
 }
 [data-theme="dark"] .sidebar-brand-name { color: #ffffff; letter-spacing: -0.01em; }
