@@ -95,9 +95,10 @@ export default function DashboardScreen({
     return { label: MONTH_NAMES[m], value: total };
   });
 
-  // Para gráficas: filtrar por condo del usuario (sin afectar búsqueda/tipo del filtro de tabla)
-  const condoHistorial = user.condo
-    ? historialVisitasData.filter(v => v.propiedad?.toLowerCase().includes(user.condo.toLowerCase()))
+  // Para gráficas: filtrar por condo (campo real, no por texto de la dirección
+  // — eso casi nunca coincidía y dejaba el gráfico siempre en cero).
+  const condoHistorial = adminCondoName
+    ? historialVisitasData.filter(v => v.condo === adminCondoName)
     : historialVisitasData;
 
   // Visitas por día — últimos 7 días
