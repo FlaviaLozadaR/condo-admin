@@ -6848,6 +6848,8 @@ h2,
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) max(1rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
 }
 
 .modal-content {
@@ -6855,7 +6857,7 @@ h2,
   border-radius: 12px;
   max-width: 900px;
   width: 90%;
-  max-height: 90vh;
+  max-height: 100%;
   box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
@@ -7938,6 +7940,14 @@ h2,
     overflow-y: auto;
   }
   .dashboard-sidebar.mobile-open { left: 0; }
+
+  /* .owner-layout tiene su propio padding-top (más chico, pensado para
+     desktop) que le gana a la regla de arriba por especificidad — en mobile
+     necesita el mismo margen de zona segura, si no el texto de arriba queda
+     tapado por la barra de estado del celular. */
+  .owner-layout .dashboard-sidebar {
+    padding-top: calc(1.2rem + var(--safe-top)) !important;
+  }
 
   .dashboard-menu {
     display: flex !important;
