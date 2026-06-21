@@ -1113,6 +1113,14 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
       )
     },
     {
+      label: "Asambleas",
+      icon: (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 3H14L18 7V21H6V3ZM14 3V7H18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+        </svg>
+      )
+    },
+    {
       label: "Pre-registro Visitas",
       icon: (
         <svg viewBox="0 0 24 24" aria-hidden="true">

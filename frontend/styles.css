@@ -5258,25 +5258,26 @@ h2,
 }
 
 .asamblea-owner-actions {
-  margin-top: 0.95rem;
+  margin-top: 0.8rem;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.65rem;
+  gap: 0.4rem;
 }
 
+/* Mismo look "tarjeta plana" que .asamblea-vote-box (el que ve el Admin con
+   los conteos) — acá en vez de un número arriba va el ícono, pero el resto
+   del estilo (forma, padding, sin borde/sombra) queda igual. */
 .asamblea-owner-btn {
   border: 0;
   border-radius: 10px;
-  min-height: 42px;
-  padding: 0.55rem 0.7rem;
-  display: inline-flex;
+  padding: 0.5rem 0.3rem;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
+  gap: 0.15rem;
   font: inherit;
-  font-weight: 700;
   cursor: pointer;
-  transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+  transition: transform 160ms ease, filter 160ms ease;
 }
 
 .asamblea-owner-btn:hover {
@@ -5286,27 +5287,28 @@ h2,
 
 .asamblea-owner-btn-favor {
   background: #e8f8ee;
-  color: #15803d;
-  border: 1px solid #c7eed4;
-  box-shadow: 0 6px 14px rgba(22, 163, 74, 0.08);
+  color: #16a34a;
 }
 
 .asamblea-owner-btn-contra {
   background: #fdf0f3;
-  color: #dc2626;
-  border: 1px solid #f7c9d2;
-  box-shadow: 0 6px 14px rgba(220, 38, 38, 0.08);
+  color: #ef4444;
 }
 
 .asamblea-owner-btn-abstencion {
   background: #f3f4f6;
-  color: #4b5563;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 6px 14px rgba(75, 85, 99, 0.08);
+  color: #475467;
 }
 
 .asamblea-owner-btn span:first-child {
-  font-size: 1rem;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.asamblea-owner-btn span:last-child {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .asamblea-voted-banner {
