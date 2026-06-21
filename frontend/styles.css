@@ -8517,6 +8517,11 @@ h2,
 [data-theme="dark"] .usuarios-table,
 [data-theme="dark"] .historial-table { color: #ffffff; }
 
+/* La tabla en sí también necesita su propio fondo — si no, cuando las columnas
+   ocultas en mobile dejan la tabla más angosta que su contenedor, se ve una
+   franja sin cubrir entre el borde de la tabla y el borde del contenedor. */
+[data-theme="dark"] .usuarios-table { background: #1a1a1a; width: 100%; }
+
 [data-theme="dark"] .pagos-table th,
 [data-theme="dark"] .recent-visits-table th,
 [data-theme="dark"] .owner-visit-history-table th,
