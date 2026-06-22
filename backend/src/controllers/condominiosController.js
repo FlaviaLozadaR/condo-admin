@@ -6,10 +6,12 @@ const CondominioDTO  = require('../dto/condominioDto');
 const { uploadPrivateFile, getSignedUrl, deleteFile } = require('../services/supabase');
 
 // El paymentQrUrl se guarda como nombre de archivo (bucket privado) — al
-// devolverlo al cliente se reemplaza por un link firmado, válido 10 minutos.
+// devolverlo al cliente se reemplaza por un link firmado. Se carga una sola vez
+// por sesión junto con el resto de los datos, así que necesita una vigencia
+// larga — si no, la imagen se rompe en medio de la sesión sin recargar la página.
 async function withSignedQr(condo) {
   if (!condo?.paymentQrUrl) return condo;
-  const signed = await getSignedUrl('payment-qr', condo.paymentQrUrl, 600).catch(() => '');
+  const signed = await getSignedUrl('payment-qr', condo.paymentQrUrl, 21600).catch(() => '');
   return { ...condo, paymentQrUrl: signed };
 }
 

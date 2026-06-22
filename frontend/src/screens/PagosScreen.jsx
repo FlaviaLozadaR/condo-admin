@@ -49,6 +49,7 @@ export default function PagosScreen({
   const [qrCondoDropdownOpen, setQrCondoDropdownOpen] = useState(false);
   const [qrZoomOpen, setQrZoomOpen] = useState(false);
   const [comprobanteZoomUrl, setComprobanteZoomUrl] = useState(null);
+  const [qrRetriedFor, setQrRetriedFor] = useState(null);
 
   // Panel gestión de expensas
   const [expensasInputVal, setExpensasInputVal] = useState('');
@@ -305,6 +306,20 @@ export default function PagosScreen({
     } catch {
       onToast?.('No se pudo descargar el QR.', 'error');
     }
+  };
+
+  // El link firmado del QR puede vencer si la sesión queda abierta mucho
+  // tiempo — si la imagen falla, se pide un link fresco una sola vez por condominio.
+  const handleQrImgError = async (condoId) => {
+    if (qrRetriedFor === condoId) return;
+    setQrRetriedFor(condoId);
+    try {
+      const fresh = await api.getCondominios();
+      setCondominiosData(prev => prev.map(c => {
+        const match = fresh.find(f => String(f.id) === String(c.id));
+        return match ? { ...c, paymentQrUrl: match.paymentQrUrl } : c;
+      }));
+    } catch {}
   };
 
   const handleSaveExpensas = async (condoId) => {
@@ -566,6 +581,7 @@ export default function PagosScreen({
                       alt="QR de pago"
                       className="payment-qr-img"
                       onClick={() => setQrZoomOpen(true)}
+                      onError={() => handleQrImgError(adminCondoId)}
                       role="button"
                       tabIndex={0}
                       title="Ver QR ampliado"

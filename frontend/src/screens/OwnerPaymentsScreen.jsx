@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 export default function OwnerPaymentsScreen({
   user,
   pagosData,
@@ -7,9 +9,16 @@ export default function OwnerPaymentsScreen({
   residentCargoExtra,
   residentCargoNota,
   condoPaymentQr,
+  onQrError,
   totalDue,
   setIsPayExpensesModalOpen,
 }) {
+  const [qrRetried, setQrRetried] = useState(false);
+  const handleQrError = () => {
+    if (qrRetried) return;
+    setQrRetried(true);
+    onQrError?.();
+  };
   const myPagos = pagosData.filter(p =>
     p.propietario === user.name || p.propiedad === residentProperty
   );
@@ -70,7 +79,7 @@ export default function OwnerPaymentsScreen({
             <h3>QR de Pago</h3>
           </div>
           <div className="resident-qr-body">
-            <img src={condoPaymentQr} alt="QR de pago del condominio" className="resident-qr-img" />
+            <img src={condoPaymentQr} alt="QR de pago del condominio" className="resident-qr-img" onError={handleQrError} />
             <div className="resident-qr-info">
               <p className="resident-qr-title">Escaneá el QR para pagar</p>
               <p className="resident-qr-sub">Usá tu billetera o app bancaria para escanear el código y realizar el pago de expensas. Luego subí el comprobante desde "Pagar Expensas".</p>

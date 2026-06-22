@@ -1603,6 +1603,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             residentCargoExtra={residentCargoExtra}
             residentCargoNota={residentCargoNota}
             condoPaymentQr={condoPaymentQr}
+            onQrError={() => api.getMyCondoPaymentQr().then(d => setCondoPaymentQr(d.paymentQrUrl || '')).catch(() => {})}
             totalDue={totalDue}
             setIsPayExpensesModalOpen={setIsPayExpensesModalOpen}
           />
