@@ -974,12 +974,31 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
   const handleSaveCondoEdit = async () => {
     if (!editingCondo?.name?.trim()) return;
     try {
+      const oldName = condominiosData.find(c => c.id === editingCondo.id)?.name;
       const updated = await api.updateCondo(String(editingCondo.id), {
         name:    editingCondo.name.trim(),
         type:    editingCondo.type,
         address: editingCondo.address || "",
       });
       setCondominiosData(prev => prev.map(c => c.id === editingCondo.id ? { ...c, ...updated } : c));
+
+      // El backend ya propaga el nuevo nombre a todas las tablas (cascadeCondoRename),
+      // pero los datos ya cargados en memoria en esta sesión quedan con el nombre viejo
+      // hasta que se recarga la página — se parchan acá para que se vean al instante.
+      if (oldName && updated.name && oldName !== updated.name) {
+        const patch = (item) => (item.condo === oldName ? { ...item, condo: updated.name } : item);
+        setUsuariosData(prev => prev.map(patch));
+        setPropiedadesData(prev => prev.map(patch));
+        setPagosData(prev => prev.map(patch));
+        setAnunciosData(prev => prev.map(patch));
+        setAsambleasData(prev => prev.map(patch));
+        setVisitPasses(prev => prev.map(patch));
+        setHistorialVisitasData(prev => prev.map(patch));
+        setPanicAlerts(prev => prev.map(patch));
+        setAreasSociales(prev => prev.map(patch));
+        setReservasAreas(prev => prev.map(patch));
+      }
+
       setIsEditCondoModalOpen(false);
       setEditingCondo(null);
       addToast("Condominio actualizado.", "success");
