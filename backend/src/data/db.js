@@ -105,7 +105,7 @@ async function createCondominio(data) {
   return rowToApp(await q(supabase.from('condominios').insert(appToRow(data)).select().single()));
 }
 // Tablas que guardan el nombre del condominio como string denormalizado en su columna "condo"
-const CONDO_NAME_TABLES = ['usuarios', 'propiedades', 'anuncios', 'asambleas', 'areas_sociales', 'reservas_areas'];
+const CONDO_NAME_TABLES = ['usuarios', 'propiedades', 'anuncios', 'asambleas', 'areas_sociales', 'reservas_areas', 'pagos', 'visitas', 'historial_visitas', 'panic_alerts'];
 
 // Al renombrar un condominio, propaga el nuevo nombre a todas las filas que
 // todavía referencian el nombre anterior — si no, esas filas dejan de
