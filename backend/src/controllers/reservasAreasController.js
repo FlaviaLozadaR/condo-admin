@@ -5,6 +5,13 @@ function horariosConflictan(ini1, fin1, ini2, fin2) {
   return !(fin1 <= ini2 || ini1 >= fin2);
 }
 
+// Si cualquiera de las dos reservas es de día completo, ocupan todo el día
+// entre sí — si no, se compara el rango de horas normalmente.
+function reservasConflictan(a, b) {
+  if (a.diaCompleto || b.diaCompleto) return true;
+  return horariosConflictan(a.horaInicio, a.horaFin, b.horaInicio, b.horaFin);
+}
+
 async function getAll(req, res) {
   try {
     const reservas = await db.getReservasAreas();
@@ -23,23 +30,29 @@ async function getAll(req, res) {
 
 async function create(req, res) {
   try {
-    const { areaId, areaNombre, fecha, horaInicio, horaFin, nota } = req.body || {};
-    if (!areaId || !fecha || !horaInicio || !horaFin) {
-      return res.status(400).json({ error: 'Faltan datos: areaId, fecha, horaInicio, horaFin' });
+    const { areaId, areaNombre, fecha, horaInicio, horaFin, nota, diaCompleto } = req.body || {};
+    const esDiaCompleto = !!diaCompleto;
+    if (!areaId || !fecha || (!esDiaCompleto && (!horaInicio || !horaFin))) {
+      return res.status(400).json({ error: 'Faltan datos: areaId, fecha y horario (o marcá día completo)' });
     }
-    if (horaInicio >= horaFin) {
+    if (!esDiaCompleto && horaInicio >= horaFin) {
       return res.status(400).json({ error: 'La hora de fin debe ser mayor a la de inicio' });
     }
+    const horaInicioFinal = esDiaCompleto ? '00:00' : horaInicio;
+    const horaFinFinal    = esDiaCompleto ? '23:59' : horaFin;
 
     const existing = await db.getReservasAreas();
     const conflict = existing.find(r =>
       r.areaId === areaId &&
       r.fecha  === fecha  &&
       r.estado !== 'rechazada' &&
-      horariosConflictan(horaInicio, horaFin, r.horaInicio, r.horaFin)
+      reservasConflictan(
+        { diaCompleto: esDiaCompleto, horaInicio: horaInicioFinal, horaFin: horaFinFinal },
+        { diaCompleto: r.diaCompleto, horaInicio: r.horaInicio, horaFin: r.horaFin }
+      )
     );
     if (conflict) {
-      return res.status(409).json({ error: `Ese horario ya está reservado (${conflict.horaInicio}–${conflict.horaFin})` });
+      return res.status(409).json({ error: conflict.diaCompleto ? 'Ese día ya está reservado por completo' : `Ese horario ya está reservado (${conflict.horaInicio}–${conflict.horaFin})` });
     }
 
     const user   = await db.getUsuarioById(req.user.id);
@@ -51,8 +64,9 @@ async function create(req, res) {
       propiedad:      user?.property || '',
       propietario:    user?.name     || '',
       fecha,
-      horaInicio,
-      horaFin,
+      horaInicio:     horaInicioFinal,
+      horaFin:        horaFinFinal,
+      diaCompleto:    esDiaCompleto,
       estado:         'pendiente',
       nota:           nota || '',
       solicitudCambio: null,
@@ -84,13 +98,16 @@ async function updateEstado(req, res) {
 async function requestCambio(req, res) {
   try {
     const { id } = req.params;
-    const { fecha, horaInicio, horaFin, nota } = req.body || {};
-    if (!fecha || !horaInicio || !horaFin) {
+    const { fecha, horaInicio, horaFin, nota, diaCompleto } = req.body || {};
+    const esDiaCompleto = !!diaCompleto;
+    if (!fecha || (!esDiaCompleto && (!horaInicio || !horaFin))) {
       return res.status(400).json({ error: 'Faltan datos para el cambio' });
     }
-    if (horaInicio >= horaFin) {
+    if (!esDiaCompleto && horaInicio >= horaFin) {
       return res.status(400).json({ error: 'La hora de fin debe ser mayor a la de inicio' });
     }
+    const horaInicioFinal = esDiaCompleto ? '00:00' : horaInicio;
+    const horaFinFinal    = esDiaCompleto ? '23:59' : horaFin;
 
     const reservas = await db.getReservasAreas();
     const reserva  = reservas.find(r => String(r.id) === String(id));
@@ -105,14 +122,17 @@ async function requestCambio(req, res) {
       r.areaId  === reserva.areaId &&
       r.fecha   === fecha &&
       r.estado  !== 'rechazada' &&
-      horariosConflictan(horaInicio, horaFin, r.horaInicio, r.horaFin)
+      reservasConflictan(
+        { diaCompleto: esDiaCompleto, horaInicio: horaInicioFinal, horaFin: horaFinFinal },
+        { diaCompleto: r.diaCompleto, horaInicio: r.horaInicio, horaFin: r.horaFin }
+      )
     );
     if (conflict) {
-      return res.status(409).json({ error: `Ese horario ya está reservado (${conflict.horaInicio}–${conflict.horaFin})` });
+      return res.status(409).json({ error: conflict.diaCompleto ? 'Ese día ya está reservado por completo' : `Ese horario ya está reservado (${conflict.horaInicio}–${conflict.horaFin})` });
     }
 
     const updated = await db.updateReservaArea(id, {
-      solicitudCambio: { fecha, horaInicio, horaFin, nota: nota || '', estado: 'pendiente' },
+      solicitudCambio: { fecha, horaInicio: horaInicioFinal, horaFin: horaFinFinal, diaCompleto: esDiaCompleto, nota: nota || '', estado: 'pendiente' },
     });
     res.json(updated);
   } catch (e) { res.status(400).json({ error: e.message }); }
@@ -132,7 +152,7 @@ async function responderCambio(req, res) {
 
     const sc = reserva.solicitudCambio;
     const changes = aprobado
-      ? { fecha: sc.fecha, horaInicio: sc.horaInicio, horaFin: sc.horaFin, solicitudCambio: { ...sc, estado: 'aprobada' } }
+      ? { fecha: sc.fecha, horaInicio: sc.horaInicio, horaFin: sc.horaFin, diaCompleto: !!sc.diaCompleto, solicitudCambio: { ...sc, estado: 'aprobada' } }
       : { solicitudCambio: { ...sc, estado: 'rechazada' } };
 
     const updated = await db.updateReservaArea(id, changes);

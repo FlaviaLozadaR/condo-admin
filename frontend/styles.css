@@ -2188,6 +2188,26 @@ h2,
   font-weight: 600;
 }
 
+.reserva-conflicto-warning {
+  width: 100%;
+  margin: 0.4rem 0 0;
+  color: #dc2626;
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.reserva-dia-completo-check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+  grid-column: 1 / -1;
+}
+.reserva-dia-completo-hint { font-weight: 400; color: #9ca3af; font-size: 0.78rem; }
+[data-theme="dark"] .reserva-dia-completo-check { color: #e5e5e5; }
+
 .reserva-cambio-form {
   display: grid;
   grid-template-columns: 1fr 1fr;

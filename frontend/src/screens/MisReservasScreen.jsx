@@ -3,6 +3,16 @@ import * as api from "../api.js";
 import { onEnterKey } from "../utils/keyboard.js";
 import { parseAreaImages } from "../utils/images.js";
 
+// Misma regla que el backend: si alguna de las dos reservas es de día
+// completo, ocupan todo el día entre sí; si no, se comparan los rangos de hora.
+function horariosConflictan(ini1, fin1, ini2, fin2) {
+  return !(fin1 <= ini2 || ini1 >= fin2);
+}
+function reservasConflictan(a, b) {
+  if (a.diaCompleto || b.diaCompleto) return true;
+  return horariosConflictan(a.horaInicio, a.horaFin, b.horaInicio, b.horaFin);
+}
+
 export default function MisReservasScreen({
   user,
   areasSociales,
@@ -10,10 +20,10 @@ export default function MisReservasScreen({
   setReservasAreas,
 }) {
   const [selectedAreaForReserva, setSelectedAreaForReserva] = useState(null);
-  const [reservaForm, setReservaForm] = useState({ fecha: '', horaInicio: '08:00', horaFin: '10:00', nota: '' });
+  const [reservaForm, setReservaForm] = useState({ fecha: '', horaInicio: '08:00', horaFin: '10:00', nota: '', diaCompleto: false });
   const [reservaFormLoading, setReservaFormLoading] = useState(false);
   const [reservaFormError, setReservaFormError] = useState('');
-  const [cambioForm, setCambioForm] = useState({ fecha: '', horaInicio: '08:00', horaFin: '10:00', nota: '' });
+  const [cambioForm, setCambioForm] = useState({ fecha: '', horaInicio: '08:00', horaFin: '10:00', nota: '', diaCompleto: false });
   const [solicitandoCambioId, setSolicitandoCambioId] = useState(null);
   const [reservasFilter, setReservasFilter] = useState('proximas');
   const [carouselIdx, setCarouselIdx] = useState(0);
@@ -22,41 +32,43 @@ export default function MisReservasScreen({
   const carouselDragStartXRef = useRef(0);
 
   const handleCrearReserva = async () => {
-    if (!reservaForm.fecha || !reservaForm.horaInicio || !reservaForm.horaFin) {
+    if (!reservaForm.fecha || (!reservaForm.diaCompleto && (!reservaForm.horaInicio || !reservaForm.horaFin))) {
       setReservaFormError('Completá fecha y horario'); return;
     }
-    if (reservaForm.horaInicio >= reservaForm.horaFin) {
+    if (!reservaForm.diaCompleto && reservaForm.horaInicio >= reservaForm.horaFin) {
       setReservaFormError('La hora de fin debe ser mayor a la de inicio'); return;
     }
+    if (conflictoActual) { setReservaFormError('Ese horario ya está ocupado — elegí otro.'); return; }
     setReservaFormLoading(true); setReservaFormError('');
     try {
       const nueva = await api.createReservaArea({
-        areaId:     selectedAreaForReserva.id,
-        areaNombre: selectedAreaForReserva.nombre,
-        fecha:      reservaForm.fecha,
-        horaInicio: reservaForm.horaInicio,
-        horaFin:    reservaForm.horaFin,
-        nota:       reservaForm.nota,
+        areaId:      selectedAreaForReserva.id,
+        areaNombre:  selectedAreaForReserva.nombre,
+        fecha:       reservaForm.fecha,
+        horaInicio:  reservaForm.horaInicio,
+        horaFin:     reservaForm.horaFin,
+        diaCompleto: reservaForm.diaCompleto,
+        nota:        reservaForm.nota,
       });
       setReservasAreas(prev => [nueva, ...prev]);
       setSelectedAreaForReserva(null);
-      setReservaForm({ fecha: '', horaInicio: '08:00', horaFin: '10:00', nota: '' });
+      setReservaForm({ fecha: '', horaInicio: '08:00', horaFin: '10:00', nota: '', diaCompleto: false });
     } catch (e) { setReservaFormError(e.message); }
     finally { setReservaFormLoading(false); }
   };
 
   const handleSolicitarCambio = async (reservaId) => {
-    if (!cambioForm.fecha || !cambioForm.horaInicio || !cambioForm.horaFin) {
+    if (!cambioForm.fecha || (!cambioForm.diaCompleto && (!cambioForm.horaInicio || !cambioForm.horaFin))) {
       alert('Completá fecha y horario'); return;
     }
-    if (cambioForm.horaInicio >= cambioForm.horaFin) {
+    if (!cambioForm.diaCompleto && cambioForm.horaInicio >= cambioForm.horaFin) {
       alert('La hora de fin debe ser mayor a la de inicio'); return;
     }
     try {
       const updated = await api.solicitarCambioReserva(reservaId, cambioForm);
       setReservasAreas(prev => prev.map(r => r.id === reservaId ? updated : r));
       setSolicitandoCambioId(null);
-      setCambioForm({ fecha: '', horaInicio: '08:00', horaFin: '10:00', nota: '' });
+      setCambioForm({ fecha: '', horaInicio: '08:00', horaFin: '10:00', nota: '', diaCompleto: false });
     } catch (e) { alert('Error: ' + e.message); }
   };
 
@@ -98,6 +110,17 @@ export default function MisReservasScreen({
   const ocupados = areaSelected && reservaForm.fecha
     ? todasCondo.filter(r => r.areaId === areaSelected.id && r.fecha === reservaForm.fecha && r.estado !== 'rechazada')
     : [];
+  const hayDiaCompletoOcupado = ocupados.some(r => r.diaCompleto);
+
+  // Si lo que el usuario eligió (horario o día completo) choca con algo ya
+  // ocupado, se bloquea el envío en vez de dejar que falle recién en el servidor.
+  const horarioSeleccionValido = reservaForm.diaCompleto || (reservaForm.horaInicio && reservaForm.horaFin && reservaForm.horaInicio < reservaForm.horaFin);
+  const conflictoActual = horarioSeleccionValido
+    ? ocupados.find(r => reservasConflictan(
+        { diaCompleto: reservaForm.diaCompleto, horaInicio: reservaForm.diaCompleto ? '00:00' : reservaForm.horaInicio, horaFin: reservaForm.diaCompleto ? '23:59' : reservaForm.horaFin },
+        { diaCompleto: r.diaCompleto, horaInicio: r.horaInicio, horaFin: r.horaFin }
+      ))
+    : null;
 
   return (
     <>
@@ -196,14 +219,28 @@ export default function MisReservasScreen({
                   <label>Fecha *</label>
                   <input type="date" min={new Date().toISOString().split('T')[0]} value={reservaForm.fecha} onChange={e => setReservaForm(f => ({...f, fecha: e.target.value}))} onKeyDown={onEnterKey(handleCrearReserva, reservaFormLoading)} />
                 </div>
-                <div className="form-group-simple">
-                  <label>Hora inicio *</label>
-                  <input type="time" value={reservaForm.horaInicio} onChange={e => setReservaForm(f => ({...f, horaInicio: e.target.value}))} onKeyDown={onEnterKey(handleCrearReserva, reservaFormLoading)} />
-                </div>
-                <div className="form-group-simple">
-                  <label>Hora fin *</label>
-                  <input type="time" value={reservaForm.horaFin} onChange={e => setReservaForm(f => ({...f, horaFin: e.target.value}))} onKeyDown={onEnterKey(handleCrearReserva, reservaFormLoading)} />
-                </div>
+                <label className="reserva-dia-completo-check">
+                  <input
+                    type="checkbox"
+                    checked={reservaForm.diaCompleto}
+                    disabled={ocupados.length > 0}
+                    onChange={e => setReservaForm(f => ({...f, diaCompleto: e.target.checked}))}
+                  />
+                  Reservar todo el día
+                  {ocupados.length > 0 && <span className="reserva-dia-completo-hint"> (no disponible — ya hay reservas ese día)</span>}
+                </label>
+                {!reservaForm.diaCompleto && (
+                  <>
+                    <div className="form-group-simple">
+                      <label>Hora inicio *</label>
+                      <input type="time" value={reservaForm.horaInicio} onChange={e => setReservaForm(f => ({...f, horaInicio: e.target.value}))} onKeyDown={onEnterKey(handleCrearReserva, reservaFormLoading)} />
+                    </div>
+                    <div className="form-group-simple">
+                      <label>Hora fin *</label>
+                      <input type="time" value={reservaForm.horaFin} onChange={e => setReservaForm(f => ({...f, horaFin: e.target.value}))} onKeyDown={onEnterKey(handleCrearReserva, reservaFormLoading)} />
+                    </div>
+                  </>
+                )}
                 <div className="form-group-simple">
                   <label>Nota (opcional)</label>
                   <input type="text" placeholder="Motivo o comentario" value={reservaForm.nota} onChange={e => setReservaForm(f => ({...f, nota: e.target.value}))} onKeyDown={onEnterKey(handleCrearReserva, reservaFormLoading)} />
@@ -214,11 +251,18 @@ export default function MisReservasScreen({
               {reservaForm.fecha && (
                 <div className="reserva-ocupados">
                   <p style={{fontWeight:600,fontSize:'0.82rem',color:'#374151',margin:'0 0 0.4rem'}}>
-                    {ocupados.length > 0 ? 'Horarios ya reservados para esa fecha:' : '✓ Sin reservas para esa fecha'}
+                    {ocupados.length > 0 ? 'Horarios ya ocupados para esa fecha:' : '✓ Sin reservas para esa fecha'}
                   </p>
                   {ocupados.map(r => (
-                    <span key={r.id} className="reserva-ocupado-chip">{r.horaInicio}–{r.horaFin}</span>
+                    <span key={r.id} className="reserva-ocupado-chip">
+                      OCUPADO · {r.diaCompleto ? 'Todo el día' : `${r.horaInicio}–${r.horaFin}`}
+                    </span>
                   ))}
+                  {conflictoActual && (
+                    <p className="reserva-conflicto-warning">
+                      ⚠ Ese horario ya está ocupado{conflictoActual.diaCompleto ? ' (todo el día)' : ` (${conflictoActual.horaInicio}–${conflictoActual.horaFin})`} — elegí otro.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -226,7 +270,7 @@ export default function MisReservasScreen({
 
               <div style={{display:'flex',gap:'0.75rem',marginTop:'1rem'}}>
                 <button className="btn btn-secondary" onClick={() => setSelectedAreaForReserva(null)}>Cancelar</button>
-                <button className="btn btn-primary" disabled={reservaFormLoading} onClick={handleCrearReserva}>
+                <button className="btn btn-primary" disabled={reservaFormLoading || !!conflictoActual || !horarioSeleccionValido} onClick={handleCrearReserva}>
                   {reservaFormLoading ? 'Enviando…' : 'Solicitar Reserva'}
                 </button>
               </div>
@@ -250,7 +294,19 @@ export default function MisReservasScreen({
 
         {reservasVisibles.length === 0 ? (
           <div className="empty-state"><div className="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><p className="empty-state-title">{reservasFilter === 'pasadas' ? 'Sin reservas pasadas' : 'Sin reservas próximas'}</p><p className="empty-state-subtitle">{reservasFilter === 'pasadas' ? 'Tus reservas finalizadas aparecerán aquí.' : 'Aún no realizaste ninguna reserva.'}</p></div>
-        ) : reservasVisibles.map(r => (
+        ) : reservasVisibles.map(r => {
+          const isEditingThis = solicitandoCambioId === r.id;
+          const ocupadosCambio = isEditingThis && cambioForm.fecha
+            ? todasCondo.filter(o => o.id !== r.id && o.areaId === r.areaId && o.fecha === cambioForm.fecha && o.estado !== 'rechazada')
+            : [];
+          const horarioCambioValido = cambioForm.diaCompleto || (cambioForm.horaInicio && cambioForm.horaFin && cambioForm.horaInicio < cambioForm.horaFin);
+          const conflictoCambio = isEditingThis && horarioCambioValido
+            ? ocupadosCambio.find(o => reservasConflictan(
+                { diaCompleto: cambioForm.diaCompleto, horaInicio: cambioForm.diaCompleto ? '00:00' : cambioForm.horaInicio, horaFin: cambioForm.diaCompleto ? '23:59' : cambioForm.horaFin },
+                { diaCompleto: o.diaCompleto, horaInicio: o.horaInicio, horaFin: o.horaFin }
+              ))
+            : null;
+          return (
           <article key={r.id} className="reserva-area-card">
             <div className="reserva-area-card-top">
               <div>
@@ -263,7 +319,7 @@ export default function MisReservasScreen({
                   <span className="reserva-area-horario-sep">·</span>
                   <span className="reserva-area-horario-item">
                     <svg className="reserva-area-horario-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-                    {r.horaInicio}–{r.horaFin}
+                    {r.diaCompleto ? 'Todo el día' : `${r.horaInicio}–${r.horaFin}`}
                   </span>
                 </p>
                 {r.nota && <p className="reserva-area-nota">"{r.nota}"</p>}
@@ -278,25 +334,41 @@ export default function MisReservasScreen({
 
             {/* Solicitar cambio */}
             {reservasFilter === 'proximas' && r.estado === 'aprobada' && !r.solicitudCambio?.estado?.includes('pendiente') && (
-              solicitandoCambioId === r.id ? (
+              isEditingThis ? (
                 <div className="reserva-cambio-form">
                   <div className="form-group-simple"><label>Nueva fecha</label><input type="date" min={new Date().toISOString().split('T')[0]} value={cambioForm.fecha} onChange={e => setCambioForm(f => ({...f, fecha: e.target.value}))} /></div>
-                  <div className="form-group-simple"><label>Hora inicio</label><input type="time" value={cambioForm.horaInicio} onChange={e => setCambioForm(f => ({...f, horaInicio: e.target.value}))} /></div>
-                  <div className="form-group-simple"><label>Hora fin</label><input type="time" value={cambioForm.horaFin} onChange={e => setCambioForm(f => ({...f, horaFin: e.target.value}))} /></div>
+                  <label className="reserva-dia-completo-check">
+                    <input type="checkbox" checked={cambioForm.diaCompleto} disabled={ocupadosCambio.length > 0} onChange={e => setCambioForm(f => ({...f, diaCompleto: e.target.checked}))} />
+                    Todo el día
+                  </label>
+                  {!cambioForm.diaCompleto && (
+                    <>
+                      <div className="form-group-simple"><label>Hora inicio</label><input type="time" value={cambioForm.horaInicio} onChange={e => setCambioForm(f => ({...f, horaInicio: e.target.value}))} /></div>
+                      <div className="form-group-simple"><label>Hora fin</label><input type="time" value={cambioForm.horaFin} onChange={e => setCambioForm(f => ({...f, horaFin: e.target.value}))} /></div>
+                    </>
+                  )}
                   <div className="form-group-simple"><label>Motivo</label><input type="text" value={cambioForm.nota} onChange={e => setCambioForm(f => ({...f, nota: e.target.value}))} /></div>
+                  {ocupadosCambio.length > 0 && (
+                    <div className="reserva-ocupados">
+                      {ocupadosCambio.map(o => (
+                        <span key={o.id} className="reserva-ocupado-chip">OCUPADO · {o.diaCompleto ? 'Todo el día' : `${o.horaInicio}–${o.horaFin}`}</span>
+                      ))}
+                      {conflictoCambio && <p className="reserva-conflicto-warning">⚠ Ese horario ya está ocupado — elegí otro.</p>}
+                    </div>
+                  )}
                   <div style={{display:'flex',gap:'0.5rem',marginTop:'0.5rem'}}>
-                    <button className="btn btn-primary" style={{fontSize:'0.82rem'}} onClick={() => handleSolicitarCambio(r.id)}>Enviar solicitud</button>
+                    <button className="btn btn-primary" style={{fontSize:'0.82rem'}} disabled={!!conflictoCambio || !horarioCambioValido} onClick={() => handleSolicitarCambio(r.id)}>Enviar solicitud</button>
                     <button className="btn btn-secondary" style={{fontSize:'0.82rem'}} onClick={() => setSolicitandoCambioId(null)}>Cancelar</button>
                   </div>
                 </div>
               ) : (
-                <button className="expensas-edit-btn" style={{marginTop:'0.5rem'}} onClick={() => { setSolicitandoCambioId(r.id); setCambioForm({ fecha: r.fecha, horaInicio: r.horaInicio, horaFin: r.horaFin, nota: '' }); }}>
+                <button className="expensas-edit-btn" style={{marginTop:'0.5rem'}} onClick={() => { setSolicitandoCambioId(r.id); setCambioForm({ fecha: r.fecha, horaInicio: r.horaInicio, horaFin: r.horaFin, nota: '', diaCompleto: !!r.diaCompleto }); }}>
                   Solicitar cambio de fecha
                 </button>
               )
             )}
           </article>
-        ))}
+        );})}
       </div>
     </>
   );

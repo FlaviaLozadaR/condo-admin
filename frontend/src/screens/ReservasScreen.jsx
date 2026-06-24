@@ -231,7 +231,7 @@ export default function ReservasScreen({
                     <span className="reserva-area-horario-sep">·</span>
                     <span className="reserva-area-horario-item">
                       <svg className="reserva-area-horario-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-                      {r.horaInicio}–{r.horaFin}
+                      {r.diaCompleto ? 'Todo el día' : `${r.horaInicio}–${r.horaFin}`}
                     </span>
                   </p>
                   {r.nota && <p className="reserva-area-nota">"{r.nota}"</p>}
@@ -275,9 +275,9 @@ export default function ReservasScreen({
               <p className="reserva-area-nombre">{r.areaNombre}</p>
               <p className="reserva-area-meta">{r.propietario} · {r.propiedad}</p>
               <div className="reserva-cambio-dates">
-                <div className="reserva-cambio-from"><p>Horario actual</p><strong>{r.fecha} · {r.horaInicio}–{r.horaFin}</strong></div>
+                <div className="reserva-cambio-from"><p>Horario actual</p><strong>{r.fecha} · {r.diaCompleto ? 'Todo el día' : `${r.horaInicio}–${r.horaFin}`}</strong></div>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:20,height:20,color:'#6366f1',flexShrink:0}}><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                <div className="reserva-cambio-to"><p>Solicita cambio a</p><strong>{r.solicitudCambio.fecha} · {r.solicitudCambio.horaInicio}–{r.solicitudCambio.horaFin}</strong></div>
+                <div className="reserva-cambio-to"><p>Solicita cambio a</p><strong>{r.solicitudCambio.fecha} · {r.solicitudCambio.diaCompleto ? 'Todo el día' : `${r.solicitudCambio.horaInicio}–${r.solicitudCambio.horaFin}`}</strong></div>
               </div>
               {r.solicitudCambio.nota && <p className="reserva-area-nota">"{r.solicitudCambio.nota}"</p>}
               <div className="reserva-area-card-actions">
