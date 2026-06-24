@@ -1,16 +1,28 @@
 const nodemailer = require('nodemailer');
+const dns = require('dns');
 
-function createTransporter() {
+// Render no tiene ruta de red IPv6 hacia Gmail — la opción "family: 4" de
+// nodemailer no alcanza a evitarlo en modo TLS directo, así que se resuelve
+// la IP a mano y se fuerza esa IPv4 literal como host de conexión.
+function resolveGmailIPv4() {
+  return new Promise((resolve) => {
+    dns.resolve4('smtp.gmail.com', (err, addresses) => {
+      resolve(err || !addresses?.length ? 'smtp.gmail.com' : addresses[0]);
+    });
+  });
+}
+
+async function createTransporter() {
+  const host = await resolveGmailIPv4();
   return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
+    host,
     port: 465,
     secure: true,
+    tls: { servername: 'smtp.gmail.com' },
     auth: {
       user: process.env.GMAIL_USER,
       pass: process.env.GMAIL_PASS,
     },
-    // Forzar IPv4: en Render la ruta IPv6 hacia Gmail se queda colgada hasta
-    // el timeout en vez de fallar rápido, así que nunca llega a probar IPv4.
     family: 4,
     connectionTimeout: 20000,
     greetingTimeout: 20000,
@@ -24,7 +36,8 @@ async function sendMailWithRetry(mailOptions, attempts = 3) {
   let lastErr;
   for (let i = 0; i < attempts; i++) {
     try {
-      return await createTransporter().sendMail(mailOptions);
+      const transporter = await createTransporter();
+      return await transporter.sendMail(mailOptions);
     } catch (err) {
       lastErr = err;
       if (i < attempts - 1) await new Promise(r => setTimeout(r, 2000 * (i + 1)));
