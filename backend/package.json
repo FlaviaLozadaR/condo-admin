@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "type": "commonjs",
   "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js"
@@ -18,7 +21,6 @@
     "jsonwebtoken": "^9.0.0",
     "morgan": "^1.10.1",
     "multer": "^2.1.1",
-    "nodemailer": "^8.0.5",
     "uuid": "^9.0.0"
   }
 }

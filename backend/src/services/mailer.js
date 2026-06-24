@@ -1,59 +1,38 @@
-const nodemailer = require('nodemailer');
-const dns = require('dns');
+// Render bloquea las conexiones SMTP salientes (puerto 465/587) a nivel de
+// infraestructura — por eso se manda por la API HTTP de Brevo (puerto 443,
+// nunca bloqueado) en vez de conectarse directo al SMTP de Gmail.
+const BREVO_API_KEY     = process.env.BREVO_API_KEY;
+const BREVO_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL;
 
-// Render no tiene ruta de red IPv6 hacia Gmail — la opción "family: 4" de
-// nodemailer no alcanza a evitarlo en modo TLS directo, así que se resuelve
-// la IP a mano y se fuerza esa IPv4 literal como host de conexión.
-function resolveGmailIPv4() {
-  return new Promise((resolve) => {
-    dns.resolve4('smtp.gmail.com', (err, addresses) => {
-      resolve(err || !addresses?.length ? 'smtp.gmail.com' : addresses[0]);
-    });
-  });
-}
-
-async function createTransporter() {
-  const host = await resolveGmailIPv4();
-  return nodemailer.createTransport({
-    host,
-    port: 465,
-    secure: true,
-    tls: { servername: 'smtp.gmail.com' },
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_PASS,
+async function sendViaBrevo({ to, cc, subject, html }) {
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': BREVO_API_KEY,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
     },
-    family: 4,
-    connectionTimeout: 20000,
-    greetingTimeout: 20000,
-    socketTimeout: 20000,
+    body: JSON.stringify({
+      sender: { name: 'Condo Admin', email: BREVO_SENDER_EMAIL },
+      to: [{ email: to }],
+      cc: cc ? [{ email: cc }] : undefined,
+      subject,
+      htmlContent: html,
+    }),
   });
-}
-
-// La conexión SMTP a Gmail desde el hosting a veces tarda o falla por red
-// (timeout intermitente) — se reintenta un par de veces antes de darse por vencido.
-async function sendMailWithRetry(mailOptions, attempts = 3) {
-  let lastErr;
-  for (let i = 0; i < attempts; i++) {
-    try {
-      const transporter = await createTransporter();
-      return await transporter.sendMail(mailOptions);
-    } catch (err) {
-      lastErr = err;
-      if (i < attempts - 1) await new Promise(r => setTimeout(r, 2000 * (i + 1)));
-    }
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Brevo ${res.status}: ${body}`);
   }
-  throw lastErr;
+  return res.json();
 }
 
 async function sendResetEmail(to, name, token) {
   const resetUrl = `${process.env.APP_URL || 'http://localhost:3001'}/reset-password.html?token=${token}`;
-  const adminEmail = process.env.GMAIL_USER;
 
-  await sendMailWithRetry({
-    from: `"Condo Admin" <${adminEmail}>`,
+  await sendViaBrevo({
     to,
-    cc: to !== adminEmail ? adminEmail : undefined,
+    cc: to !== BREVO_SENDER_EMAIL ? BREVO_SENDER_EMAIL : undefined,
     subject: 'Restablecer tu contraseña — Condo Admin',
     html: `
       <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:2rem;background:#f8fafc;border-radius:12px;">
@@ -81,12 +60,10 @@ async function sendResetEmail(to, name, token) {
 
 async function sendWelcomeEmail(to, name, password, role) {
   const loginUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  const adminEmail = process.env.GMAIL_USER;
 
-  await sendMailWithRetry({
-    from: `"Condo Admin" <${adminEmail}>`,
+  await sendViaBrevo({
     to,
-    cc: to !== adminEmail ? adminEmail : undefined,
+    cc: to !== BREVO_SENDER_EMAIL ? BREVO_SENDER_EMAIL : undefined,
     subject: 'Bienvenido a Condo Admin — Tus credenciales de acceso',
     html: `
       <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:2rem;background:#f8fafc;border-radius:12px;">

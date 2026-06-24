@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 // ── Validate required env vars ─────────────────────────────────
-const REQUIRED_ENV = ['JWT_SECRET', 'GMAIL_USER', 'GMAIL_PASS', 'SUPABASE_URL', 'SUPABASE_SECRET_KEY'];
+const REQUIRED_ENV = ['JWT_SECRET', 'BREVO_API_KEY', 'BREVO_SENDER_EMAIL', 'SUPABASE_URL', 'SUPABASE_SECRET_KEY'];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
 if (missing.length) {
   console.error(`[STARTUP ERROR] Faltan variables de entorno: ${missing.join(', ')}`);
@@ -114,5 +114,5 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`\n✓ Backend corriendo en http://localhost:${PORT}`);
   console.log(`✓ Entorno: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`✓ Gmail:   ${process.env.GMAIL_USER}\n`);
+  console.log(`✓ Email:   ${process.env.BREVO_SENDER_EMAIL}\n`);
 });
