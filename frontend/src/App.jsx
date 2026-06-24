@@ -610,7 +610,6 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
     if (['Propietario', 'Inquilino'].includes(user.role)) {
       api.getMyCondoPaymentQr().then(d => {
         setCondoPaymentQr(d.paymentQrUrl || '');
-        setResidentExpensas(Number(d.expensasMensuales) || 0);
       }).catch(() => {});
       api.getMyProperty().then(d => {
         setResidentExpensas(Number(d.expensaMensual) || 0);
