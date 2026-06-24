@@ -46,6 +46,18 @@ CREATE TABLE IF NOT EXISTS propiedades (
 CREATE INDEX IF NOT EXISTS idx_propiedades_condo ON propiedades (condo);
 CREATE INDEX IF NOT EXISTS idx_propiedades_code  ON propiedades (code);
 
+-- Cargos extra de una propiedad: itemizados (no un solo número acumulado) para
+-- poder agregar varios y editar/borrar cada uno individualmente.
+CREATE TABLE IF NOT EXISTS cargos_extra (
+  id TEXT PRIMARY KEY,
+  propiedad_id TEXT NOT NULL,
+  monto NUMERIC DEFAULT 0,
+  motivo TEXT DEFAULT '',
+  inserted_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_cargos_extra_propiedad ON cargos_extra (propiedad_id);
+
 CREATE TABLE IF NOT EXISTS pagos (
   id TEXT PRIMARY KEY,
   propiedad TEXT DEFAULT '',

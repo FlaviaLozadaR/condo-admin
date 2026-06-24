@@ -89,7 +89,9 @@ export const deleteCondoPaymentQr = (condoId) => request(`/condominios/${condoId
 export const asignarExpensas = (condoId, monto, propiedadIds) => request(`/condominios/${condoId}/asignar-expensas`, { method: 'PUT', body: { monto, propiedadIds } });
 export const getMyProperty = () => request('/propiedades/my-property');
 export const getMyProperties = () => request('/propiedades/my-properties');
-export const updateCargoExtra = (propId, cargoExtra, notaCargo) => request(`/propiedades/${propId}/cargo-extra`, { method: 'PUT', body: { cargoExtra, notaCargo } });
+export const addCargoExtra    = (propId, monto, motivo) => request(`/propiedades/${propId}/cargos-extra`, { method: 'POST', body: { monto, motivo } });
+export const editCargoExtra   = (propId, cargoId, monto, motivo) => request(`/propiedades/${propId}/cargos-extra/${cargoId}`, { method: 'PUT', body: { monto, motivo } });
+export const removeCargoExtra = (propId, cargoId) => request(`/propiedades/${propId}/cargos-extra/${cargoId}`, { method: 'DELETE' });
 
 // Usuarios
 export const getUsuarios = () => request('/usuarios');

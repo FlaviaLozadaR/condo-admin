@@ -57,9 +57,12 @@ export default function PagosScreen({
   const [expensasMsg, setExpensasMsg] = useState('');
   const [expensasSelectedIds, setExpensasSelectedIds] = useState(new Set());
   const [cargoExtraSearch, setCargoExtraSearch] = useState('');
-  const [editingCargoExtra, setEditingCargoExtra] = useState(null);
-  const [cargoExtraVal, setCargoExtraVal] = useState('');
-  const [cargoNotaVal, setCargoNotaVal] = useState('');
+  const [cargoExtraModalProp, setCargoExtraModalProp] = useState(null);
+  const [newCargoMonto, setNewCargoMonto] = useState('');
+  const [newCargoMotivo, setNewCargoMotivo] = useState('');
+  const [editingCargoItemId, setEditingCargoItemId] = useState(null);
+  const [editCargoMonto, setEditCargoMonto] = useState('');
+  const [editCargoMotivo, setEditCargoMotivo] = useState('');
   const [cargoExtraLoading, setCargoExtraLoading] = useState(false);
   const [editingExpensaId, setEditingExpensaId] = useState(null);
   const [expensaEditVal, setExpensaEditVal] = useState('');
@@ -357,17 +360,65 @@ export default function PagosScreen({
     }
   };
 
-  const handleSaveCargoExtra = async (propId) => {
+  const recomputeCargoTotals = (items) => ({
+    cargoExtra: items.reduce((s, c) => s + (Number(c.monto) || 0), 0),
+    notaCargo:  items.map(c => c.motivo).filter(Boolean).join(' · '),
+  });
+
+  const patchPropCargoList = (propId, newList) => {
+    const { cargoExtra, notaCargo } = recomputeCargoTotals(newList);
+    setPropiedadesData(prev => prev.map(p => String(p.id) === String(propId)
+      ? { ...p, cargoExtra, notaCargo, cargosExtraList: newList }
+      : p
+    ));
+    setCargoExtraModalProp(prev => prev && String(prev.id) === String(propId)
+      ? { ...prev, cargoExtra, notaCargo, cargosExtraList: newList }
+      : prev
+    );
+  };
+
+  const handleAddCargoExtra = async (propId) => {
+    const monto = parseFloat(newCargoMonto);
+    if (isNaN(monto) || monto <= 0) return;
     setCargoExtraLoading(true);
     try {
-      const updated = await api.updateCargoExtra(propId, parseFloat(cargoExtraVal) || 0, cargoNotaVal);
-      setPropiedadesData(prev => prev.map(p => String(p.id) === String(propId)
-        ? { ...p, cargoExtra: updated.cargoExtra, notaCargo: updated.notaCargo }
-        : p
-      ));
-      setEditingCargoExtra(null);
+      const nuevo = await api.addCargoExtra(propId, monto, newCargoMotivo.trim());
+      const prop = propiedadesData.find(p => String(p.id) === String(propId));
+      patchPropCargoList(propId, [...(prop?.cargosExtraList || []), nuevo]);
+      setNewCargoMonto('');
+      setNewCargoMotivo('');
     } catch (e) {
-      alert('Error: ' + e.message);
+      onToast?.(e.message || 'No se pudo agregar el cargo extra.', 'error');
+    } finally {
+      setCargoExtraLoading(false);
+    }
+  };
+
+  const handleEditCargoExtra = async (propId, cargoId) => {
+    const monto = parseFloat(editCargoMonto);
+    if (isNaN(monto) || monto < 0) return;
+    setCargoExtraLoading(true);
+    try {
+      const updated = await api.editCargoExtra(propId, cargoId, monto, editCargoMotivo.trim());
+      const prop = propiedadesData.find(p => String(p.id) === String(propId));
+      const newList = (prop?.cargosExtraList || []).map(c => String(c.id) === String(cargoId) ? updated : c);
+      patchPropCargoList(propId, newList);
+      setEditingCargoItemId(null);
+    } catch (e) {
+      onToast?.(e.message || 'No se pudo editar el cargo extra.', 'error');
+    } finally {
+      setCargoExtraLoading(false);
+    }
+  };
+
+  const handleDeleteCargoExtra = async (propId, cargoId) => {
+    setCargoExtraLoading(true);
+    try {
+      await api.removeCargoExtra(propId, cargoId);
+      const prop = propiedadesData.find(p => String(p.id) === String(propId));
+      patchPropCargoList(propId, (prop?.cargosExtraList || []).filter(c => String(c.id) !== String(cargoId)));
+    } catch (e) {
+      onToast?.(e.message || 'No se pudo borrar el cargo extra.', 'error');
     } finally {
       setCargoExtraLoading(false);
     }
@@ -783,7 +834,6 @@ export default function PagosScreen({
                         const expensaActual = Number(p.expensaMensual) || 0;
                         const cargoExtra    = Number(p.cargoExtra)     || 0;
                         const total         = expensaActual + cargoExtra;
-                        const isEditing     = editingCargoExtra === p.id;
                         const isChecked     = expensasSelectedIds.has(p.id);
                         return (
                           <tr key={p.id} className={isChecked ? 'expensas-row-selected' : ''}>
@@ -814,31 +864,21 @@ export default function PagosScreen({
                               )}
                             </td>
                             <td>
-                              {isEditing ? (
-                                <div style={{display:'flex',flexDirection:'column',gap:'0.3rem'}}>
-                                  <input type="number" min="0" className="expensas-base-input" style={{width:80}} placeholder="+ Bs." value={cargoExtraVal} onChange={e => setCargoExtraVal(e.target.value)} autoFocus />
-                                  <input type="text" className="expensas-base-input" placeholder="Motivo (opcional)" style={{width:140,fontSize:'0.78rem'}} value={cargoNotaVal} onChange={e => setCargoNotaVal(e.target.value)} />
-                                  <div style={{display:'flex',gap:'0.3rem'}}>
-                                    <button className="btn btn-primary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} disabled={cargoExtraLoading} onClick={() => handleSaveCargoExtra(p.id)}>
-                                      {cargoExtraLoading ? '…' : 'OK'}
-                                    </button>
-                                    <button className="btn btn-secondary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} onClick={() => setEditingCargoExtra(null)}>✕</button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <span style={{color: cargoExtra > 0 ? '#dc2626' : '#9ca3af', fontWeight: cargoExtra > 0 ? 700 : 400}}>
-                                  {cargoExtra > 0 ? `Bs. ${cargoExtra.toLocaleString()}` : '—'}
-                                  {p.notaCargo && <span style={{display:'block',fontSize:'0.72rem',color:'#9ca3af'}}>{p.notaCargo}</span>}
-                                </span>
-                              )}
+                              <span
+                                className="expensas-editable-value"
+                                title="Click para ver y gestionar los cargos extra de esta propiedad"
+                                onClick={() => setCargoExtraModalProp(p)}
+                                style={{color: cargoExtra > 0 ? '#dc2626' : '#9ca3af', fontWeight: cargoExtra > 0 ? 700 : 400}}
+                              >
+                                {cargoExtra > 0 ? `Bs. ${cargoExtra.toLocaleString()}` : '—'}
+                                {p.notaCargo && <span style={{display:'block',fontSize:'0.72rem',color:'#9ca3af'}}>{p.notaCargo}</span>}
+                              </span>
                             </td>
                             <td><strong>{total > 0 ? `Bs. ${total.toLocaleString()}` : '—'}</strong></td>
                             <td>
-                              {!isEditing && (
-                                <button className="expensas-edit-btn" onClick={() => { setEditingCargoExtra(p.id); setCargoExtraVal(''); setCargoNotaVal(''); }}>
-                                  + Cargo extra
-                                </button>
-                              )}
+                              <button className="expensas-edit-btn" onClick={() => setCargoExtraModalProp(p)}>
+                                + Cargo extra
+                              </button>
                             </td>
                           </tr>
                         );
@@ -1150,6 +1190,51 @@ export default function PagosScreen({
             <div className="confirm-modal-actions">
               <button type="button" className="confirm-modal-cancel" onClick={() => setConfirmPrompt(null)}>Cancelar</button>
               <button type="button" className="confirm-modal-accept" onClick={() => { confirmPrompt.onAccept(); setConfirmPrompt(null); }}>Confirmar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cargoExtraModalProp && (
+        <div className="modal-overlay modal-overlay-centered" onClick={() => { setCargoExtraModalProp(null); setEditingCargoItemId(null); setNewCargoMonto(''); setNewCargoMotivo(''); }}>
+          <div className="confirm-modal cargo-extra-modal" onClick={e => e.stopPropagation()}>
+            <h2>Cargos extra — {cargoExtraModalProp.code}{cargoExtraModalProp.block ? ` · ${cargoExtraModalProp.block}` : ''}</h2>
+            <div className="cargo-extra-list">
+              {(cargoExtraModalProp.cargosExtraList || []).length === 0 ? (
+                <p className="cargo-extra-empty">Sin cargos extra todavía.</p>
+              ) : cargoExtraModalProp.cargosExtraList.map(c => (
+                <div key={c.id} className="cargo-extra-item">
+                  {editingCargoItemId === c.id ? (
+                    <>
+                      <input type="number" min="0" className="expensas-base-input" style={{width:80}} value={editCargoMonto} onChange={e => setEditCargoMonto(e.target.value)} autoFocus />
+                      <input type="text" className="expensas-base-input" style={{flex:1}} placeholder="Motivo" value={editCargoMotivo} onChange={e => setEditCargoMotivo(e.target.value)} />
+                      <button className="btn btn-primary" style={{padding:'0.25rem 0.55rem',fontSize:'0.75rem'}} disabled={cargoExtraLoading} onClick={() => handleEditCargoExtra(cargoExtraModalProp.id, c.id)}>OK</button>
+                      <button className="btn btn-secondary" style={{padding:'0.25rem 0.55rem',fontSize:'0.75rem'}} onClick={() => setEditingCargoItemId(null)}>✕</button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="cargo-extra-item-info">
+                        <strong>Bs. {Number(c.monto).toLocaleString()}</strong>
+                        {c.motivo && <span>{c.motivo}</span>}
+                      </div>
+                      <button className="expensas-edit-btn" onClick={() => { setEditingCargoItemId(c.id); setEditCargoMonto(String(c.monto)); setEditCargoMotivo(c.motivo || ''); }}>Editar</button>
+                      <button type="button" className="anuncio-action-btn anuncio-action-delete" title="Borrar" onClick={() => handleDeleteCargoExtra(cargoExtraModalProp.id, c.id)}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V7H6V19ZM8 9H16V19H8V9ZM15.5 4L14.5 3H9.5L8.5 4H5V6H19V4H15.5Z"/></svg>
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="cargo-extra-add-row">
+              <input type="number" min="0" className="expensas-base-input" style={{width:80}} placeholder="+ Bs." value={newCargoMonto} onChange={e => setNewCargoMonto(e.target.value)} />
+              <input type="text" className="expensas-base-input" style={{flex:1}} placeholder="Motivo (opcional)" value={newCargoMotivo} onChange={e => setNewCargoMotivo(e.target.value)} />
+              <button className="btn btn-primary" disabled={cargoExtraLoading || !newCargoMonto} onClick={() => handleAddCargoExtra(cargoExtraModalProp.id)}>
+                {cargoExtraLoading ? '…' : 'Agregar'}
+              </button>
+            </div>
+            <div className="confirm-modal-actions">
+              <button type="button" className="confirm-modal-cancel" onClick={() => { setCargoExtraModalProp(null); setEditingCargoItemId(null); setNewCargoMonto(''); setNewCargoMotivo(''); }}>Cerrar</button>
             </div>
           </div>
         </div>

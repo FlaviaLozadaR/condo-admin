@@ -184,32 +184,71 @@ async function getMyProperties(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
-// PUT /propiedades/:id/cargo-extra — admin suma un cargo extra a una propiedad
-// (se acumula sobre lo que ya tenía, igual que la expensa — no lo reemplaza)
-async function updateCargoExtra(req, res) {
-  try {
-    const { cargoExtra, notaCargo } = req.body || {};
+// Lanza 403 si un Administrador intenta tocar una propiedad fuera de su condominio.
+async function assertCanManagePropiedad(req, propiedad) {
+  if (req.user.role !== 'Administrador') return;
+  const adminUser = await db.getUsuarioById(req.user.id);
+  if (propiedad.condo !== adminUser?.condo) {
+    const err = new Error('Solo podés modificar propiedades de tu condominio');
+    err.status = 403;
+    throw err;
+  }
+}
 
+// Cargos extra: lista itemizada por propiedad — se puede agregar, editar o
+// borrar cada uno individualmente (en vez de un único número acumulado).
+async function addCargoExtra(req, res) {
+  try {
+    const { monto, motivo } = req.body || {};
     const propiedades = await db.getPropiedades();
     const propiedad    = propiedades.find(p => String(p.id) === String(req.params.id));
     if (!propiedad) return res.status(404).json({ error: 'Propiedad no encontrada' });
+    await assertCanManagePropiedad(req, propiedad);
 
-    if (req.user.role === 'Administrador') {
-      const adminUser = await db.getUsuarioById(req.user.id);
-      if (propiedad.condo !== adminUser?.condo) {
-        return res.status(403).json({ error: 'Solo podés modificar propiedades de tu condominio' });
-      }
-    }
-
-    const montoNum = Math.max(0, Number(cargoExtra) || 0);
-    const changes = {
-      cargoExtra: (Number(propiedad.cargoExtra) || 0) + montoNum,
-      notaCargo:  [propiedad.notaCargo, notaCargo].filter(Boolean).join(' · '),
-    };
-    const updated = await db.updatePropiedad(req.params.id, changes);
-    if (!updated) return res.status(404).json({ error: 'Propiedad no encontrada' });
-    res.json(PropiedadDTO.toResponse(updated));
-  } catch (e) { res.status(400).json({ error: e.message }); }
+    const nuevo = await db.createCargoExtra({
+      id: uuid(),
+      propiedadId: req.params.id,
+      monto: Math.max(0, Number(monto) || 0),
+      motivo: motivo || '',
+    });
+    res.status(201).json(nuevo);
+  } catch (e) { res.status(e.status || 400).json({ error: e.message }); }
 }
 
-module.exports = { getAll, create, update, remove, getMyProperty, getMyProperties, updateCargoExtra };
+async function editCargoExtra(req, res) {
+  try {
+    const { monto, motivo } = req.body || {};
+    const existing = await db.getCargoExtraById(req.params.cargoId);
+    if (!existing || String(existing.propiedadId) !== String(req.params.id)) {
+      return res.status(404).json({ error: 'Cargo extra no encontrado' });
+    }
+    const propiedades = await db.getPropiedades();
+    const propiedad    = propiedades.find(p => String(p.id) === String(req.params.id));
+    if (!propiedad) return res.status(404).json({ error: 'Propiedad no encontrada' });
+    await assertCanManagePropiedad(req, propiedad);
+
+    const updated = await db.updateCargoExtraItem(req.params.cargoId, {
+      monto: Math.max(0, Number(monto) || 0),
+      motivo: motivo || '',
+    });
+    res.json(updated);
+  } catch (e) { res.status(e.status || 400).json({ error: e.message }); }
+}
+
+async function removeCargoExtra(req, res) {
+  try {
+    const existing = await db.getCargoExtraById(req.params.cargoId);
+    if (!existing || String(existing.propiedadId) !== String(req.params.id)) {
+      return res.status(404).json({ error: 'Cargo extra no encontrado' });
+    }
+    const propiedades = await db.getPropiedades();
+    const propiedad    = propiedades.find(p => String(p.id) === String(req.params.id));
+    if (!propiedad) return res.status(404).json({ error: 'Propiedad no encontrada' });
+    await assertCanManagePropiedad(req, propiedad);
+
+    await db.deleteCargoExtraItem(req.params.cargoId);
+    res.json({ ok: true });
+  } catch (e) { res.status(e.status || 400).json({ error: e.message }); }
+}
+
+module.exports = { getAll, create, update, remove, getMyProperty, getMyProperties, addCargoExtra, editCargoExtra, removeCargoExtra };

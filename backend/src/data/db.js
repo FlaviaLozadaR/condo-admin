@@ -164,11 +164,49 @@ function sortPropiedades(rows, { byCondoFirst = false } = {}) {
   });
 }
 
+// Cargos extra: itemizados en su propia tabla — cargoExtra/notaCargo en la
+// propiedad son calculados (suma y motivos unidos) para no romper a quienes
+// ya leen esos dos campos como un único número/texto.
+async function getCargosExtraByPropiedadIds(propiedadIds) {
+  const map = new Map();
+  if (!propiedadIds.length) return map;
+  const { data } = await supabase.from('cargos_extra').select('*').in('propiedad_id', propiedadIds).order('inserted_at');
+  (data || []).map(rowToApp).forEach(c => {
+    if (!map.has(c.propiedadId)) map.set(c.propiedadId, []);
+    map.get(c.propiedadId).push(c);
+  });
+  return map;
+}
+function attachCargosExtra(propiedades, cargosMap) {
+  return propiedades.map(p => {
+    const items = cargosMap.get(p.id) || [];
+    const cargoExtra = items.reduce((s, c) => s + (Number(c.monto) || 0), 0);
+    const notaCargo  = items.map(c => c.motivo).filter(Boolean).join(' · ');
+    return { ...p, cargoExtra, notaCargo, cargosExtraList: items };
+  });
+}
+async function createCargoExtra(data) {
+  return rowToApp(await q(supabase.from('cargos_extra').insert(appToRow(data)).select().single()));
+}
+async function updateCargoExtraItem(id, changes) {
+  return rowToApp(await q(supabase.from('cargos_extra').update(appToRow(changes)).eq('id', id).select().single()));
+}
+async function deleteCargoExtraItem(id) {
+  await q(supabase.from('cargos_extra').delete().eq('id', id));
+}
+async function getCargoExtraById(id) {
+  const { data, error } = await supabase.from('cargos_extra').select('*').eq('id', id).single();
+  if (error) return null;
+  return rowToApp(data);
+}
+
 async function getPropiedades(condo) {
   let query = supabase.from('propiedades').select('*');
   if (condo) query = query.eq('condo', condo);
   const rows = (await q(query)).map(rowToApp);
-  return sortPropiedades(rows, { byCondoFirst: true });
+  const sorted = sortPropiedades(rows, { byCondoFirst: true });
+  const cargosMap = await getCargosExtraByPropiedadIds(sorted.map(p => p.id));
+  return attachCargosExtra(sorted, cargosMap);
 }
 async function createPropiedad(data) {
   return rowToApp(await q(supabase.from('propiedades').insert(appToRow(data)).select().single()));
@@ -201,9 +239,11 @@ async function getPropiedadesPaged({ page = 1, limit = 20, q: search, condo } = 
   const sorted = sortPropiedades(data.map(rowToApp));
   const total  = sorted.length;
   const from   = (page - 1) * limit;
+  const pageItems = sorted.slice(from, from + limit);
+  const cargosMap = await getCargosExtraByPropiedadIds(pageItems.map(p => p.id));
 
   return {
-    data: sorted.slice(from, from + limit),
+    data: attachCargosExtra(pageItems, cargosMap),
     total,
     page,
     pageSize: limit,
@@ -587,6 +627,7 @@ module.exports = {
   getUsuarios, getUsuarioById, getUsuarioByEmail, createUsuario, updateUsuario, deleteUsuario, getUsuariosPaged, getSeguridadContacts,
   getCondominios, createCondominio, updateCondominio, deleteCondominio,
   getPropiedades, createPropiedad, updatePropiedad, deletePropiedad, propiedadExists, getPropiedadesPaged,
+  createCargoExtra, updateCargoExtraItem, deleteCargoExtraItem, getCargoExtraById,
   getPagos, getPagoById, createPago, updatePagoEstado, updatePago, getPagosPaged,
   getAnuncios, createAnuncio, updateAnuncio, deleteAnuncio, getAnunciosPaged,
   getAsambleas, getAsambleaById, createAsamblea, updateAsamblea, deleteAsamblea, voteAsamblea, getAsambleasPaged,

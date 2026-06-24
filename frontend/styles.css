@@ -6229,6 +6229,43 @@ h2,
   box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15);
 }
 
+.cargo-extra-modal {
+  max-width: 420px;
+  width: min(420px, 92%);
+  text-align: left;
+}
+.cargo-extra-modal h2 { font-size: 1.05rem; margin: 0 0 0.8rem; }
+
+.cargo-extra-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 240px;
+  overflow-y: auto;
+  margin-bottom: 0.8rem;
+}
+.cargo-extra-empty { color: #9ca3af; font-size: 0.85rem; margin: 0; }
+.cargo-extra-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+.cargo-extra-item-info { flex: 1; min-width: 0; }
+.cargo-extra-item-info strong { display: block; color: #101828; }
+.cargo-extra-item-info span { display: block; font-size: 0.78rem; color: #6b7280; }
+.cargo-extra-add-row {
+  display: flex;
+  gap: 0.4rem;
+  border-top: 1px solid #f3f4f6;
+  padding-top: 0.8rem;
+}
+[data-theme="dark"] .cargo-extra-item { background: #1a1a1a; }
+[data-theme="dark"] .cargo-extra-item-info strong { color: #ffffff; }
+[data-theme="dark"] .cargo-extra-add-row { border-top-color: #262626; }
+
 .confirm-modal-icon {
   width: 56px;
   height: 56px;
