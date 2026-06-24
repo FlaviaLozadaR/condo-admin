@@ -109,15 +109,18 @@ async function asignarExpensas(req, res) {
 
     // Solo se actualizan propiedades que realmente pertenecen a este condominio
     // — un propiedadId de otro condominio no puede colarse en la lista.
-    const propiedadesDelCondo = new Set((await db.getPropiedades(condo.name)).map(p => String(p.id)));
+    const propiedadesDelCondo = new Map((await db.getPropiedades(condo.name)).map(p => [String(p.id), p]));
     const montoNum = Math.max(0, Number(monto) || 0);
     const updated  = [];
     for (const propId of propiedadIds) {
-      if (!propiedadesDelCondo.has(String(propId))) continue;
-      const result = await db.updatePropiedad(propId, { expensaMensual: montoNum });
+      const propActual = propiedadesDelCondo.get(String(propId));
+      if (!propActual) continue;
+      // Cada asignación se suma a lo que la propiedad ya tenía — no la reemplaza.
+      const nuevoTotal = (Number(propActual.expensaMensual) || 0) + montoNum;
+      const result = await db.updatePropiedad(propId, { expensaMensual: nuevoTotal });
       if (result) updated.push(result);
     }
-    res.json({ ok: true, updated: updated.length });
+    res.json({ ok: true, updated });
   } catch (e) { res.status(400).json({ error: e.message }); }
 }
 

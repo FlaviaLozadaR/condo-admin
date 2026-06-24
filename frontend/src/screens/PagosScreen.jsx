@@ -328,10 +328,11 @@ export default function PagosScreen({
     setExpensasLoading(true);
     setExpensasMsg('');
     try {
-      await api.asignarExpensas(condoId, monto, [...expensasSelectedIds]);
-      setPropiedadesData(prev => prev.map(p =>
-        expensasSelectedIds.has(p.id) ? { ...p, expensaMensual: monto } : p
-      ));
+      const { updated } = await api.asignarExpensas(condoId, monto, [...expensasSelectedIds]);
+      setPropiedadesData(prev => prev.map(p => {
+        const match = updated?.find(u => String(u.id) === String(p.id));
+        return match ? { ...p, expensaMensual: match.expensaMensual } : p;
+      }));
       setExpensasMsg('ok');
     } catch (e) {
       setExpensasMsg('error:' + e.message);
@@ -345,8 +346,9 @@ export default function PagosScreen({
     if (isNaN(monto) || monto < 0) return;
     setExpensaEditLoading(true);
     try {
-      await api.asignarExpensas(condoId, monto, [propId]);
-      setPropiedadesData(prev => prev.map(p => String(p.id) === String(propId) ? { ...p, expensaMensual: monto } : p));
+      const { updated } = await api.asignarExpensas(condoId, monto, [propId]);
+      const nuevoTotal = updated?.[0]?.expensaMensual;
+      setPropiedadesData(prev => prev.map(p => String(p.id) === String(propId) ? { ...p, expensaMensual: nuevoTotal ?? p.expensaMensual } : p));
       setEditingExpensaId(null);
     } catch (e) {
       onToast?.(e.message || 'No se pudo actualizar la expensa.', 'error');
@@ -708,7 +710,7 @@ export default function PagosScreen({
             {/* Monto + asignación */}
             <div className="expensas-asignar-row">
               <div className="expensas-monto-field">
-                <p className="expensas-base-label">Monto a asignar</p>
+                <p className="expensas-base-label">Monto a sumar</p>
                 <div className="expensas-base-edit">
                   <span style={{fontWeight:600,color:'#374151'}}>Bs.</span>
                   <input
@@ -720,6 +722,7 @@ export default function PagosScreen({
                     onChange={e => { setExpensasInputVal(e.target.value); setExpensasMsg(''); }}
                   />
                 </div>
+                <p style={{margin:'0.3rem 0 0',fontSize:'0.72rem',color:'#6b7280'}}>Se suma a lo que la propiedad ya tenía asignado.</p>
               </div>
               <div style={{flex:1,minWidth:160}}>
                 <p className="expensas-base-label">Seleccionados</p>
@@ -793,7 +796,7 @@ export default function PagosScreen({
                             <td>
                               {editingExpensaId === p.id ? (
                                 <div style={{display:'flex',gap:'0.3rem',alignItems:'center'}}>
-                                  <input type="number" min="0" className="expensas-base-input" style={{width:80}} value={expensaEditVal} onChange={e => setExpensaEditVal(e.target.value)} autoFocus />
+                                  <input type="number" min="0" className="expensas-base-input" style={{width:80}} placeholder="+ Bs." value={expensaEditVal} onChange={e => setExpensaEditVal(e.target.value)} autoFocus />
                                   <button className="btn btn-primary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} disabled={expensaEditLoading} onClick={() => handleSaveExpensaActual(p.id, adminCondoId)}>
                                     {expensaEditLoading ? '…' : 'OK'}
                                   </button>
@@ -802,8 +805,8 @@ export default function PagosScreen({
                               ) : (
                                 <span
                                   className="expensas-editable-value"
-                                  title="Click para corregir la expensa de esta propiedad"
-                                  onClick={() => { setEditingExpensaId(p.id); setExpensaEditVal(String(expensaActual)); }}
+                                  title="Click para sumar un monto a la expensa de esta propiedad"
+                                  onClick={() => { setEditingExpensaId(p.id); setExpensaEditVal(''); }}
                                   style={{color: expensaActual > 0 ? '#101828' : '#9ca3af', fontWeight: expensaActual > 0 ? 700 : 400}}
                                 >
                                   {expensaActual > 0 ? `Bs. ${expensaActual.toLocaleString()}` : '—'}

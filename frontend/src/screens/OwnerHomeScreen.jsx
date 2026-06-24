@@ -7,6 +7,7 @@ export default function OwnerHomeScreen({
   historialVisitasData,
   residentProperty,
   residentUnit,
+  totalDue,
   setIsPayExpensesModalOpen,
   setActiveSection,
 }) {
@@ -98,10 +99,11 @@ export default function OwnerHomeScreen({
 
   const paymentStatus = myOverduePagos.length > 0 ? "En mora"
     : myPendingPagos.length > 0 ? "Pendiente"
+    : totalDue > 0 ? "Debe"
     : myPagos.length > 0 ? "Al día"
     : "Sin pagos";
   const paymentStatusClass = myOverduePagos.length > 0 ? "owner-text-danger"
-    : myPendingPagos.length > 0 ? "owner-text-warning"
+    : (myPendingPagos.length > 0 || totalDue > 0) ? "owner-text-warning"
     : "owner-text-success";
 
   // Reservas activas del usuario

@@ -583,16 +583,13 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
     p.propietario === user.name || p.propiedad === residentProperty
   );
 
-  // Cuánto ya pagó aprobado este mes
-  const nowForPagos = new Date();
-  const paidThisMonth = myPagos
-    .filter(p => {
-      if (p.estado !== 'aprobado') return false;
-      const d = new Date(p.fecha);
-      return !isNaN(d) && d.getMonth() === nowForPagos.getMonth() && d.getFullYear() === nowForPagos.getFullYear();
-    })
+  // Cuánto pagó aprobado en total — la expensa se acumula sin reiniciarse cada
+  // mes, así que lo pagado tiene que descontarse de todo lo histórico, no solo
+  // de este mes, para que no reaparezca como deuda ya cubierta.
+  const paidAllTime = myPagos
+    .filter(p => p.estado === 'aprobado')
     .reduce((s, p) => s + (Number(p.monto) || 0), 0);
-  const totalDue = Math.max(0, (residentExpensas + residentCargoExtra) - paidThisMonth);
+  const totalDue = Math.max(0, (residentExpensas + residentCargoExtra) - paidAllTime);
 
   useEffect(() => {
     localStorage.setItem(PANIC_ALERTS_STORAGE_KEY, JSON.stringify(panicAlerts));
@@ -1462,6 +1459,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             historialVisitasData={historialVisitasData}
             residentProperty={residentProperty}
             residentUnit={residentUnit}
+            totalDue={totalDue}
             setIsPayExpensesModalOpen={setIsPayExpensesModalOpen}
             setActiveSection={setActiveSection}
           />
