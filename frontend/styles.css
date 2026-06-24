@@ -2450,6 +2450,51 @@ h2,
   min-width: 0;
 }
 
+/* Tarjetas para mobile — evitan depender del scroll horizontal de la tabla */
+.expensas-props-cards { display: none; }
+
+@media (max-width: 700px) {
+  .expensas-props-table-wrap { display: none; }
+  .expensas-props-cards { display: flex; flex-direction: column; gap: 0.7rem; }
+}
+
+.expensas-prop-card {
+  border: 1px solid #f3f4f6;
+  border-radius: 10px;
+  padding: 0.8rem 0.9rem;
+  background: #ffffff;
+}
+.expensas-prop-card.expensas-row-selected { border-color: #818cf8; background: #f5f5ff; }
+
+.expensas-prop-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+.expensas-prop-card-head input[type="checkbox"] { margin-top: 0.2rem; }
+.expensas-prop-card-owner { display: block; font-size: 0.8rem; color: #6b7280; margin-top: 0.1rem; }
+
+.expensas-prop-card-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.35rem 0;
+  font-size: 0.88rem;
+}
+.expensas-prop-card-label { color: #9ca3af; font-size: 0.78rem; flex-shrink: 0; padding-top: 0.15rem; }
+.expensas-prop-card-total { border-top: 1px solid #f3f4f6; margin-top: 0.2rem; padding-top: 0.5rem; }
+.expensas-prop-card-btn { width: 100%; margin-top: 0.6rem; justify-content: center; }
+
+[data-theme="dark"] .expensas-prop-card { background: #111111; border-color: #262626; }
+[data-theme="dark"] .expensas-prop-card.expensas-row-selected { background: rgba(99,102,241,0.12); border-color: #6366f1; }
+[data-theme="dark"] .expensas-prop-card-head { border-bottom-color: #262626; }
+[data-theme="dark"] .expensas-prop-card-total { border-top-color: #262626; }
+[data-theme="dark"] .expensas-prop-card strong { color: #ffffff; }
+
 .expensas-props-table {
   width: 100%;
   min-width: 760px;

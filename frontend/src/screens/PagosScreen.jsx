@@ -813,79 +813,150 @@ export default function PagosScreen({
               {condoPropiedades.length === 0 ? (
                 <p style={{color:'#9ca3af',fontSize:'0.85rem',textAlign:'center',padding:'1rem 0'}}>No hay propiedades registradas en este condominio.</p>
               ) : (
-                <div className="expensas-props-table-wrap">
-                  <table className="expensas-props-table">
-                    <thead>
-                      <tr>
-                        <th style={{width:36}}>
-                          <input type="checkbox" checked={allFilteredSelected} onChange={toggleAll} title="Seleccionar todos" />
-                        </th>
-                        <th>Unidad</th>
-                        <th>Propietario</th>
-                        <th>Inquilino</th>
-                        <th>Expensa actual</th>
-                        <th>Cargo extra</th>
-                        <th>Total</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredProps.map(p => {
-                        const expensaActual = Number(p.expensaMensual) || 0;
-                        const cargoExtra    = Number(p.cargoExtra)     || 0;
-                        const total         = expensaActual + cargoExtra;
-                        const isChecked     = expensasSelectedIds.has(p.id);
-                        return (
-                          <tr key={p.id} className={isChecked ? 'expensas-row-selected' : ''}>
-                            <td>
-                              <input type="checkbox" checked={isChecked} onChange={() => toggleOne(p.id)} />
-                            </td>
-                            <td><strong>{p.code}</strong>{p.block ? <span style={{color:'#9ca3af',fontSize:'0.78rem'}}> · {p.block}</span> : ''}</td>
-                            <td>{p.owner || '—'}</td>
-                            <td style={{color:'#6b7280'}}>{getPropertyTenantsText(p) !== '-' ? getPropertyTenantsText(p) : '—'}</td>
-                            <td>
-                              {editingExpensaId === p.id ? (
-                                <div style={{display:'flex',gap:'0.3rem',alignItems:'center'}}>
-                                  <input type="number" min="0" className="expensas-base-input" style={{width:80}} placeholder="+ Bs." value={expensaEditVal} onChange={e => setExpensaEditVal(e.target.value)} autoFocus />
-                                  <button className="btn btn-primary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} disabled={expensaEditLoading} onClick={() => handleSaveExpensaActual(p.id, adminCondoId)}>
-                                    {expensaEditLoading ? '…' : 'OK'}
-                                  </button>
-                                  <button className="btn btn-secondary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} onClick={() => setEditingExpensaId(null)}>✕</button>
-                                </div>
-                              ) : (
+                <>
+                  {/* Tabla — pantallas anchas (desktop/tablet) */}
+                  <div className="expensas-props-table-wrap">
+                    <table className="expensas-props-table">
+                      <thead>
+                        <tr>
+                          <th style={{width:36}}>
+                            <input type="checkbox" checked={allFilteredSelected} onChange={toggleAll} title="Seleccionar todos" />
+                          </th>
+                          <th>Unidad</th>
+                          <th>Propietario</th>
+                          <th>Inquilino</th>
+                          <th>Expensa actual</th>
+                          <th>Cargo extra</th>
+                          <th>Total</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredProps.map(p => {
+                          const expensaActual = Number(p.expensaMensual) || 0;
+                          const cargoExtra    = Number(p.cargoExtra)     || 0;
+                          const total         = expensaActual + cargoExtra;
+                          const isChecked     = expensasSelectedIds.has(p.id);
+                          return (
+                            <tr key={p.id} className={isChecked ? 'expensas-row-selected' : ''}>
+                              <td>
+                                <input type="checkbox" checked={isChecked} onChange={() => toggleOne(p.id)} />
+                              </td>
+                              <td><strong>{p.code}</strong>{p.block ? <span style={{color:'#9ca3af',fontSize:'0.78rem'}}> · {p.block}</span> : ''}</td>
+                              <td>{p.owner || '—'}</td>
+                              <td style={{color:'#6b7280'}}>{getPropertyTenantsText(p) !== '-' ? getPropertyTenantsText(p) : '—'}</td>
+                              <td>
+                                {editingExpensaId === p.id ? (
+                                  <div style={{display:'flex',gap:'0.3rem',alignItems:'center'}}>
+                                    <input type="number" min="0" className="expensas-base-input" style={{width:80}} placeholder="+ Bs." value={expensaEditVal} onChange={e => setExpensaEditVal(e.target.value)} autoFocus />
+                                    <button className="btn btn-primary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} disabled={expensaEditLoading} onClick={() => handleSaveExpensaActual(p.id, adminCondoId)}>
+                                      {expensaEditLoading ? '…' : 'OK'}
+                                    </button>
+                                    <button className="btn btn-secondary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} onClick={() => setEditingExpensaId(null)}>✕</button>
+                                  </div>
+                                ) : (
+                                  <span
+                                    className="expensas-editable-value"
+                                    title="Click para sumar un monto a la expensa de esta propiedad"
+                                    onClick={() => { setEditingExpensaId(p.id); setExpensaEditVal(''); }}
+                                    style={{color: expensaActual > 0 ? '#101828' : '#9ca3af', fontWeight: expensaActual > 0 ? 700 : 400}}
+                                  >
+                                    {expensaActual > 0 ? `Bs. ${expensaActual.toLocaleString()}` : '—'}
+                                  </span>
+                                )}
+                              </td>
+                              <td>
                                 <span
                                   className="expensas-editable-value"
-                                  title="Click para sumar un monto a la expensa de esta propiedad"
-                                  onClick={() => { setEditingExpensaId(p.id); setExpensaEditVal(''); }}
-                                  style={{color: expensaActual > 0 ? '#101828' : '#9ca3af', fontWeight: expensaActual > 0 ? 700 : 400}}
+                                  title="Click para ver y gestionar los cargos extra de esta propiedad"
+                                  onClick={() => setCargoExtraModalProp(p)}
+                                  style={{color: cargoExtra > 0 ? '#dc2626' : '#9ca3af', fontWeight: cargoExtra > 0 ? 700 : 400}}
                                 >
-                                  {expensaActual > 0 ? `Bs. ${expensaActual.toLocaleString()}` : '—'}
+                                  {cargoExtra > 0 ? `Bs. ${cargoExtra.toLocaleString()}` : '—'}
+                                  {p.notaCargo && <span style={{display:'block',fontSize:'0.72rem',color:'#9ca3af'}}>{p.notaCargo}</span>}
                                 </span>
-                              )}
-                            </td>
-                            <td>
+                              </td>
+                              <td><strong>{total > 0 ? `Bs. ${total.toLocaleString()}` : '—'}</strong></td>
+                              <td>
+                                <button className="expensas-edit-btn" onClick={() => setCargoExtraModalProp(p)}>
+                                  + Cargo extra
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Tarjetas — mobile: nada que deslizar, todo en columna */}
+                  <div className="expensas-props-cards">
+                    {filteredProps.map(p => {
+                      const expensaActual = Number(p.expensaMensual) || 0;
+                      const cargoExtra    = Number(p.cargoExtra)     || 0;
+                      const total         = expensaActual + cargoExtra;
+                      const isChecked     = expensasSelectedIds.has(p.id);
+                      return (
+                        <div key={p.id} className={`expensas-prop-card${isChecked ? ' expensas-row-selected' : ''}`}>
+                          <div className="expensas-prop-card-head">
+                            <input type="checkbox" checked={isChecked} onChange={() => toggleOne(p.id)} />
+                            <div>
+                              <strong>{p.code}</strong>{p.block ? <span style={{color:'#9ca3af',fontSize:'0.78rem'}}> · {p.block}</span> : ''}
+                              <span className="expensas-prop-card-owner">{p.owner || '—'}</span>
+                            </div>
+                          </div>
+
+                          <div className="expensas-prop-card-row">
+                            <span className="expensas-prop-card-label">Inquilino</span>
+                            <span style={{color:'#6b7280'}}>{getPropertyTenantsText(p) !== '-' ? getPropertyTenantsText(p) : '—'}</span>
+                          </div>
+
+                          <div className="expensas-prop-card-row">
+                            <span className="expensas-prop-card-label">Expensa actual</span>
+                            {editingExpensaId === p.id ? (
+                              <div style={{display:'flex',gap:'0.3rem',alignItems:'center'}}>
+                                <input type="number" min="0" className="expensas-base-input" style={{width:80}} placeholder="+ Bs." value={expensaEditVal} onChange={e => setExpensaEditVal(e.target.value)} autoFocus />
+                                <button className="btn btn-primary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} disabled={expensaEditLoading} onClick={() => handleSaveExpensaActual(p.id, adminCondoId)}>
+                                  {expensaEditLoading ? '…' : 'OK'}
+                                </button>
+                                <button className="btn btn-secondary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} onClick={() => setEditingExpensaId(null)}>✕</button>
+                              </div>
+                            ) : (
                               <span
                                 className="expensas-editable-value"
-                                title="Click para ver y gestionar los cargos extra de esta propiedad"
-                                onClick={() => setCargoExtraModalProp(p)}
-                                style={{color: cargoExtra > 0 ? '#dc2626' : '#9ca3af', fontWeight: cargoExtra > 0 ? 700 : 400}}
+                                onClick={() => { setEditingExpensaId(p.id); setExpensaEditVal(''); }}
+                                style={{color: expensaActual > 0 ? '#101828' : '#9ca3af', fontWeight: expensaActual > 0 ? 700 : 400}}
                               >
-                                {cargoExtra > 0 ? `Bs. ${cargoExtra.toLocaleString()}` : '—'}
-                                {p.notaCargo && <span style={{display:'block',fontSize:'0.72rem',color:'#9ca3af'}}>{p.notaCargo}</span>}
+                                {expensaActual > 0 ? `Bs. ${expensaActual.toLocaleString()}` : '—'}
                               </span>
-                            </td>
-                            <td><strong>{total > 0 ? `Bs. ${total.toLocaleString()}` : '—'}</strong></td>
-                            <td>
-                              <button className="expensas-edit-btn" onClick={() => setCargoExtraModalProp(p)}>
-                                + Cargo extra
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                            )}
+                          </div>
+
+                          <div className="expensas-prop-card-row">
+                            <span className="expensas-prop-card-label">Cargo extra</span>
+                            <span
+                              className="expensas-editable-value"
+                              onClick={() => setCargoExtraModalProp(p)}
+                              style={{color: cargoExtra > 0 ? '#dc2626' : '#9ca3af', fontWeight: cargoExtra > 0 ? 700 : 400, textAlign:'right'}}
+                            >
+                              {cargoExtra > 0 ? `Bs. ${cargoExtra.toLocaleString()}` : '—'}
+                              {p.notaCargo && <span style={{display:'block',fontSize:'0.72rem',color:'#9ca3af',fontWeight:400}}>{p.notaCargo}</span>}
+                            </span>
+                          </div>
+
+                          <div className="expensas-prop-card-row expensas-prop-card-total">
+                            <span className="expensas-prop-card-label">Total</span>
+                            <strong>{total > 0 ? `Bs. ${total.toLocaleString()}` : '—'}</strong>
+                          </div>
+
+                          <button className="expensas-edit-btn expensas-prop-card-btn" onClick={() => setCargoExtraModalProp(p)}>
+                            + Cargo extra
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
           </section>
