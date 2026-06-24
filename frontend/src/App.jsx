@@ -439,6 +439,15 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             setVisitPasses(visitas);
           }
         }
+
+        // Expensas/cargo extra — Propietario/Inquilino: si el admin asigna o
+        // cambia el monto, se refleja solo sin esperar a un refresh manual.
+        if (["Propietario", "Inquilino"].includes(user.role)) {
+          const prop = await api.getMyProperty();
+          setResidentExpensas(Number(prop.expensaMensual) || 0);
+          setResidentCargoExtra(Number(prop.cargoExtra) || 0);
+          setResidentCargoNota(prop.notaCargo || '');
+        }
       } catch { /* sin conexión, ignorar */ }
     };
 
