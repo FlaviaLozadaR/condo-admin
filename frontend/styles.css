@@ -2196,6 +2196,26 @@ h2,
   font-size: 0.82rem;
 }
 
+.reservas-anticipacion-notice {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 0.55rem 0.85rem;
+  color: #1d4ed8;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+[data-theme="dark"] .reservas-anticipacion-notice { background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.3); color: #93c5fd; }
+
+.reserva-cobro-status {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #dc2626;
+}
+.reserva-cobro-status-ok { color: #16a34a; }
+
 .reserva-dia-completo-check {
   display: flex;
   align-items: center;

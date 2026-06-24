@@ -207,6 +207,7 @@ export const deleteAreaSocial = (id) => request(`/areas-sociales/${id}`, { metho
 export const getReservasAreas = () => request('/reservas-areas');
 export const createReservaArea = (data) => request('/reservas-areas', { method: 'POST', body: data });
 export const aprobarReservaArea = (id, estado, nota) => request(`/reservas-areas/${id}/estado`, { method: 'PATCH', body: { estado, nota } });
+export const cobrarReservaArea = (id) => request(`/reservas-areas/${id}/cobrar`, { method: 'PATCH' });
 export const solicitarCambioReserva = (id, data) => request(`/reservas-areas/${id}/solicitar-cambio`, { method: 'POST', body: data });
 export const responderCambioReserva = (id, aprobado) => request(`/reservas-areas/${id}/responder-cambio`, { method: 'PATCH', body: { aprobado } });
 export const deleteReservaArea = (id) => request(`/reservas-areas/${id}`, { method: 'DELETE' });

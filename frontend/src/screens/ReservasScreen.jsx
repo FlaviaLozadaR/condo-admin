@@ -72,6 +72,13 @@ export default function ReservasScreen({
     } catch (e) { alert('Error: ' + e.message); }
   };
 
+  const handleCobrarReserva = async (id) => {
+    try {
+      const updated = await api.cobrarReservaArea(id);
+      setReservasAreas(prev => prev.map(r => r.id === id ? updated : r));
+    } catch (e) { alert('Error: ' + e.message); }
+  };
+
   const handleDeleteReservaArea = (id) => {
     askConfirm('¿Eliminar esta reserva? Esta acción no se puede deshacer.', async () => {
       try {
@@ -107,7 +114,13 @@ export default function ReservasScreen({
   // Próximas vs pasadas (según fecha + hora de fin de la reserva)
   const now               = new Date();
   const esReservaPasada   = r => new Date(`${r.fecha}T${r.horaFin || '23:59'}`) < now;
-  const reservasProximas  = myReservas.filter(r => !esReservaPasada(r));
+  // Las solicitudes se atienden en orden de llegada — pendientes primero, las
+  // más viejas arriba, así el admin las va resolviendo una por una.
+  const reservasProximas  = myReservas.filter(r => !esReservaPasada(r)).sort((a, b) => {
+    if (a.estado === 'pendiente' && b.estado !== 'pendiente') return -1;
+    if (a.estado !== 'pendiente' && b.estado === 'pendiente') return 1;
+    return new Date(a.insertedAt) - new Date(b.insertedAt);
+  });
   const reservasPasadas   = myReservas.filter(r => esReservaPasada(r)).sort((a, b) => `${b.fecha}T${b.horaFin}`.localeCompare(`${a.fecha}T${a.horaFin}`));
   const reservasVisibles  = reservasDateFilter === 'pasadas' ? reservasPasadas : reservasProximas;
 
@@ -124,6 +137,10 @@ export default function ReservasScreen({
           </button>
         )}
       </header>
+
+      {areasTab === 'reservas' && (
+        <p className="reservas-anticipacion-notice">ℹ Las reservas deben solicitarse con al menos 24 horas de anticipación.</p>
+      )}
 
       {/* Filtro por condominio — solo Super Admin */}
       {isSA && (
@@ -215,7 +232,10 @@ export default function ReservasScreen({
           {reservasVisibles.length === 0 ? (
             <div className="empty-state"><div className="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><p className="empty-state-title">{reservasDateFilter === 'pasadas' ? 'Sin reservas pasadas' : 'Sin reservas próximas'}</p><p className="empty-state-subtitle">{reservasDateFilter === 'pasadas' ? 'Las reservas finalizadas aparecerán aquí.' : 'Aún no hay solicitudes de reserva próximas.'}</p></div>
           ) : reservasVisibles.map(r => {
-            const areaImg = parseAreaImages(areasSociales.find(a => a.id === r.areaId)?.imagenUrl)[0] || '';
+            const area    = areasSociales.find(a => a.id === r.areaId);
+            const areaImg = parseAreaImages(area?.imagenUrl)[0] || '';
+            const precio  = Number(area?.precio) || 0;
+            const necesitaCobro = precio > 0 && !r.cobrado;
             return (
             <article key={r.id} className="reserva-area-card">
               {areaImg && <img src={areaImg} alt={r.areaNombre} className="reserva-area-card-img" />}
@@ -235,12 +255,25 @@ export default function ReservasScreen({
                     </span>
                   </p>
                   {r.nota && <p className="reserva-area-nota">"{r.nota}"</p>}
+                  {precio > 0 && (
+                    <p className={`reserva-cobro-status${r.cobrado ? ' reserva-cobro-status-ok' : ''}`}>
+                      {r.cobrado ? '✓ Cobrado — esperando que suba el comprobante' : `Sin cobrar — Bs. ${precio.toLocaleString()}`}
+                    </p>
+                  )}
                 </div>
                 <span className={`pagos-status-chip pagos-status-${r.estado}`}>{r.estado}</span>
               </div>
               {r.estado === 'pendiente' && (
                 <div className="reserva-area-card-actions reserva-area-card-actions-row">
+                  {necesitaCobro && (
+                    <button className="btn btn-primary" style={{fontSize:'0.82rem',padding:'0.3rem 0.8rem'}}
+                      onClick={() => askConfirm(`¿Cobrar Bs. ${precio.toLocaleString()} como cargo extra a ${r.propietario}?`, () => handleCobrarReserva(r.id))}>
+                      Cobrar Bs. {precio.toLocaleString()}
+                    </button>
+                  )}
                   <button className="btn btn-primary" style={{fontSize:'0.82rem',padding:'0.3rem 0.8rem'}}
+                    disabled={necesitaCobro}
+                    title={necesitaCobro ? 'Primero tenés que cobrar la reserva' : ''}
                     onClick={() => askConfirm('¿Confirmás aprobar esta reserva?', () => handleAprobarReserva(r.id, 'aprobada'))}>
                     Aprobar
                   </button>

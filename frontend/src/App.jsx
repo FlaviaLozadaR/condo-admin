@@ -48,6 +48,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
   const knownPanicIdsRef = useRef(new Set());
   const knownAnuncioIdsRef = useRef(new Set());
   const knownPagoIdsRef = useRef(new Set());
+  const lastResidentCargoExtraRef = useRef(null);
   const knownVisitIdsRef = useRef(new Set());
   const [visitMode, setVisitMode] = useState("peatonal");
   const [visitRegistrationForm, setVisitRegistrationForm] = useState({
@@ -444,8 +445,13 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
         // cambia el monto, se refleja solo sin esperar a un refresh manual.
         if (["Propietario", "Inquilino"].includes(user.role)) {
           const prop = await api.getMyProperty();
+          const nuevoCargoExtra = Number(prop.cargoExtra) || 0;
+          if (lastResidentCargoExtraRef.current !== null && nuevoCargoExtra > lastResidentCargoExtraRef.current) {
+            addToast(`💰 Se te asignó un cargo extra: Bs. ${(nuevoCargoExtra - lastResidentCargoExtraRef.current).toLocaleString()}`, "pago");
+          }
+          lastResidentCargoExtraRef.current = nuevoCargoExtra;
           setResidentExpensas(Number(prop.expensaMensual) || 0);
-          setResidentCargoExtra(Number(prop.cargoExtra) || 0);
+          setResidentCargoExtra(nuevoCargoExtra);
           setResidentCargoNota(prop.notaCargo || '');
         }
       } catch { /* sin conexión, ignorar */ }

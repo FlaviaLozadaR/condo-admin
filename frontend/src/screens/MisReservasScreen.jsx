@@ -13,6 +13,14 @@ function reservasConflictan(a, b) {
   return horariosConflictan(a.horaInicio, a.horaFin, b.horaInicio, b.horaFin);
 }
 
+const MIN_HORAS_ANTICIPACION = 24;
+function cumpleAnticipacionMinima(fecha, horaInicio) {
+  if (!fecha) return false;
+  const inicio = new Date(`${fecha}T${horaInicio}`);
+  const minimo = new Date(Date.now() + MIN_HORAS_ANTICIPACION * 60 * 60 * 1000);
+  return inicio >= minimo;
+}
+
 export default function MisReservasScreen({
   user,
   areasSociales,
@@ -37,6 +45,9 @@ export default function MisReservasScreen({
     }
     if (!reservaForm.diaCompleto && reservaForm.horaInicio >= reservaForm.horaFin) {
       setReservaFormError('La hora de fin debe ser mayor a la de inicio'); return;
+    }
+    if (!cumpleAnticipacionMinima(reservaForm.fecha, reservaForm.diaCompleto ? '00:00' : reservaForm.horaInicio)) {
+      setReservaFormError(`Las reservas deben hacerse con al menos ${MIN_HORAS_ANTICIPACION} horas de anticipación.`); return;
     }
     if (conflictoActual) { setReservaFormError('Ese horario ya está ocupado — elegí otro.'); return; }
     setReservaFormLoading(true); setReservaFormError('');
@@ -63,6 +74,9 @@ export default function MisReservasScreen({
     }
     if (!cambioForm.diaCompleto && cambioForm.horaInicio >= cambioForm.horaFin) {
       alert('La hora de fin debe ser mayor a la de inicio'); return;
+    }
+    if (!cumpleAnticipacionMinima(cambioForm.fecha, cambioForm.diaCompleto ? '00:00' : cambioForm.horaInicio)) {
+      alert(`Las reservas deben hacerse con al menos ${MIN_HORAS_ANTICIPACION} horas de anticipación.`); return;
     }
     try {
       const updated = await api.solicitarCambioReserva(reservaId, cambioForm);
@@ -121,6 +135,7 @@ export default function MisReservasScreen({
         { diaCompleto: r.diaCompleto, horaInicio: r.horaInicio, horaFin: r.horaFin }
       ))
     : null;
+  const anticipacionInsuficiente = reservaForm.fecha && !cumpleAnticipacionMinima(reservaForm.fecha, reservaForm.diaCompleto ? '00:00' : reservaForm.horaInicio);
 
   return (
     <>
@@ -214,6 +229,7 @@ export default function MisReservasScreen({
             </div>
 
             <div className="reserva-form-main">
+              <p className="reservas-anticipacion-notice">ℹ Las reservas deben hacerse con al menos 24 horas de anticipación.</p>
               <div className="reserva-form-fields">
                 <div className="form-group-simple">
                   <label>Fecha *</label>
@@ -263,6 +279,9 @@ export default function MisReservasScreen({
                       ⚠ Ese horario ya está ocupado{conflictoActual.diaCompleto ? ' (todo el día)' : ` (${conflictoActual.horaInicio}–${conflictoActual.horaFin})`} — elegí otro.
                     </p>
                   )}
+                  {!conflictoActual && anticipacionInsuficiente && (
+                    <p className="reserva-conflicto-warning">⚠ Elegí una fecha/hora con al menos {MIN_HORAS_ANTICIPACION} horas de anticipación.</p>
+                  )}
                 </div>
               )}
 
@@ -270,7 +289,7 @@ export default function MisReservasScreen({
 
               <div style={{display:'flex',gap:'0.75rem',marginTop:'1rem'}}>
                 <button className="btn btn-secondary" onClick={() => setSelectedAreaForReserva(null)}>Cancelar</button>
-                <button className="btn btn-primary" disabled={reservaFormLoading || !!conflictoActual || !horarioSeleccionValido} onClick={handleCrearReserva}>
+                <button className="btn btn-primary" disabled={reservaFormLoading || !!conflictoActual || !horarioSeleccionValido || anticipacionInsuficiente} onClick={handleCrearReserva}>
                   {reservaFormLoading ? 'Enviando…' : 'Solicitar Reserva'}
                 </button>
               </div>
@@ -323,6 +342,11 @@ export default function MisReservasScreen({
                   </span>
                 </p>
                 {r.nota && <p className="reserva-area-nota">"{r.nota}"</p>}
+                {r.cobrado && r.estado === 'pendiente' && (
+                  <p className="reserva-cobro-status reserva-cobro-status-ok">
+                    ✓ Se te asignó un cargo extra por esta reserva — pagalo desde "Mis Pagos" para que se apruebe.
+                  </p>
+                )}
                 {r.solicitudCambio && (
                   <p style={{fontSize:'0.78rem',color: r.solicitudCambio.estado === 'aprobada' ? '#16a34a' : r.solicitudCambio.estado === 'rechazada' ? '#dc2626' : '#f59e0b',marginTop:'0.25rem'}}>
                     Cambio {r.solicitudCambio.estado}: {r.solicitudCambio.fecha} {r.solicitudCambio.horaInicio}–{r.solicitudCambio.horaFin}
