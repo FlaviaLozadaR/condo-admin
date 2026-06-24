@@ -856,10 +856,9 @@ export default function PagosScreen({
                                   </div>
                                 ) : (
                                   <span
-                                    className="expensas-editable-value"
+                                    className={`expensas-editable-value${expensaActual > 0 ? ' expensas-value-set' : ''}`}
                                     title="Click para sumar un monto a la expensa de esta propiedad"
                                     onClick={() => { setEditingExpensaId(p.id); setExpensaEditVal(''); }}
-                                    style={{color: expensaActual > 0 ? '#101828' : '#9ca3af', fontWeight: expensaActual > 0 ? 700 : 400}}
                                   >
                                     {expensaActual > 0 ? `Bs. ${expensaActual.toLocaleString()}` : '—'}
                                   </span>
@@ -923,9 +922,8 @@ export default function PagosScreen({
                               </div>
                             ) : (
                               <span
-                                className="expensas-editable-value"
+                                className={`expensas-editable-value${expensaActual > 0 ? ' expensas-value-set' : ''}`}
                                 onClick={() => { setEditingExpensaId(p.id); setExpensaEditVal(''); }}
-                                style={{color: expensaActual > 0 ? '#101828' : '#9ca3af', fontWeight: expensaActual > 0 ? 700 : 400}}
                               >
                                 {expensaActual > 0 ? `Bs. ${expensaActual.toLocaleString()}` : '—'}
                               </span>
