@@ -7,14 +7,32 @@ function createTransporter() {
       user: process.env.GMAIL_USER,
       pass: process.env.GMAIL_PASS,
     },
+    connectionTimeout: 20000,
+    greetingTimeout: 20000,
+    socketTimeout: 20000,
   });
+}
+
+// La conexión SMTP a Gmail desde el hosting a veces tarda o falla por red
+// (timeout intermitente) — se reintenta un par de veces antes de darse por vencido.
+async function sendMailWithRetry(mailOptions, attempts = 3) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await createTransporter().sendMail(mailOptions);
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) await new Promise(r => setTimeout(r, 2000 * (i + 1)));
+    }
+  }
+  throw lastErr;
 }
 
 async function sendResetEmail(to, name, token) {
   const resetUrl = `${process.env.APP_URL || 'http://localhost:3001'}/reset-password.html?token=${token}`;
   const adminEmail = process.env.GMAIL_USER;
 
-  await createTransporter().sendMail({
+  await sendMailWithRetry({
     from: `"Condo Admin" <${adminEmail}>`,
     to,
     cc: to !== adminEmail ? adminEmail : undefined,
@@ -47,7 +65,7 @@ async function sendWelcomeEmail(to, name, password, role) {
   const loginUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
   const adminEmail = process.env.GMAIL_USER;
 
-  await createTransporter().sendMail({
+  await sendMailWithRetry({
     from: `"Condo Admin" <${adminEmail}>`,
     to,
     cc: to !== adminEmail ? adminEmail : undefined,
