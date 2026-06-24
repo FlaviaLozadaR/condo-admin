@@ -2,11 +2,16 @@ const nodemailer = require('nodemailer');
 
 function createTransporter() {
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
     auth: {
       user: process.env.GMAIL_USER,
       pass: process.env.GMAIL_PASS,
     },
+    // Forzar IPv4: en Render la ruta IPv6 hacia Gmail se queda colgada hasta
+    // el timeout en vez de fallar rápido, así que nunca llega a probar IPv4.
+    family: 4,
     connectionTimeout: 20000,
     greetingTimeout: 20000,
     socketTimeout: 20000,
