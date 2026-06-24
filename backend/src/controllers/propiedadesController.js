@@ -184,23 +184,27 @@ async function getMyProperties(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
-// PUT /propiedades/:id/cargo-extra — admin pone cargo extra a una propiedad
+// PUT /propiedades/:id/cargo-extra — admin suma un cargo extra a una propiedad
+// (se acumula sobre lo que ya tenía, igual que la expensa — no lo reemplaza)
 async function updateCargoExtra(req, res) {
   try {
     const { cargoExtra, notaCargo } = req.body || {};
 
+    const propiedades = await db.getPropiedades();
+    const propiedad    = propiedades.find(p => String(p.id) === String(req.params.id));
+    if (!propiedad) return res.status(404).json({ error: 'Propiedad no encontrada' });
+
     if (req.user.role === 'Administrador') {
-      const adminUser   = await db.getUsuarioById(req.user.id);
-      const propiedades = await db.getPropiedades();
-      const propiedad   = propiedades.find(p => String(p.id) === String(req.params.id));
-      if (!propiedad || propiedad.condo !== adminUser?.condo) {
+      const adminUser = await db.getUsuarioById(req.user.id);
+      if (propiedad.condo !== adminUser?.condo) {
         return res.status(403).json({ error: 'Solo podés modificar propiedades de tu condominio' });
       }
     }
 
+    const montoNum = Math.max(0, Number(cargoExtra) || 0);
     const changes = {
-      cargoExtra: Math.max(0, Number(cargoExtra) || 0),
-      notaCargo:  notaCargo || '',
+      cargoExtra: (Number(propiedad.cargoExtra) || 0) + montoNum,
+      notaCargo:  [propiedad.notaCargo, notaCargo].filter(Boolean).join(' · '),
     };
     const updated = await db.updatePropiedad(req.params.id, changes);
     if (!updated) return res.status(404).json({ error: 'Propiedad no encontrada' });

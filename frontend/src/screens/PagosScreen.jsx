@@ -360,9 +360,9 @@ export default function PagosScreen({
   const handleSaveCargoExtra = async (propId) => {
     setCargoExtraLoading(true);
     try {
-      await api.updateCargoExtra(propId, parseFloat(cargoExtraVal) || 0, cargoNotaVal);
+      const updated = await api.updateCargoExtra(propId, parseFloat(cargoExtraVal) || 0, cargoNotaVal);
       setPropiedadesData(prev => prev.map(p => String(p.id) === String(propId)
-        ? { ...p, cargoExtra: parseFloat(cargoExtraVal) || 0, notaCargo: cargoNotaVal }
+        ? { ...p, cargoExtra: updated.cargoExtra, notaCargo: updated.notaCargo }
         : p
       ));
       setEditingCargoExtra(null);
@@ -816,7 +816,7 @@ export default function PagosScreen({
                             <td>
                               {isEditing ? (
                                 <div style={{display:'flex',flexDirection:'column',gap:'0.3rem'}}>
-                                  <input type="number" min="0" className="expensas-base-input" style={{width:80}} value={cargoExtraVal} onChange={e => setCargoExtraVal(e.target.value)} autoFocus />
+                                  <input type="number" min="0" className="expensas-base-input" style={{width:80}} placeholder="+ Bs." value={cargoExtraVal} onChange={e => setCargoExtraVal(e.target.value)} autoFocus />
                                   <input type="text" className="expensas-base-input" placeholder="Motivo (opcional)" style={{width:140,fontSize:'0.78rem'}} value={cargoNotaVal} onChange={e => setCargoNotaVal(e.target.value)} />
                                   <div style={{display:'flex',gap:'0.3rem'}}>
                                     <button className="btn btn-primary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} disabled={cargoExtraLoading} onClick={() => handleSaveCargoExtra(p.id)}>
@@ -835,7 +835,7 @@ export default function PagosScreen({
                             <td><strong>{total > 0 ? `Bs. ${total.toLocaleString()}` : '—'}</strong></td>
                             <td>
                               {!isEditing && (
-                                <button className="expensas-edit-btn" onClick={() => { setEditingCargoExtra(p.id); setCargoExtraVal(String(cargoExtra)); setCargoNotaVal(p.notaCargo || ''); }}>
+                                <button className="expensas-edit-btn" onClick={() => { setEditingCargoExtra(p.id); setCargoExtraVal(''); setCargoNotaVal(''); }}>
                                   + Cargo extra
                                 </button>
                               )}

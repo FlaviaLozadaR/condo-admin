@@ -2720,10 +2720,11 @@ h2,
   flex-wrap: wrap;
 }
 
-.resident-qr-img-wrap {
-  position: relative;
-  width: 140px;
-  height: 140px;
+.resident-qr-img-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
   flex-shrink: 0;
 }
 
@@ -2739,6 +2740,21 @@ h2,
   -webkit-touch-callout: none;
   -webkit-user-drag: none;
 }
+
+.resident-qr-download-link {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: none;
+  color: #4f46e5;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+}
+.resident-qr-download-link:hover { text-decoration: underline; }
+[data-theme="dark"] .resident-qr-download-link { color: #9f8fff; }
 
 .resident-qr-info { flex: 1; min-width: 160px; }
 

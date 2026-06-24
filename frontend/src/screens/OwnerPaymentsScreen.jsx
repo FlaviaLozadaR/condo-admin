@@ -93,7 +93,7 @@ export default function OwnerPaymentsScreen({
             <h3>QR de Pago</h3>
           </div>
           <div className="resident-qr-body">
-            <div className="resident-qr-img-wrap">
+            <div className="resident-qr-img-col">
               <img
                 src={condoPaymentQr}
                 alt="QR de pago del condominio"
@@ -105,14 +105,9 @@ export default function OwnerPaymentsScreen({
                 title="Ver QR ampliado"
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setQrZoomOpen(true); } }}
               />
-              <button
-                type="button"
-                className="payment-qr-download-btn"
-                onClick={handleDownloadQr}
-                title="Descargar QR"
-                aria-label="Descargar QR"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <button type="button" className="resident-qr-download-link" onClick={handleDownloadQr}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:14,height:14}}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Descargar
               </button>
             </div>
             <div className="resident-qr-info">
