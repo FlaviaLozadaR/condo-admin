@@ -14,10 +14,24 @@ export default function OwnerPaymentsScreen({
   setIsPayExpensesModalOpen,
 }) {
   const [qrRetried, setQrRetried] = useState(false);
+  const [qrZoomOpen, setQrZoomOpen] = useState(false);
   const handleQrError = () => {
     if (qrRetried) return;
     setQrRetried(true);
     onQrError?.();
+  };
+  const handleDownloadQr = async () => {
+    try {
+      const res  = await fetch(condoPaymentQr);
+      const blob = await res.blob();
+      const ext  = (blob.type.split('/')[1] || 'png').split('+')[0];
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = `qr-pago.${ext}`;
+      a.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch {}
   };
   const myPagos = pagosData.filter(p =>
     p.propietario === user.name || p.propiedad === residentProperty
@@ -79,13 +93,43 @@ export default function OwnerPaymentsScreen({
             <h3>QR de Pago</h3>
           </div>
           <div className="resident-qr-body">
-            <img src={condoPaymentQr} alt="QR de pago del condominio" className="resident-qr-img" onError={handleQrError} />
+            <div className="resident-qr-img-wrap">
+              <img
+                src={condoPaymentQr}
+                alt="QR de pago del condominio"
+                className="resident-qr-img"
+                onError={handleQrError}
+                onClick={() => setQrZoomOpen(true)}
+                role="button"
+                tabIndex={0}
+                title="Ver QR ampliado"
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setQrZoomOpen(true); } }}
+              />
+              <button
+                type="button"
+                className="payment-qr-download-btn"
+                onClick={handleDownloadQr}
+                title="Descargar QR"
+                aria-label="Descargar QR"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </button>
+            </div>
             <div className="resident-qr-info">
               <p className="resident-qr-title">Escaneá el QR para pagar</p>
               <p className="resident-qr-sub">Usá tu billetera o app bancaria para escanear el código y realizar el pago de expensas. Luego subí el comprobante desde "Pagar Expensas".</p>
             </div>
           </div>
         </section>
+      )}
+
+      {qrZoomOpen && condoPaymentQr && (
+        <div className="qr-zoom-overlay" onClick={() => setQrZoomOpen(false)}>
+          <div className="qr-zoom-content" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="qr-zoom-close" onClick={() => setQrZoomOpen(false)} aria-label="Cerrar">✕</button>
+            <img src={condoPaymentQr} alt="QR de pago ampliado" className="qr-zoom-img" />
+          </div>
+        </div>
       )}
 
 

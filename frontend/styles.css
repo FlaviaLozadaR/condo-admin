@@ -2720,6 +2720,13 @@ h2,
   flex-wrap: wrap;
 }
 
+.resident-qr-img-wrap {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  flex-shrink: 0;
+}
+
 .resident-qr-img {
   width: 140px;
   height: 140px;
@@ -2728,7 +2735,9 @@ h2,
   border: 1px solid #c4b5fd;
   background: #ffffff;
   display: block;
-  flex-shrink: 0;
+  cursor: pointer;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
 }
 
 .resident-qr-info { flex: 1; min-width: 160px; }
