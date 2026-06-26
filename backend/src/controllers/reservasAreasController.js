@@ -12,13 +12,6 @@ function reservasConflictan(a, b) {
   return horariosConflictan(a.horaInicio, a.horaFin, b.horaInicio, b.horaFin);
 }
 
-const MIN_HORAS_ANTICIPACION = 24;
-function cumpleAnticipacionMinima(fecha, horaInicio) {
-  const inicio = new Date(`${fecha}T${horaInicio}`);
-  const minimo = new Date(Date.now() + MIN_HORAS_ANTICIPACION * 60 * 60 * 1000);
-  return inicio >= minimo;
-}
-
 async function getAll(req, res) {
   try {
     const reservas = await db.getReservasAreas();
@@ -47,10 +40,6 @@ async function create(req, res) {
     }
     const horaInicioFinal = esDiaCompleto ? '00:00' : horaInicio;
     const horaFinFinal    = esDiaCompleto ? '23:59' : horaFin;
-
-    if (!cumpleAnticipacionMinima(fecha, horaInicioFinal)) {
-      return res.status(400).json({ error: `Las reservas deben hacerse con al menos ${MIN_HORAS_ANTICIPACION} horas de anticipación.` });
-    }
 
     const existing = await db.getReservasAreas();
     const conflict = existing.find(r =>
@@ -125,10 +114,6 @@ async function requestCambio(req, res) {
     }
     const horaInicioFinal = esDiaCompleto ? '00:00' : horaInicio;
     const horaFinFinal    = esDiaCompleto ? '23:59' : horaFin;
-
-    if (!cumpleAnticipacionMinima(fecha, horaInicioFinal)) {
-      return res.status(400).json({ error: `Las reservas deben hacerse con al menos ${MIN_HORAS_ANTICIPACION} horas de anticipación.` });
-    }
 
     const reservas = await db.getReservasAreas();
     const reserva  = reservas.find(r => String(r.id) === String(id));

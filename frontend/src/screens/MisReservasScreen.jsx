@@ -46,9 +46,6 @@ export default function MisReservasScreen({
     if (!reservaForm.diaCompleto && reservaForm.horaInicio >= reservaForm.horaFin) {
       setReservaFormError('La hora de fin debe ser mayor a la de inicio'); return;
     }
-    if (!cumpleAnticipacionMinima(reservaForm.fecha, reservaForm.diaCompleto ? '00:00' : reservaForm.horaInicio)) {
-      setReservaFormError(`Las reservas deben hacerse con al menos ${MIN_HORAS_ANTICIPACION} horas de anticipación.`); return;
-    }
     if (conflictoActual) { setReservaFormError('Ese horario ya está ocupado — elegí otro.'); return; }
     setReservaFormLoading(true); setReservaFormError('');
     try {
@@ -74,9 +71,6 @@ export default function MisReservasScreen({
     }
     if (!cambioForm.diaCompleto && cambioForm.horaInicio >= cambioForm.horaFin) {
       alert('La hora de fin debe ser mayor a la de inicio'); return;
-    }
-    if (!cumpleAnticipacionMinima(cambioForm.fecha, cambioForm.diaCompleto ? '00:00' : cambioForm.horaInicio)) {
-      alert(`Las reservas deben hacerse con al menos ${MIN_HORAS_ANTICIPACION} horas de anticipación.`); return;
     }
     try {
       const updated = await api.solicitarCambioReserva(reservaId, cambioForm);
@@ -229,7 +223,7 @@ export default function MisReservasScreen({
             </div>
 
             <div className="reserva-form-main">
-              <p className="reservas-anticipacion-notice">ℹ Las reservas deben hacerse con al menos 24 horas de anticipación.</p>
+              <p className="reservas-anticipacion-notice"> Las reservas deben hacerse con al menos 24 horas de anticipación.</p>
               <div className="reserva-form-fields">
                 <div className="form-group-simple">
                   <label>Fecha *</label>
@@ -280,7 +274,7 @@ export default function MisReservasScreen({
                     </p>
                   )}
                   {!conflictoActual && anticipacionInsuficiente && (
-                    <p className="reserva-conflicto-warning">⚠ Elegí una fecha/hora con al menos {MIN_HORAS_ANTICIPACION} horas de anticipación.</p>
+                    <p className="reserva-anticipacion-tip">ℹ Tip: lo ideal es reservar con al menos {MIN_HORAS_ANTICIPACION} horas de anticipación, pero si el horario está libre podés solicitarla igual.</p>
                   )}
                 </div>
               )}
@@ -289,7 +283,7 @@ export default function MisReservasScreen({
 
               <div style={{display:'flex',gap:'0.75rem',marginTop:'1rem'}}>
                 <button className="btn btn-secondary" onClick={() => setSelectedAreaForReserva(null)}>Cancelar</button>
-                <button className="btn btn-primary" disabled={reservaFormLoading || !!conflictoActual || !horarioSeleccionValido || anticipacionInsuficiente} onClick={handleCrearReserva}>
+                <button className="btn btn-primary" disabled={reservaFormLoading || !!conflictoActual || !horarioSeleccionValido} onClick={handleCrearReserva}>
                   {reservaFormLoading ? 'Enviando…' : 'Solicitar Reserva'}
                 </button>
               </div>

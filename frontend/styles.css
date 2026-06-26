@@ -2215,6 +2215,15 @@ h2,
 }
 [data-theme="dark"] .reservas-anticipacion-notice { background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.3); color: #93c5fd; }
 
+.reserva-anticipacion-tip {
+  width: 100%;
+  margin: 0.4rem 0 0;
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+[data-theme="dark"] .reserva-anticipacion-tip { color: #93c5fd; }
+
 .reserva-cobro-status {
   margin: 0.3rem 0 0;
   font-size: 0.8rem;
