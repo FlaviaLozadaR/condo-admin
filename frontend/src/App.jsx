@@ -39,7 +39,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
         : "Dashboard"
   );
   const [isPayExpensesModalOpen, setIsPayExpensesModalOpen] = useState(false);
-  const [payForm, setPayForm] = useState({ monto: "", referencia: "", motivo: "", file: null });
+  const [payForm, setPayForm] = useState({ monto: "", referencia: "", motivo: "", tipo: "Expensa", file: null });
   const [paySubmitting, setPaySubmitting] = useState(false);
   const [payMsg, setPayMsg] = useState("");
   const [isPanicConfirmOpen, setIsPanicConfirmOpen] = useState(false);
@@ -49,6 +49,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
   const knownAnuncioIdsRef = useRef(new Set());
   const knownPagoIdsRef = useRef(new Set());
   const lastResidentCargoExtraRef = useRef(null);
+  const lastReservaEstadosRef = useRef(new Map());
   const knownVisitIdsRef = useRef(new Set());
   const [visitMode, setVisitMode] = useState("peatonal");
   const [visitRegistrationForm, setVisitRegistrationForm] = useState({
@@ -453,6 +454,24 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
           setResidentExpensas(Number(prop.expensaMensual) || 0);
           setResidentCargoExtra(nuevoCargoExtra);
           setResidentCargoNota(prop.notaCargo || '');
+        }
+
+        // Reservas de áreas — se refresca para reflejar aprobaciones/rechazos
+        // del admin (o solicitudes nuevas de residentes) sin esperar un refresh manual.
+        if (["Propietario", "Inquilino", "Administrador", "Super Admin"].includes(user.role)) {
+          const reservas = await api.getReservasAreas();
+          if (["Propietario", "Inquilino"].includes(user.role)) {
+            reservas.forEach(r => {
+              if (r.propietario === user.name) {
+                const prevEstado = lastReservaEstadosRef.current.get(r.id);
+                if (prevEstado && prevEstado !== r.estado && ["aprobada", "rechazada"].includes(r.estado)) {
+                  addToast(`📅 Tu reserva de ${r.areaNombre} fue ${r.estado}`, r.estado === "aprobada" ? "pago" : "error");
+                }
+                lastReservaEstadosRef.current.set(r.id, r.estado);
+              }
+            });
+          }
+          setReservasAreas(reservas);
         }
       } catch { /* sin conexión, ignorar */ }
     };
@@ -1625,6 +1644,8 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             areasSociales={areasSociales}
             reservasAreas={reservasAreas}
             setReservasAreas={setReservasAreas}
+            setIsPayExpensesModalOpen={setIsPayExpensesModalOpen}
+            setPayForm={setPayForm}
           />
         ) : activeSection === "Dashboard" && isSecurity ? (
           <DashboardScreen
@@ -2795,11 +2816,11 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
       )}
 
       {isPayExpensesModalOpen && (
-        <div className="modal-overlay" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", motivo: "", file: null }); }}>
+        <div className="modal-overlay" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", motivo: "", tipo: "Expensa", file: null }); }}>
           <div className="modal-content modal-pay-expenses" onClick={e => e.stopPropagation()}>
             <header className="modal-pay-expenses-header">
-              <h2>Pagar Expensas</h2>
-              <button className="modal-close" type="button" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", motivo: "", file: null }); }}>✕</button>
+              <h2>{payForm.tipo === "Reserva" ? "Pagar Reserva" : "Pagar Expensas"}</h2>
+              <button className="modal-close" type="button" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", motivo: "", tipo: "Expensa", file: null }); }}>✕</button>
             </header>
 
             <div className="modal-pay-expenses-body">
@@ -2817,7 +2838,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
                     style={{flex:1}}
                   />
                 </div>
-                {totalDue > 0 && (
+                {payForm.tipo !== "Reserva" && totalDue > 0 && (
                   <p style={{margin:'0.3rem 0 0',fontSize:'0.78rem',color:'#9090c0'}}>
                     Total adeudado: Bs. {totalDue.toLocaleString()}
                     {Number(payForm.monto) > 0 && Number(payForm.monto) < totalDue && (
@@ -2884,7 +2905,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             </div>
 
             <footer className="modal-pay-expenses-footer">
-              <button type="button" className="modal-pay-cancel-btn" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", motivo: "", file: null }); }}>
+              <button type="button" className="modal-pay-cancel-btn" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", motivo: "", tipo: "Expensa", file: null }); }}>
                 Cancelar
               </button>
               <button
@@ -2901,7 +2922,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
                     const fd = new FormData();
                     fd.append("propiedad",   residentProperty);
                     fd.append("propietario", residentProfile.name);
-                    fd.append("tipo",        "Expensa");
+                    fd.append("tipo",        payForm.tipo || "Expensa");
                     fd.append("monto",       String(monto));
                     fd.append("estado",      "pendiente");
                     fd.append("referencia",  payForm.referencia.trim());
@@ -2909,7 +2930,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
                     fd.append("comprobante", payForm.file);
                     const newPago = await api.createPago(fd);
                     setPagosData(prev => [newPago, ...prev]);
-                    setPayForm({ monto: "", referencia: "", motivo: "", file: null });
+                    setPayForm({ monto: "", referencia: "", motivo: "", tipo: "Expensa", file: null });
                     setIsPayExpensesModalOpen(false);
                     setPayMsg("");
                   } catch (err) {

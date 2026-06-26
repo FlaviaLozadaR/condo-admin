@@ -26,6 +26,8 @@ export default function MisReservasScreen({
   areasSociales,
   reservasAreas,
   setReservasAreas,
+  setIsPayExpensesModalOpen,
+  setPayForm,
 }) {
   const [selectedAreaForReserva, setSelectedAreaForReserva] = useState(null);
   const [reservaForm, setReservaForm] = useState({ fecha: '', horaInicio: '08:00', horaFin: '10:00', nota: '', diaCompleto: false });
@@ -78,6 +80,19 @@ export default function MisReservasScreen({
       setSolicitandoCambioId(null);
       setCambioForm({ fecha: '', horaInicio: '08:00', horaFin: '10:00', nota: '', diaCompleto: false });
     } catch (e) { alert('Error: ' + e.message); }
+  };
+
+  const handlePagarReserva = (r) => {
+    const area = areasSociales.find(a => a.id === r.areaId);
+    const precio = Number(area?.precio) || 0;
+    setPayForm({
+      monto:     precio > 0 ? String(precio) : "",
+      referencia: "",
+      motivo:    `Reserva de ${r.areaNombre} - ${r.fecha}`,
+      tipo:      "Reserva",
+      file:      null,
+    });
+    setIsPayExpensesModalOpen(true);
   };
 
   const disponibles  = areasSociales.filter(a => a.activo !== false);
@@ -337,9 +352,14 @@ export default function MisReservasScreen({
                 </p>
                 {r.nota && <p className="reserva-area-nota">"{r.nota}"</p>}
                 {r.cobrado && r.estado === 'pendiente' && (
-                  <p className="reserva-cobro-status reserva-cobro-status-ok">
-                    ✓ Se te asignó un cargo extra por esta reserva — pagalo desde "Mis Pagos" para que se apruebe.
-                  </p>
+                  <>
+                    <p className="reserva-cobro-status reserva-cobro-status-ok">
+                      ✓ Se te asignó un cargo extra por esta reserva.
+                    </p>
+                    <button className="btn btn-primary" style={{fontSize:'0.82rem',padding:'0.4rem 0.9rem',marginTop:'0.4rem'}} onClick={() => handlePagarReserva(r)}>
+                      Pagar Reserva
+                    </button>
+                  </>
                 )}
                 {r.solicitudCambio && (
                   <p style={{fontSize:'0.78rem',color: r.solicitudCambio.estado === 'aprobada' ? '#16a34a' : r.solicitudCambio.estado === 'rechazada' ? '#dc2626' : '#f59e0b',marginTop:'0.25rem'}}>
