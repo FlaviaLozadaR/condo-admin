@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS pagos (
   due_date TEXT DEFAULT '',
   created_by_role TEXT DEFAULT '',
   condo TEXT DEFAULT '',
+  motivo TEXT DEFAULT '',
   inserted_at TIMESTAMPTZ DEFAULT NOW()
 );
 

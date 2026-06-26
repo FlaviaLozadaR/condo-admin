@@ -39,7 +39,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
         : "Dashboard"
   );
   const [isPayExpensesModalOpen, setIsPayExpensesModalOpen] = useState(false);
-  const [payForm, setPayForm] = useState({ monto: "", referencia: "", file: null });
+  const [payForm, setPayForm] = useState({ monto: "", referencia: "", motivo: "", file: null });
   const [paySubmitting, setPaySubmitting] = useState(false);
   const [payMsg, setPayMsg] = useState("");
   const [isPanicConfirmOpen, setIsPanicConfirmOpen] = useState(false);
@@ -2795,11 +2795,11 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
       )}
 
       {isPayExpensesModalOpen && (
-        <div className="modal-overlay" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", file: null }); }}>
+        <div className="modal-overlay" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", motivo: "", file: null }); }}>
           <div className="modal-content modal-pay-expenses" onClick={e => e.stopPropagation()}>
             <header className="modal-pay-expenses-header">
               <h2>Pagar Expensas</h2>
-              <button className="modal-close" type="button" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", file: null }); }}>✕</button>
+              <button className="modal-close" type="button" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", motivo: "", file: null }); }}>✕</button>
             </header>
 
             <div className="modal-pay-expenses-body">
@@ -2839,6 +2839,16 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
                 />
               </section>
 
+              <section className="modal-pay-reference-section">
+                <label>Motivo (opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Ej: pago de reserva de churrasquera"
+                  value={payForm.motivo}
+                  onChange={e => setPayForm({ ...payForm, motivo: e.target.value })}
+                />
+              </section>
+
               <section className="modal-pay-upload-section">
                 <label>Adjuntar Comprobante (imagen o PDF) *</label>
                 <label className="modal-pay-upload-box">
@@ -2874,7 +2884,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             </div>
 
             <footer className="modal-pay-expenses-footer">
-              <button type="button" className="modal-pay-cancel-btn" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", file: null }); }}>
+              <button type="button" className="modal-pay-cancel-btn" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", motivo: "", file: null }); }}>
                 Cancelar
               </button>
               <button
@@ -2895,10 +2905,11 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
                     fd.append("monto",       String(monto));
                     fd.append("estado",      "pendiente");
                     fd.append("referencia",  payForm.referencia.trim());
+                    fd.append("motivo",      payForm.motivo.trim());
                     fd.append("comprobante", payForm.file);
                     const newPago = await api.createPago(fd);
                     setPagosData(prev => [newPago, ...prev]);
-                    setPayForm({ monto: "", referencia: "", file: null });
+                    setPayForm({ monto: "", referencia: "", motivo: "", file: null });
                     setIsPayExpensesModalOpen(false);
                     setPayMsg("");
                   } catch (err) {

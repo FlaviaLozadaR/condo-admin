@@ -1165,6 +1165,9 @@ export default function PagosScreen({
                 </div>
                 <div className="propiedad-line-item"><span>Monto</span><strong>Bs. {reviewingItem.monto}</strong></div>
                 <div className="propiedad-line-item"><span>Fecha</span><strong>{reviewingItem.fecha}</strong></div>
+                {reviewingItem.motivo && (
+                  <div className="propiedad-line-item"><span>Motivo</span><strong>{reviewingItem.motivo}</strong></div>
+                )}
                 <div className="propiedad-line-item">
                   <span>Estado</span>
                   <span className={`pagos-status-chip pagos-status-${reviewingItem.estado}`}>{reviewingItem.estado}</span>
