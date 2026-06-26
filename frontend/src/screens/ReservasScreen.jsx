@@ -9,6 +9,7 @@ export default function ReservasScreen({
   setAreasSociales,
   reservasAreas,
   setReservasAreas,
+  setPropiedadesData,
   setEditingArea,
   setAreaForm,
   setAreaFormError,
@@ -74,8 +75,13 @@ export default function ReservasScreen({
 
   const handleCobrarReserva = async (id) => {
     try {
-      const updated = await api.cobrarReservaArea(id);
-      setReservasAreas(prev => prev.map(r => r.id === id ? updated : r));
+      const { reserva, propiedad } = await api.cobrarReservaArea(id);
+      setReservasAreas(prev => prev.map(r => r.id === id ? reserva : r));
+      // Refleja al instante el cargo extra recién creado — sin esto, el
+      // Dashboard y "Gestión de Expensas" quedan con el número viejo hasta recargar.
+      if (propiedad) {
+        setPropiedadesData(prev => prev.map(p => String(p.id) === String(propiedad.id) ? propiedad : p));
+      }
     } catch (e) { alert('Error: ' + e.message); }
   };
 

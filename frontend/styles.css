@@ -2231,6 +2231,7 @@ h2,
   color: #dc2626;
 }
 .reserva-cobro-status-ok { color: #16a34a; }
+.reserva-cobro-status-pending { color: #f59e0b; }
 
 .reserva-dia-completo-check {
   display: flex;

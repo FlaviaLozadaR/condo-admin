@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as api from "../api.js";
 import { onEnterKey } from "../utils/keyboard.js";
 import { parseAreaImages } from "../utils/images.js";
@@ -26,6 +26,7 @@ export default function MisReservasScreen({
   areasSociales,
   reservasAreas,
   setReservasAreas,
+  pagosData,
   setIsPayExpensesModalOpen,
   setPayForm,
 }) {
@@ -38,6 +39,11 @@ export default function MisReservasScreen({
   const [reservasFilter, setReservasFilter] = useState('proximas');
   const [carouselIdx, setCarouselIdx] = useState(0);
   const [carouselDragOffset, setCarouselDragOffset] = useState(0);
+
+  // Refresca apenas se abre la pantalla — no espera al ciclo de 30s en segundo plano.
+  useEffect(() => {
+    api.getReservasAreas().then(setReservasAreas).catch(() => {});
+  }, []);
   const [isDraggingCarousel, setIsDraggingCarousel] = useState(false);
   const carouselDragStartXRef = useRef(0);
 
@@ -90,6 +96,7 @@ export default function MisReservasScreen({
       referencia: "",
       motivo:    `Reserva de ${r.areaNombre} - ${r.fecha}`,
       tipo:      "Reserva",
+      reservaId: r.id,
       file:      null,
     });
     setIsPayExpensesModalOpen(true);
@@ -334,6 +341,7 @@ export default function MisReservasScreen({
                 { diaCompleto: o.diaCompleto, horaInicio: o.horaInicio, horaFin: o.horaFin }
               ))
             : null;
+          const pagoYaEnviado = (pagosData || []).some(p => p.reservaId === r.id && p.estado !== 'rechazado');
           return (
           <article key={r.id} className="reserva-area-card">
             <div className="reserva-area-card-top">
@@ -356,9 +364,13 @@ export default function MisReservasScreen({
                     <p className="reserva-cobro-status reserva-cobro-status-ok">
                       ✓ Se te asignó un cargo extra por esta reserva.
                     </p>
-                    <button className="btn btn-primary" style={{fontSize:'0.82rem',padding:'0.4rem 0.9rem',marginTop:'0.4rem'}} onClick={() => handlePagarReserva(r)}>
-                      Pagar Reserva
-                    </button>
+                    {pagoYaEnviado ? (
+                      <p className="reserva-cobro-status reserva-cobro-status-pending">⏱ Comprobante enviado — esperando que el administrador lo apruebe.</p>
+                    ) : (
+                      <button className="btn btn-primary" style={{fontSize:'0.82rem',padding:'0.4rem 0.9rem',marginTop:'0.4rem'}} onClick={() => handlePagarReserva(r)}>
+                        Pagar Reserva
+                      </button>
+                    )}
                   </>
                 )}
                 {r.solicitudCambio && (

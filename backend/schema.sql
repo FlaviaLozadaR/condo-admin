@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS pagos (
   created_by_role TEXT DEFAULT '',
   condo TEXT DEFAULT '',
   motivo TEXT DEFAULT '',
+  reserva_id TEXT DEFAULT '',
   inserted_at TIMESTAMPTZ DEFAULT NOW()
 );
 

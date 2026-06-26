@@ -39,7 +39,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
         : "Dashboard"
   );
   const [isPayExpensesModalOpen, setIsPayExpensesModalOpen] = useState(false);
-  const [payForm, setPayForm] = useState({ monto: "", referencia: "", motivo: "", tipo: "Expensa", file: null });
+  const [payForm, setPayForm] = useState({ monto: "", referencia: "", motivo: "", tipo: "Expensa", reservaId: "", file: null });
   const [paySubmitting, setPaySubmitting] = useState(false);
   const [payMsg, setPayMsg] = useState("");
   const [isPanicConfirmOpen, setIsPanicConfirmOpen] = useState(false);
@@ -401,9 +401,9 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
               knownPanicIdsRef.current.add(String(a.id));
               addToast(`🚨 Alerta de pánico: ${a.resident} — ${a.address} ${a.unit}`, "panic");
             });
-            setPanicAlerts(alerts);
             setMenuBadges(prev => ({ ...prev, panic: (prev.panic || 0) + newAlerts.length }));
           }
+          setPanicAlerts(alerts);
         }
 
         // Anuncios nuevos — todos los roles
@@ -414,11 +414,13 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             knownAnuncioIdsRef.current.add(String(a.id));
             addToast(`📢 Nuevo anuncio: ${a.title}`, "anuncio");
           });
-          setAnunciosData(anuncios);
           setMenuBadges(prev => ({ ...prev, anuncios: (prev.anuncios || 0) + newAnuncios.length }));
         }
+        setAnunciosData(anuncios);
 
-        // Pagos pendientes — Admin/SuperAdmin
+        // Pagos pendientes — Admin/SuperAdmin: se actualiza siempre (no solo
+        // cuando hay un pago nuevo) para reflejar también cambios de estado
+        // hechos desde otra sesión/dispositivo.
         if (["Administrador", "Super Admin"].includes(user.role)) {
           const pagos = await api.getPagos();
           const newPagos = pagos.filter(p => !knownPagoIdsRef.current.has(String(p.id)));
@@ -427,9 +429,15 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
               knownPagoIdsRef.current.add(String(p.id));
               addToast(`💰 Nuevo pago pendiente: ${p.propiedad} — Bs. ${p.monto}`, "pago");
             });
-            setPagosData(pagos);
             setMenuBadges(prev => ({ ...prev, pagos: (prev.pagos || 0) + newPagos.length }));
           }
+          setPagosData(pagos);
+
+          // Propiedades — refleja cargos extra/expensas asignados desde
+          // cualquier lado (otra sesión, "Cobrar" de una reserva, etc.) sin
+          // esperar a un refresh manual. Alimenta el Dashboard y Gestión de Expensas.
+          const propiedades = await api.getPropiedades();
+          setPropiedadesData(propiedades);
         }
 
         // Visitas nuevas — Seguridad (sin toast: solo mantiene la lista al día)
@@ -1584,6 +1592,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             setAreasSociales={setAreasSociales}
             reservasAreas={reservasAreas}
             setReservasAreas={setReservasAreas}
+            setPropiedadesData={setPropiedadesData}
             setEditingArea={setEditingArea}
             setAreaForm={setAreaForm}
             setAreaFormError={setAreaFormError}
@@ -1644,6 +1653,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             areasSociales={areasSociales}
             reservasAreas={reservasAreas}
             setReservasAreas={setReservasAreas}
+            pagosData={pagosData}
             setIsPayExpensesModalOpen={setIsPayExpensesModalOpen}
             setPayForm={setPayForm}
           />
@@ -2816,11 +2826,11 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
       )}
 
       {isPayExpensesModalOpen && (
-        <div className="modal-overlay" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", motivo: "", tipo: "Expensa", file: null }); }}>
+        <div className="modal-overlay" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", motivo: "", tipo: "Expensa", reservaId: "", file: null }); }}>
           <div className="modal-content modal-pay-expenses" onClick={e => e.stopPropagation()}>
             <header className="modal-pay-expenses-header">
               <h2>{payForm.tipo === "Reserva" ? "Pagar Reserva" : "Pagar Expensas"}</h2>
-              <button className="modal-close" type="button" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", motivo: "", tipo: "Expensa", file: null }); }}>✕</button>
+              <button className="modal-close" type="button" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", motivo: "", tipo: "Expensa", reservaId: "", file: null }); }}>✕</button>
             </header>
 
             <div className="modal-pay-expenses-body">
@@ -2905,7 +2915,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             </div>
 
             <footer className="modal-pay-expenses-footer">
-              <button type="button" className="modal-pay-cancel-btn" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", motivo: "", tipo: "Expensa", file: null }); }}>
+              <button type="button" className="modal-pay-cancel-btn" onClick={() => { setIsPayExpensesModalOpen(false); setPayMsg(""); setPayForm({ monto: "", referencia: "", motivo: "", tipo: "Expensa", reservaId: "", file: null }); }}>
                 Cancelar
               </button>
               <button
@@ -2927,10 +2937,11 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
                     fd.append("estado",      "pendiente");
                     fd.append("referencia",  payForm.referencia.trim());
                     fd.append("motivo",      payForm.motivo.trim());
+                    fd.append("reservaId",   payForm.reservaId || "");
                     fd.append("comprobante", payForm.file);
                     const newPago = await api.createPago(fd);
                     setPagosData(prev => [newPago, ...prev]);
-                    setPayForm({ monto: "", referencia: "", motivo: "", tipo: "Expensa", file: null });
+                    setPayForm({ monto: "", referencia: "", motivo: "", tipo: "Expensa", reservaId: "", file: null });
                     setIsPayExpensesModalOpen(false);
                     setPayMsg("");
                   } catch (err) {

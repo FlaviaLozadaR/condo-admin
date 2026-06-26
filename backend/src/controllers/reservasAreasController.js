@@ -197,7 +197,10 @@ async function cobrar(req, res) {
     });
 
     const updated = await db.updateReservaArea(id, { cobrado: true });
-    res.json(updated);
+    // Se devuelve también la propiedad ya actualizada (con el cargo extra
+    // sumado) para que el admin la vea reflejada al instante, sin recargar.
+    const propiedadActualizada = (await db.getPropiedades(reserva.condo)).find(p => String(p.id) === String(propiedad.id));
+    res.json({ reserva: updated, propiedad: propiedadActualizada });
   } catch (e) { res.status(400).json({ error: e.message }); }
 }
 

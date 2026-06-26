@@ -1,6 +1,6 @@
 class PagoDTO {
   static fromRequest(body = {}) {
-    const { propiedad, propietario, resident, unit, tipo, monto, fecha, estado, dueDate, referencia, motivo } = body;
+    const { propiedad, propietario, resident, unit, tipo, monto, fecha, estado, dueDate, referencia, motivo, reservaId } = body;
     if (!monto) throw new Error('El monto es requerido');
     return {
       propiedad:   propiedad || `${unit || ''} - ${resident || ''}`,
@@ -14,6 +14,7 @@ class PagoDTO {
       dueDate:     dueDate || '',
       referencia:  referencia || '',
       motivo:      motivo || '',
+      reservaId:   reservaId || '',
     };
   }
 
