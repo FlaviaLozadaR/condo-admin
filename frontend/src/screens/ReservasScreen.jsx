@@ -274,7 +274,12 @@ export default function ReservasScreen({
                   <button className="btn btn-primary" style={{fontSize:'0.82rem',padding:'0.3rem 0.8rem'}}
                     disabled={necesitaCobro}
                     title={necesitaCobro ? 'Primero tenés que cobrar la reserva' : ''}
-                    onClick={() => askConfirm('¿Confirmás aprobar esta reserva?', () => handleAprobarReserva(r.id, 'aprobada'))}>
+                    onClick={() => askConfirm(
+                      precio > 0
+                        ? `¿Ya viste el pago de ${r.propietario} por el cargo extra de Bs. ${precio.toLocaleString()}? Esto aprueba la reserva.`
+                        : '¿Confirmás aprobar esta reserva?',
+                      () => handleAprobarReserva(r.id, 'aprobada')
+                    )}>
                     Aprobar
                   </button>
                   <button className="btn btn-secondary" style={{fontSize:'0.82rem',padding:'0.3rem 0.8rem'}}

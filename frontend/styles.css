@@ -307,6 +307,13 @@ h2,
   color: var(--accent-dark);
 }
 
+.btn:disabled, .btn-primary:disabled, .btn-secondary:disabled, button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(0.3);
+}
+.btn-primary:disabled:hover { background: linear-gradient(135deg, var(--accent) 0%, #6f4cff 100%); }
+
 .btn-secondary:hover {
   background: var(--surface-soft);
 }
