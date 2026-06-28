@@ -1,11 +1,16 @@
 import { useState } from "react";
 import * as api from "../api.js";
+import Pagination from "../components/Pagination.jsx";
 
 const DOC_TYPES = [
   { type: "front", label: "Carnet (frente)", flag: "hasIdDocumentFront" },
   { type: "back",  label: "Carnet (dorso)",  flag: "hasIdDocumentBack" },
   { type: "plate", label: "Foto de placa",   flag: "hasPlatePhoto", vehicularOnly: true },
 ];
+
+const MESES_LARGOS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const monthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+const PAGE_SIZE = 15;
 
 export default function SecurityHistoryScreen({ visitPasses, setVisitPasses, historialVisitasData = [], onToast }) {
   const [busyKey, setBusyKey] = useState(null);
@@ -14,6 +19,9 @@ export default function SecurityHistoryScreen({ visitPasses, setVisitPasses, his
   const [saving, setSaving] = useState(false);
   const [deletingVisitaId, setDeletingVisitaId] = useState(null);
   const [deletingVisitaBusy, setDeletingVisitaBusy] = useState(false);
+  const [historyMonthFilter, setHistoryMonthFilter] = useState("todos");
+  const [historyMonthDropdownOpen, setHistoryMonthDropdownOpen] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
 
   const confirmDeleteVisita = async () => {
     if (!deletingVisitaId) return;
@@ -140,6 +148,33 @@ export default function SecurityHistoryScreen({ visitPasses, setVisitPasses, his
     }
   };
 
+  // Meses disponibles para filtrar, según la fecha real de registro de cada pase.
+  const monthOptions = (() => {
+    const map = new Map();
+    visitPasses.forEach((p) => {
+      const d = new Date(p.insertedAt);
+      if (isNaN(d)) return;
+      const key = monthKey(d);
+      if (!map.has(key)) map.set(key, { key, year: d.getFullYear(), month: d.getMonth(), label: `${MESES_LARGOS[d.getMonth()]} ${d.getFullYear()}` });
+    });
+    return Array.from(map.values()).sort((a, b) => (b.year - a.year) || (b.month - a.month));
+  })();
+
+  const filteredVisitPasses = (historyMonthFilter === "todos"
+    ? visitPasses
+    : visitPasses.filter((p) => {
+        const d = new Date(p.insertedAt);
+        return !isNaN(d) && monthKey(d) === historyMonthFilter;
+      })
+  ).slice().sort((a, b) => new Date(b.insertedAt) - new Date(a.insertedAt));
+
+  const historyTotalPages = Math.max(1, Math.ceil(filteredVisitPasses.length / PAGE_SIZE));
+  const pagedVisitPasses = filteredVisitPasses.slice((historyPage - 1) * PAGE_SIZE, historyPage * PAGE_SIZE);
+
+  const selectedHistoryMonthLabel = historyMonthFilter === "todos"
+    ? "Todos los meses"
+    : (monthOptions.find((m) => m.key === historyMonthFilter)?.label || "Todos los meses");
+
   return (
     <>
       <header className="dashboard-header visit-header">
@@ -150,6 +185,44 @@ export default function SecurityHistoryScreen({ visitPasses, setVisitPasses, his
       </header>
 
       <section className="visit-security-card visit-history-card">
+        <div className="management-condo-field panic-month-field" style={{maxWidth:260,marginBottom:'1rem'}}>
+          <label>Período</label>
+          <div className="condo-dropdown" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setHistoryMonthDropdownOpen(false); }} tabIndex={-1}>
+            <button
+              type="button"
+              className="condo-dropdown-trigger"
+              onClick={() => setHistoryMonthDropdownOpen((o) => !o)}
+              aria-expanded={historyMonthDropdownOpen}
+            >
+              <span className="condo-dropdown-value">{selectedHistoryMonthLabel}</span>
+              <svg className={`condo-dropdown-chevron${historyMonthDropdownOpen ? " open" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {historyMonthDropdownOpen && (
+              <ul className="condo-dropdown-list" role="listbox">
+                <li
+                  role="option"
+                  aria-selected={historyMonthFilter === "todos"}
+                  className={`condo-dropdown-item${historyMonthFilter === "todos" ? " selected" : ""}`}
+                  onMouseDown={() => { setHistoryMonthFilter("todos"); setHistoryPage(1); setHistoryMonthDropdownOpen(false); }}
+                >
+                  Todos los meses
+                </li>
+                {monthOptions.map((opt) => (
+                  <li
+                    key={opt.key}
+                    role="option"
+                    aria-selected={historyMonthFilter === opt.key}
+                    className={`condo-dropdown-item${historyMonthFilter === opt.key ? " selected" : ""}`}
+                    onMouseDown={() => { setHistoryMonthFilter(opt.key); setHistoryPage(1); setHistoryMonthDropdownOpen(false); }}
+                  >
+                    {opt.label}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
         <div className="visit-history-table-wrap">
           <table className="visit-history-table">
             <thead>
@@ -170,7 +243,7 @@ export default function SecurityHistoryScreen({ visitPasses, setVisitPasses, his
               </tr>
             </thead>
             <tbody>
-              {visitPasses.map((item) => {
+              {pagedVisitPasses.map((item) => {
                 const historial = historialByPassId.get(item.id);
                 return (
                 <tr key={item.id}>
@@ -245,7 +318,11 @@ export default function SecurityHistoryScreen({ visitPasses, setVisitPasses, his
               })}
             </tbody>
           </table>
+          {pagedVisitPasses.length === 0 && (
+            <p style={{textAlign:'center',color:'#9ca3af',padding:'1.2rem 0'}}>No hay registros para ese período.</p>
+          )}
         </div>
+        <Pagination page={historyPage} totalPages={historyTotalPages} onPageChange={setHistoryPage} />
       </section>
 
       {detailItem && (

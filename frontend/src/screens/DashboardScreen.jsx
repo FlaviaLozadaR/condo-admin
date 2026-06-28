@@ -186,11 +186,10 @@ export default function DashboardScreen({
     debt:     `Bs. ${p.totalDebt.toLocaleString()}`,
   }));
 
-  // KPIs de seguridad
-  const todayKey        = nowDate.toDateString();
-  const visitasHoyCount = historialVisitasData.filter(v => {
+  // KPIs de seguridad — visitas del mes en curso, se reinicia solo al empezar el mes siguiente
+  const visitasMesCount = historialVisitasData.filter(v => {
     const d = parseFecha(v.fecha);
-    return d && d.toDateString() === todayKey;
+    return d && d.getMonth() === curMonth && d.getFullYear() === curYear;
   }).length;
 
   const kpis =
@@ -203,7 +202,7 @@ export default function DashboardScreen({
         ]
       : user.role === 'Seguridad'
       ? [
-          { label: 'Visitas Hoy',   value: visitasHoyCount,    icon: 'users',    tone: 'blue'   },
+          { label: 'Visitas Este Mes', value: visitasMesCount, icon: 'users',    tone: 'blue'   },
           { label: 'QR Validados',  value: visitPasses.length, icon: 'building', tone: 'green'  },
           { label: 'Peatonales',    value: pedCount,           icon: 'users',    tone: 'yellow' },
           { label: 'Vehiculares',   value: vehCount,           icon: 'alert',    tone: 'red'    },
