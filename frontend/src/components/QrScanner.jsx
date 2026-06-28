@@ -23,6 +23,7 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
   const [actionLoading, setActionLoading]   = useState(false);
   const [busyEntryId, setBusyEntryId]       = useState(null);
   const [qrValidationError, setQrValidationError] = useState(null); // { title, message }
+  const [scanConfirm, setScanConfirm] = useState(null); // { pass, type: 'ingreso'|'salida', openEntry }
   const html5QrRef        = useRef(null);
   const scannerRunningRef = useRef(false);
 
@@ -174,8 +175,9 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
     showMsg(`✓ Ingreso registrado: ${pass.fullName} — ${hora}`);
   };
 
-  // Al escanear (o ingresar manualmente) un código válido, registra automáticamente
-  // el ingreso o la salida del visitante según corresponda.
+  // Al escanear (o ingresar manualmente) un código válido, el primer escaneo
+  // de un QR es para ingreso y el segundo para salida — pero ninguno de los
+  // dos se registra solo: se le pide confirmación al guardia antes.
   const autoRegister = async (pass) => {
     if (pass.status === 'Inactivo') {
       setQrValidationError({
@@ -207,18 +209,25 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
       (!h.salida || h.salida === '-')
     );
 
+    setScanConfirm({ pass, type: open ? 'salida' : 'ingreso', openEntry: open || null });
+  };
+
+  const confirmScanAction = async () => {
+    if (!scanConfirm) return;
+    const { pass, type, openEntry } = scanConfirm;
     setActionLoading(true);
     try {
-      if (!open) {
+      if (type === 'ingreso') {
         await registerIngreso(pass);
       } else {
-        const hora = await performSalida(open, pass.id);
+        const hora = await performSalida(openEntry, pass.id);
         showMsg(`✓ Salida registrada: ${pass.fullName} — ${hora}. QR desactivado.`);
       }
     } catch (e) {
       showMsg('Error: ' + e.message);
     } finally {
       setActionLoading(false);
+      setScanConfirm(null);
     }
   };
 
@@ -429,6 +438,27 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
             <div className="confirm-modal-actions">
               <button type="button" className="confirm-modal-accept" style={{width:'100%'}} onClick={() => setQrValidationError(null)}>
                 Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {scanConfirm && (
+        <div className="modal-overlay modal-overlay-centered" onClick={() => !actionLoading && setScanConfirm(null)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className={`confirm-modal-icon ${scanConfirm.type === 'salida' ? 'confirm-modal-icon-danger' : ''}`} aria-hidden="true">
+              {scanConfirm.type === 'ingreso' ? '→' : '←'}
+            </div>
+            <h2>Confirmación de {scanConfirm.type === 'ingreso' ? 'Ingreso' : 'Salida'}</h2>
+            <p>
+              {scanConfirm.pass.fullName} — {scanConfirm.pass.property}
+              {scanConfirm.pass.mode === 'vehicular' ? ` · Vehicular (${scanConfirm.pass.plate})` : ' · Peatonal'}
+            </p>
+            <div className="confirm-modal-actions">
+              <button type="button" className="confirm-modal-cancel" disabled={actionLoading} onClick={() => setScanConfirm(null)}>Cancelar</button>
+              <button type="button" className="confirm-modal-accept" disabled={actionLoading} onClick={confirmScanAction}>
+                {actionLoading ? 'Registrando…' : 'Aceptar'}
               </button>
             </div>
           </div>
