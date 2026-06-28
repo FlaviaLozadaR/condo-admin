@@ -24,6 +24,8 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
   const [busyEntryId, setBusyEntryId]       = useState(null);
   const [qrValidationError, setQrValidationError] = useState(null); // { title, message }
   const [scanConfirm, setScanConfirm] = useState(null); // { pass, type: 'ingreso'|'salida', openEntry }
+  const [vehicularSearch, setVehicularSearch] = useState(""); // busca por placa
+  const [peatonalSearch, setPeatonalSearch]   = useState(""); // busca por cédula
   const html5QrRef        = useRef(null);
   const scannerRunningRef = useRef(false);
 
@@ -129,8 +131,17 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
 
   // Separados por portería — vehicular y peatonal son flujos físicamente
   // distintos, no tiene sentido mezclarlos en una sola lista.
-  const insideVehicular = insideVisitors.filter(e => e.tipo === 'vehicular');
-  const insidePeatonal  = insideVisitors.filter(e => e.tipo !== 'vehicular');
+  const insideVehicularAll = insideVisitors.filter(e => e.tipo === 'vehicular');
+  const insidePeatonalAll  = insideVisitors.filter(e => e.tipo !== 'vehicular');
+
+  // Búsqueda rápida: por placa en vehicular, por cédula en peatonal — para no
+  // tener que desplazarse por toda la lista buscando a alguien puntual.
+  const insideVehicular = vehicularSearch.trim()
+    ? insideVehicularAll.filter(e => (e.placa || '').toLowerCase().includes(vehicularSearch.trim().toLowerCase()))
+    : insideVehicularAll;
+  const insidePeatonal = peatonalSearch.trim()
+    ? insidePeatonalAll.filter(e => (e.cedula || '').toLowerCase().includes(peatonalSearch.trim().toLowerCase()))
+    : insidePeatonalAll;
 
   // Marca la salida de un registro de historial y, si corresponde, desactiva su pase QR.
   // `passIdOverride` permite indicar directamente el pase a desactivar (p.ej. el pase
@@ -262,9 +273,9 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
     finally { setActionLoading(false); }
   };
 
-  const renderInsideList = (list) => (
+  const renderInsideList = (list, emptyMessage = "No hay visitantes dentro por esta portería.") => (
     list.length === 0 ? (
-      <p className="visit-inside-empty">No hay visitantes dentro por esta portería.</p>
+      <p className="visit-inside-empty">{emptyMessage}</p>
     ) : (
       <div className="visit-inside-list">
         {list.map((entry) => {
@@ -310,9 +321,18 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
               <circle cx="16.5" cy="16" r="1.6" />
             </svg>
             Portería Vehicular
-            {insideVehicular.length > 0 && <span className="visit-inside-count">{insideVehicular.length}</span>}
+            {insideVehicularAll.length > 0 && <span className="visit-inside-count">{insideVehicularAll.length}</span>}
           </h2>
-          {renderInsideList(insideVehicular)}
+          {insideVehicularAll.length > 0 && (
+            <input
+              type="text"
+              className="visit-inside-search"
+              placeholder="Buscar por placa..."
+              value={vehicularSearch}
+              onChange={e => setVehicularSearch(e.target.value)}
+            />
+          )}
+          {renderInsideList(insideVehicular, vehicularSearch.trim() ? "Ningún vehículo dentro coincide con esa placa." : "No hay visitantes dentro por esta portería.")}
         </article>
 
         <article className="visit-security-card visit-inside-card">
@@ -322,9 +342,18 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
               <path d="M12 7.5V13L9 16.5M12 13L15 16.5M12 10.5L8.5 12M12 10.5L15.5 12" />
             </svg>
             Portería Peatonal
-            {insidePeatonal.length > 0 && <span className="visit-inside-count">{insidePeatonal.length}</span>}
+            {insidePeatonalAll.length > 0 && <span className="visit-inside-count">{insidePeatonalAll.length}</span>}
           </h2>
-          {renderInsideList(insidePeatonal)}
+          {insidePeatonalAll.length > 0 && (
+            <input
+              type="text"
+              className="visit-inside-search"
+              placeholder="Buscar por cédula..."
+              value={peatonalSearch}
+              onChange={e => setPeatonalSearch(e.target.value)}
+            />
+          )}
+          {renderInsideList(insidePeatonal, peatonalSearch.trim() ? "Ningún visitante dentro coincide con esa cédula." : "No hay visitantes dentro por esta portería.")}
         </article>
       </div>
 

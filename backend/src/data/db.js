@@ -494,6 +494,30 @@ async function deleteVisita(id) {
   await q(supabase.from('visitas').delete().eq('id', id));
 }
 
+// Adjunta a cada fila de historial si la visita ligada (visitaId) tiene fotos
+// de documentos disponibles — para mostrar el botón "Ver" solo cuando aplica,
+// sin tener que cargar las fotos en sí (eso queda para el link firmado puntual).
+async function attachVisitaDocFlags(historialRows) {
+  const visitaIds = [...new Set(historialRows.map(h => h.visitaId).filter(Boolean))];
+  if (!visitaIds.length) {
+    return historialRows.map(h => ({ ...h, hasIdDocumentFront: false, hasIdDocumentBack: false, hasPlatePhoto: false }));
+  }
+  const { data } = await supabase
+    .from('visitas')
+    .select('id, id_document_front_path, id_document_back_path, plate_photo_path')
+    .in('id', visitaIds);
+  const map = new Map((data || []).map(rowToApp).map(v => [v.id, v]));
+  return historialRows.map(h => {
+    const v = map.get(h.visitaId);
+    return {
+      ...h,
+      hasIdDocumentFront: !!v?.idDocumentFrontPath,
+      hasIdDocumentBack:  !!v?.idDocumentBackPath,
+      hasPlatePhoto:      !!v?.platePhotoPath,
+    };
+  });
+}
+
 // HISTORIAL
 async function getHistorial(condo) {
   let query = supabase.from('historial_visitas').select('*').order('inserted_at', { ascending: false });
@@ -539,7 +563,7 @@ async function getHistorialPaged({ page = 1, limit = 20, tipo, q: search, condo 
   if (vehicularMes.error) throw vehicularMes.error;
 
   return {
-    data: data.map(rowToApp),
+    data: await attachVisitaDocFlags(data.map(rowToApp)),
     total: totalMes.count || 0,
     totalPeatonales: peatonalMes.count || 0,
     totalVehiculares: vehicularMes.count || 0,

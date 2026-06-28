@@ -6,6 +6,12 @@ import { parseFecha } from "./dashboardUtils.js";
 const PAGE_SIZE = 20;
 const MESES_LARGOS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
+const DOC_TYPES = [
+  { type: "front", label: "Carnet (frente)", flag: "hasIdDocumentFront" },
+  { type: "back",  label: "Carnet (dorso)",  flag: "hasIdDocumentBack" },
+  { type: "plate", label: "Foto de placa",   flag: "hasPlatePhoto", vehicularOnly: true },
+];
+
 export default function HistorialVisitasScreen({ user, isSuperAdministrator, condominiosData, propiedadesData, historialVisitasData, onToast, exportToPDF }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -19,7 +25,41 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
   const [exportMonthsFilter, setExportMonthsFilter] = useState(new Set());
   const [exportMonthsDropdownOpen, setExportMonthsDropdownOpen] = useState(false);
   const [deletingHistorialId, setDeletingHistorialId] = useState(null);
+  const [docsItem, setDocsItem] = useState(null);
+  const [docsBusyType, setDocsBusyType] = useState(null);
   const canDeleteHistorial = ["Super Admin", "Administrador", "Seguridad"].includes(user.role);
+
+  const handleViewDoc = async (id, type) => {
+    setDocsBusyType(`${type}-view`);
+    try {
+      const { url } = await api.getVisitaDocumentUrl(id, type);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      onToast?.(err.message || "No se pudo abrir el documento.", "error");
+    } finally {
+      setDocsBusyType(null);
+    }
+  };
+
+  const handleDownloadDoc = async (id, type, label) => {
+    setDocsBusyType(`${type}-download`);
+    try {
+      const { url } = await api.getVisitaDocumentUrl(id, type);
+      const res  = await fetch(url);
+      const blob = await res.blob();
+      const ext  = (blob.type.split('/')[1] || 'jpg').split('+')[0];
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = `${label.replace(/\s+/g, '_')}.${ext}`;
+      a.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      onToast?.(err.message || "No se pudo descargar el documento.", "error");
+    } finally {
+      setDocsBusyType(null);
+    }
+  };
 
   const confirmDeleteHistorial = async () => {
     if (!deletingHistorialId) return;
@@ -422,15 +462,18 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
               <th>Entrada</th>
               <th>Salida</th>
               <th>Motivo</th>
+              <th>Documentos</th>
               {canDeleteHistorial && <th>Acciones</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={canDeleteHistorial ? 10 : 9}>Cargando...</td></tr>
+              <tr><td colSpan={canDeleteHistorial ? 11 : 10}>Cargando...</td></tr>
             ) : pageData.data.length === 0 ? (
-              <tr><td colSpan={canDeleteHistorial ? 10 : 9}>No se encontraron registros.</td></tr>
-            ) : pageData.data.map((item) => (
+              <tr><td colSpan={canDeleteHistorial ? 11 : 10}>No se encontraron registros.</td></tr>
+            ) : pageData.data.map((item) => {
+              const availableDocs = DOC_TYPES.filter(d => item[d.flag] && (!d.vehicularOnly || item.tipo === 'vehicular'));
+              return (
               <tr key={item.id}>
                 <td>{item.visitante}</td>
                 <td>{item.cedula}</td>
@@ -449,6 +492,15 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
                   ) : item.salida}
                 </td>
                 <td>{item.motivo}</td>
+                <td>
+                  {availableDocs.length === 0 ? (
+                    <span style={{color:'#9ca3af',fontSize:'0.8rem'}}>—</span>
+                  ) : (
+                    <button type="button" className="historial-docs-btn" onClick={() => setDocsItem(item)}>
+                      Ver ({availableDocs.length})
+                    </button>
+                  )}
+                </td>
                 {canDeleteHistorial && (
                   <td>
                     <button type="button" className="historial-delete-btn" title="Eliminar registro" onClick={() => setDeletingHistorialId(item.id)}>
@@ -457,7 +509,8 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
                   </td>
                 )}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </section>
@@ -471,6 +524,33 @@ export default function HistorialVisitasScreen({ user, isSuperAdministrator, con
             <div className="confirm-modal-actions">
               <button type="button" className="confirm-modal-cancel" onClick={() => setDeletingHistorialId(null)}>Cancelar</button>
               <button type="button" className="confirm-modal-accept confirm-modal-accept-danger" onClick={confirmDeleteHistorial}>Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {docsItem && (
+        <div className="modal-overlay modal-overlay-centered" onClick={() => setDocsItem(null)}>
+          <div className="confirm-modal historial-docs-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Documentos de {docsItem.visitante}</h2>
+            <p style={{color:'#6b7280',fontSize:'0.85rem',margin:'0 0 0.8rem'}}>{docsItem.fecha} · {docsItem.propiedad}</p>
+            <div className="historial-docs-list">
+              {DOC_TYPES.filter(d => docsItem[d.flag] && (!d.vehicularOnly || docsItem.tipo === 'vehicular')).map(d => (
+                <div key={d.type} className="historial-docs-item">
+                  <span>{d.label}</span>
+                  <div className="historial-docs-item-actions">
+                    <button type="button" className="btn btn-secondary" disabled={docsBusyType === `${d.type}-view`} onClick={() => handleViewDoc(docsItem.visitaId, d.type)}>
+                      {docsBusyType === `${d.type}-view` ? '…' : 'Ver'}
+                    </button>
+                    <button type="button" className="btn btn-primary" disabled={docsBusyType === `${d.type}-download`} onClick={() => handleDownloadDoc(docsItem.visitaId, d.type, d.label)}>
+                      {docsBusyType === `${d.type}-download` ? '…' : 'Descargar'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="confirm-modal-actions">
+              <button type="button" className="confirm-modal-cancel" style={{width:'100%'}} onClick={() => setDocsItem(null)}>Cerrar</button>
             </div>
           </div>
         </div>
