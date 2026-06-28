@@ -295,13 +295,15 @@ export default function DashboardScreen({
       </section>
 
       {user.role === 'Seguridad' && (() => {
-        const activePanicAlerts = panicAlerts.filter((a) => a.status !== 'Atendida').slice(0, 3);
+        // Siempre las 3 más recientes (sin importar el estado) — el historial
+        // completo con filtro por estado ya está en "Botón de Pánico".
+        const activePanicAlerts = panicAlerts.slice(0, 3);
         return (
           <section className="panic-security-panel dashboard-panic-widget">
-            <h2>🚨 Alertas de Pánico Activas</h2>
-            <p>Personas que activaron el botón de pánico y requieren asistencia inmediata.</p>
+            <h2>🚨 Alertas de Pánico Recientes</h2>
+            <p>Las últimas personas que activaron el botón de pánico.</p>
             {activePanicAlerts.length === 0 ? (
-              <div className="panic-empty">No hay alertas activas en este momento.</div>
+              <div className="panic-empty">No hay alertas registradas todavía.</div>
             ) : (
               <div className="panic-alert-list">
                 {activePanicAlerts.map((alert) => (
