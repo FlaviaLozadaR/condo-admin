@@ -5816,8 +5816,18 @@ h2,
   font-size: 0.82rem;
 }
 
-.visit-inside-card {
+.visit-inside-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
   margin-top: 1rem;
+}
+@media (max-width: 768px) {
+  .visit-inside-grid { grid-template-columns: 1fr; }
+}
+
+.visit-inside-card {
+  margin-top: 0;
 }
 
 .visit-inside-card h2 {

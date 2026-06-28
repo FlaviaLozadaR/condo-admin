@@ -126,6 +126,11 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
     .map(h => ({ ...h, _entered: parseEntryDateTime(h) }))
     .sort((a, b) => (a._entered?.getTime() ?? 0) - (b._entered?.getTime() ?? 0));
 
+  // Separados por portería — vehicular y peatonal son flujos físicamente
+  // distintos, no tiene sentido mezclarlos en una sola lista.
+  const insideVehicular = insideVisitors.filter(e => e.tipo === 'vehicular');
+  const insidePeatonal  = insideVisitors.filter(e => e.tipo !== 'vehicular');
+
   // Marca la salida de un registro de historial y, si corresponde, desactiva su pase QR.
   // `passIdOverride` permite indicar directamente el pase a desactivar (p.ej. el pase
   // recién escaneado), sin depender de que esté presente en `visitPasses`.
@@ -248,6 +253,35 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
     finally { setActionLoading(false); }
   };
 
+  const renderInsideList = (list) => (
+    list.length === 0 ? (
+      <p className="visit-inside-empty">No hay visitantes dentro por esta portería.</p>
+    ) : (
+      <div className="visit-inside-list">
+        {list.map((entry) => {
+          const longStay = entry._entered && (Date.now() - entry._entered.getTime()) > LONG_STAY_MS;
+          return (
+            <div key={entry.id} className={`visit-inside-item${longStay ? " visit-inside-item-warn" : ""}`}>
+              <div className="visit-inside-info">
+                <strong>{entry.visitante}</strong>
+                <span>{entry.propiedad} · {entry.tipo === 'vehicular' ? `Vehicular (${entry.placa})` : 'Peatonal'}</span>
+                <small>Ingresó a las {entry.entrada}{longStay ? " · hace más de 2 hs" : ""}</small>
+              </div>
+              <button
+                type="button"
+                className="visit-inside-salida-btn"
+                disabled={busyEntryId === entry.id}
+                onClick={() => handleMarkSalida(entry)}
+              >
+                {busyEntryId === entry.id ? "..." : "Marcar Salida"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    )
+  );
+
   return (
     <>
       <header className="dashboard-header visit-header">
@@ -257,38 +291,23 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
         </div>
       </header>
 
-      <article className="visit-security-card visit-inside-card">
-        <h2>
-          Visitantes Dentro
-          {insideVisitors.length > 0 && <span className="visit-inside-count">{insideVisitors.length}</span>}
-        </h2>
-        {insideVisitors.length === 0 ? (
-          <p className="visit-inside-empty">No hay visitantes dentro del condominio.</p>
-        ) : (
-          <div className="visit-inside-list">
-            {insideVisitors.map((entry) => {
-              const longStay = entry._entered && (Date.now() - entry._entered.getTime()) > LONG_STAY_MS;
-              return (
-                <div key={entry.id} className={`visit-inside-item${longStay ? " visit-inside-item-warn" : ""}`}>
-                  <div className="visit-inside-info">
-                    <strong>{entry.visitante}</strong>
-                    <span>{entry.propiedad} · {entry.tipo === 'vehicular' ? `Vehicular (${entry.placa})` : 'Peatonal'}</span>
-                    <small>Ingresó a las {entry.entrada}{longStay ? " · hace más de 2 hs" : ""}</small>
-                  </div>
-                  <button
-                    type="button"
-                    className="visit-inside-salida-btn"
-                    disabled={busyEntryId === entry.id}
-                    onClick={() => handleMarkSalida(entry)}
-                  >
-                    {busyEntryId === entry.id ? "..." : "Marcar Salida"}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </article>
+      <div className="visit-inside-grid">
+        <article className="visit-security-card visit-inside-card">
+          <h2>
+            🚗 Portería Vehicular
+            {insideVehicular.length > 0 && <span className="visit-inside-count">{insideVehicular.length}</span>}
+          </h2>
+          {renderInsideList(insideVehicular)}
+        </article>
+
+        <article className="visit-security-card visit-inside-card">
+          <h2>
+            🚶 Portería Peatonal
+            {insidePeatonal.length > 0 && <span className="visit-inside-count">{insidePeatonal.length}</span>}
+          </h2>
+          {renderInsideList(insidePeatonal)}
+        </article>
+      </div>
 
       <section className="visit-security-layout">
         <article className="visit-security-card visit-qr-card">
