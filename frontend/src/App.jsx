@@ -500,9 +500,9 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             knownPanicIdsRef.current.add(String(a.id));
             addToast(`🚨 ALERTA DE PÁNICO: ${a.resident} — ${a.address} ${a.unit}`, "panic");
           });
-          setPanicAlerts(alerts);
           setMenuBadges(prev => ({ ...prev, panic: (prev.panic || 0) + newAlerts.length }));
         }
+        setPanicAlerts(alerts);
       } catch { /* ignorar */ }
     };
     const panicInterval = setInterval(pollPanic, 10000);
@@ -1515,6 +1515,8 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
               pagosData={pagosData}
               historialVisitasData={historialVisitasData}
               visitPasses={visitPasses}
+              panicAlerts={panicAlerts}
+              setActiveSection={setActiveSection}
               exportToPDF={exportToPDF}
               onToast={addToast}
             />
@@ -1656,19 +1658,6 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             pagosData={pagosData}
             setIsPayExpensesModalOpen={setIsPayExpensesModalOpen}
             setPayForm={setPayForm}
-          />
-        ) : activeSection === "Dashboard" && isSecurity ? (
-          <DashboardScreen
-            user={user}
-            adminCondoName={adminCondoName}
-            propiedadesData={propiedadesData}
-            pagosData={pagosData}
-            historialVisitasData={historialVisitasData}
-            visitPasses={visitPasses}
-            panicAlerts={panicAlerts}
-            setActiveSection={setActiveSection}
-            exportToPDF={exportToPDF}
-            onToast={addToast}
           />
         ) : activeSection === "Registro Visitas" ? (
           <SecurityVisitRegisterScreen
