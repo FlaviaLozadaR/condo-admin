@@ -103,6 +103,39 @@ async function updateStatus(req, res) {
     }
     if (!updated) return res.status(404).json({ error: 'No encontrado' });
 
+    // Al aprobar un pago, los cargos extra que cubre quedan pagados — se
+    // borran para que no sigan apareciendo como pendientes. Una Reserva paga
+    // exactamente el cargo extra que la generó; una Expensa pagada en su
+    // totalidad (sin saldo restante) paga todos los cargos extra de la propiedad.
+    let propiedadActualizada = null;
+    if (estado === 'aprobado') {
+      let propiedadId = null;
+      if (existing.tipo === 'Reserva' && existing.reservaId) {
+        const propiedades = await db.getPropiedades();
+        const propiedad   = propiedades.find(p =>
+          p.owner === existing.propietario ||
+          (Array.isArray(p.tenants) ? p.tenants.includes(existing.propietario) : p.tenant === existing.propietario)
+        );
+        if (propiedad) {
+          await db.deleteCargosExtraByReservaId(existing.reservaId).catch(() => {});
+          propiedadId = propiedad.id;
+        }
+      } else if (existing.tipo !== 'Reserva' && !saldoRestante) {
+        const propiedades = await db.getPropiedades();
+        const propiedad   = propiedades.find(p =>
+          p.owner === existing.propietario ||
+          (Array.isArray(p.tenants) ? p.tenants.includes(existing.propietario) : p.tenant === existing.propietario)
+        );
+        if (propiedad) {
+          await db.deleteCargosExtraByPropiedadId(propiedad.id).catch(() => {});
+          propiedadId = propiedad.id;
+        }
+      }
+      if (propiedadId) {
+        propiedadActualizada = (await db.getPropiedades()).find(p => String(p.id) === String(propiedadId)) || null;
+      }
+    }
+
     // Si hay saldo restante, actualizarlo en la propiedad del propietario
     if (saldoRestante > 0 && updated.propietario) {
       const propiedades = await db.getPropiedades();
@@ -118,7 +151,7 @@ async function updateStatus(req, res) {
       }
     }
 
-    res.json(await withSignedComprobante(PagoDTO.toResponse(updated)));
+    res.json({ ...(await withSignedComprobante(PagoDTO.toResponse(updated))), propiedadActualizada });
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 

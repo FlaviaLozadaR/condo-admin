@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS cargos_extra (
   propiedad_id TEXT NOT NULL,
   monto NUMERIC DEFAULT 0,
   motivo TEXT DEFAULT '',
+  reserva_id TEXT DEFAULT '',
   inserted_at TIMESTAMPTZ DEFAULT NOW()
 );
 

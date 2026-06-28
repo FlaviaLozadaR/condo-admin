@@ -77,8 +77,11 @@ export default function ReservasScreen({
 
   const handleAprobarPagoReserva = async (pagoId, estado) => {
     try {
-      const updated = await api.updatePagoStatus(pagoId, estado);
-      setPagosData(prev => prev.map(p => String(p.id) === String(pagoId) ? updated : p));
+      const { propiedadActualizada, ...pago } = await api.updatePagoStatus(pagoId, estado);
+      setPagosData(prev => prev.map(p => String(p.id) === String(pagoId) ? pago : p));
+      if (propiedadActualizada) {
+        setPropiedadesData(prev => prev.map(p => String(p.id) === String(propiedadActualizada.id) ? propiedadActualizada : p));
+      }
     } catch (e) { alert('Error: ' + e.message); }
   };
 

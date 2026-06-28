@@ -5862,6 +5862,14 @@ h2,
   gap: 0.5rem;
 }
 
+.visit-inside-title-icon {
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+  color: #5b4bff;
+}
+[data-theme="dark"] .visit-inside-title-icon { color: #818cf8; }
+
 .visit-inside-count {
   display: inline-flex;
   align-items: center;

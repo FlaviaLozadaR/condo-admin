@@ -303,6 +303,12 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
       <div className="visit-inside-grid">
         <article className="visit-security-card visit-inside-card">
           <h2>
+            <svg className="visit-inside-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 16V12.5C4 11.7 4.4 11 5.1 10.6L6.4 9.8C6.7 9.6 7 9.3 7.1 9L7.8 7.2C8.1 6.5 8.7 6 9.5 6H14.5C15.3 6 15.9 6.5 16.2 7.2L16.9 9C17 9.3 17.3 9.6 17.6 9.8L18.9 10.6C19.6 11 20 11.7 20 12.5V16" />
+              <path d="M3 16H21" />
+              <circle cx="7.5" cy="16" r="1.6" />
+              <circle cx="16.5" cy="16" r="1.6" />
+            </svg>
             Portería Vehicular
             {insideVehicular.length > 0 && <span className="visit-inside-count">{insideVehicular.length}</span>}
           </h2>
@@ -311,6 +317,10 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
 
         <article className="visit-security-card visit-inside-card">
           <h2>
+            <svg className="visit-inside-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="5" r="2" />
+              <path d="M12 7.5V13L9 16.5M12 13L15 16.5M12 10.5L8.5 12M12 10.5L15.5 12" />
+            </svg>
             Portería Peatonal
             {insidePeatonal.length > 0 && <span className="visit-inside-count">{insidePeatonal.length}</span>}
           </h2>

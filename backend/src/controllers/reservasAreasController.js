@@ -194,6 +194,7 @@ async function cobrar(req, res) {
       propiedadId: propiedad.id,
       monto,
       motivo:      `Reserva ${reserva.areaNombre || 'área social'} - ${reserva.fecha}`,
+      reservaId:   reserva.id,
     });
 
     const updated = await db.updateReservaArea(id, { cobrado: true });

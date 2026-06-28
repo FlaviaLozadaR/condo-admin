@@ -199,6 +199,16 @@ async function getCargoExtraById(id) {
   if (error) return null;
   return rowToApp(data);
 }
+// Al aprobarse el pago de una reserva, el cargo extra que la generó queda
+// pagado — se borra para que no siga apareciendo como pendiente.
+async function deleteCargosExtraByReservaId(reservaId) {
+  await q(supabase.from('cargos_extra').delete().eq('reserva_id', reservaId));
+}
+// Al aprobarse un pago de expensa que cubre el total (expensa + cargos
+// extra), los cargos extra de esa propiedad quedan pagados — se borran.
+async function deleteCargosExtraByPropiedadId(propiedadId) {
+  await q(supabase.from('cargos_extra').delete().eq('propiedad_id', propiedadId));
+}
 
 async function getPropiedades(condo) {
   let query = supabase.from('propiedades').select('*');
@@ -629,6 +639,7 @@ module.exports = {
   getCondominios, createCondominio, updateCondominio, deleteCondominio,
   getPropiedades, createPropiedad, updatePropiedad, deletePropiedad, propiedadExists, getPropiedadesPaged,
   createCargoExtra, updateCargoExtraItem, deleteCargoExtraItem, getCargoExtraById,
+  deleteCargosExtraByReservaId, deleteCargosExtraByPropiedadId,
   getPagos, getPagoById, createPago, updatePagoEstado, updatePago, getPagosPaged,
   getAnuncios, createAnuncio, updateAnuncio, deleteAnuncio, getAnunciosPaged,
   getAsambleas, getAsambleaById, createAsamblea, updateAsamblea, deleteAsamblea, voteAsamblea, getAsambleasPaged,

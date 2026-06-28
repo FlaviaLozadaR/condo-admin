@@ -426,9 +426,19 @@ export default function PagosScreen({
     }
   };
 
+  // Si al aprobar el pago se descontó algún cargo extra de la propiedad
+  // (porque ese pago lo cubría), refleja la propiedad ya actualizada al instante.
+  const applyPropiedadPatch = (result) => {
+    if (result?.propiedadActualizada) {
+      const p = result.propiedadActualizada;
+      setPropiedadesData(prev => prev.map(item => String(item.id) === String(p.id) ? p : item));
+    }
+  };
+
   const updatePaymentStatus = async (id, status) => {
     try {
-      await api.updatePagoStatus(String(id), status);
+      const result = await api.updatePagoStatus(String(id), status);
+      applyPropiedadPatch(result);
       setPagosData(prev => prev.map(item => String(item.id) === String(id) ? { ...item, estado: status } : item));
       setPageData(prev => ({ ...prev, data: prev.data.map(item => String(item.id) === String(id) ? { ...item, estado: status } : item) }));
       fetchPage(false);
@@ -438,6 +448,10 @@ export default function PagosScreen({
   };
 
   const getExpensaTotal = (pago) => {
+    // Una Reserva siempre tiene un monto fijo (el precio del área) — comparar
+    // contra el cargoExtra acumulado de la propiedad (que puede incluir otros
+    // cargos) daría un "total a pagar" incorrecto.
+    if (pago.tipo === 'Reserva') return Number(pago.monto) || 0;
     const prop = propiedadesData.find(p => p.owner === pago.propietario || propertyHasTenant(p, pago.propietario));
     return (Number(prop?.expensaMensual) || 0) + (Number(prop?.cargoExtra) || 0) || Number(pago.monto) || 0;
   };
@@ -449,14 +463,16 @@ export default function PagosScreen({
       const expensaTotal = getExpensaTotal(pago);
 
       if (cumplio === 'si') {
-        await api.updatePagoStatus(String(pago.id), 'aprobado');
+        const result = await api.updatePagoStatus(String(pago.id), 'aprobado');
+        applyPropiedadPatch(result);
         setPagosData(prev => prev.map(item => String(item.id) === String(pago.id) ? { ...item, estado: 'aprobado' } : item));
         setPageData(prev => ({ ...prev, data: prev.data.map(item => String(item.id) === String(pago.id) ? { ...item, estado: 'aprobado' } : item) }));
       } else {
         const montoReal     = Math.max(0, parseFloat(reviewMontoReal) || 0);
         const saldoRestante = Math.max(0, expensaTotal - montoReal);
-        await api.updatePagoStatus(String(pago.id), 'aprobado', montoReal, saldoRestante,
+        const result = await api.updatePagoStatus(String(pago.id), 'aprobado', montoReal, saldoRestante,
           `Pago parcial: pagó Bs. ${montoReal}, saldo pendiente Bs. ${saldoRestante}`);
+        applyPropiedadPatch(result);
         setPagosData(prev => prev.map(item => String(item.id) === String(pago.id) ? { ...item, estado: 'aprobado', monto: montoReal } : item));
         setPageData(prev => ({ ...prev, data: prev.data.map(item => String(item.id) === String(pago.id) ? { ...item, estado: 'aprobado', monto: montoReal } : item) }));
       }
