@@ -619,8 +619,11 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
   // Cuánto pagó aprobado en total — la expensa se acumula sin reiniciarse cada
   // mes, así que lo pagado tiene que descontarse de todo lo histórico, no solo
   // de este mes, para que no reaparezca como deuda ya cubierta.
+  // Las Reservas se excluyen acá: su cargo extra ya se borra solo al aprobarse
+  // el pago (ver pagosController.updateStatus) — sumarlas también aquí
+  // descontaría el mismo pago dos veces.
   const paidAllTime = myPagos
-    .filter(p => p.estado === 'aprobado')
+    .filter(p => p.estado === 'aprobado' && p.tipo !== 'Reserva')
     .reduce((s, p) => s + (Number(p.monto) || 0), 0);
   const totalDue = Math.max(0, (residentExpensas + residentCargoExtra) - paidAllTime);
 

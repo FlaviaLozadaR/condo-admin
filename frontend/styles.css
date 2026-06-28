@@ -2408,6 +2408,30 @@ h2,
   flex-wrap: wrap;
 }
 
+.expensas-mgmt-header-toggle {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.expensas-mgmt-chevron {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-left: auto;
+  color: #9ca3af;
+  transition: transform 0.2s ease;
+}
+.expensas-mgmt-chevron-open {
+  transform: rotate(180deg);
+}
+
+[data-theme="dark"] .expensas-mgmt-header-toggle { color: inherit; }
+
 .expensas-base-row {
   display: flex;
   align-items: flex-start;

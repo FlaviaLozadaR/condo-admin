@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as api from "../api.js";
 import Pagination from "../components/Pagination.jsx";
 import { getPropertyTenantsText, propertyHasTenant } from "../utils/tenants.js";
@@ -58,6 +58,10 @@ export default function PagosScreen({
   const [expensasMsg, setExpensasMsg] = useState('');
   const [expensasSelectedIds, setExpensasSelectedIds] = useState(new Set());
   const [cargoExtraSearch, setCargoExtraSearch] = useState('');
+  const [expensasCollapsed, setExpensasCollapsed] = useState(true);
+  const [expensasPage, setExpensasPage] = useState(1);
+  const expensasMgmtRef = useRef(null);
+  const EXPENSAS_PAGE_SIZE = 15;
   const [cargoExtraModalProp, setCargoExtraModalProp] = useState(null);
   const [newCargoMonto, setNewCargoMonto] = useState('');
   const [newCargoMotivo, setNewCargoMotivo] = useState('');
@@ -78,6 +82,10 @@ export default function PagosScreen({
     const t = setTimeout(() => setDebouncedSearch(paymentSearchTerm), 400);
     return () => clearTimeout(t);
   }, [paymentSearchTerm]);
+
+  useEffect(() => {
+    setExpensasPage(1);
+  }, [cargoExtraSearch]);
 
   useEffect(() => {
     setPage(1);
@@ -752,6 +760,13 @@ export default function PagosScreen({
             )
           : condoPropiedades;
 
+        const expensasTotalPages = Math.max(1, Math.ceil(filteredProps.length / EXPENSAS_PAGE_SIZE));
+        const pagedProps = filteredProps.slice((expensasPage - 1) * EXPENSAS_PAGE_SIZE, expensasPage * EXPENSAS_PAGE_SIZE);
+        const goToExpensasPage = (p) => {
+          setExpensasPage(p);
+          expensasMgmtRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+
         const allFilteredSelected = filteredProps.length > 0 && filteredProps.every(p => expensasSelectedIds.has(p.id));
 
         const toggleAll = () => {
@@ -767,15 +782,20 @@ export default function PagosScreen({
         };
 
         return (
-          <section className="expensas-mgmt-panel">
-            <div className="expensas-mgmt-header">
+          <section className="expensas-mgmt-panel" ref={expensasMgmtRef}>
+            <button type="button" className="expensas-mgmt-header expensas-mgmt-header-toggle" onClick={() => setExpensasCollapsed(c => !c)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{width:20,height:20,flexShrink:0}}>
                 <path d="M12 3V21M16.5 7.5C16.5 6.1 15 5 12.8 5H11.2C9 5 7.5 6.1 7.5 7.5C7.5 8.9 9 10 11.2 10H12.8C15 10 16.5 11.1 16.5 12.5C16.5 13.9 15 15 12.8 15H11.2C9 15 7.5 13.9 7.5 12.5" />
               </svg>
               <span>Gestión de Expensas</span>
               {activeCondo && <span className="payment-qr-condo-badge">{activeCondo.type}: {activeCondo.name}</span>}
-            </div>
+              <svg className={`expensas-mgmt-chevron${expensasCollapsed ? '' : ' expensas-mgmt-chevron-open'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="18 15 12 9 6 15" />
+              </svg>
+            </button>
 
+            {!expensasCollapsed && (
+            <>
             {/* Monto + asignación */}
             <div className="expensas-asignar-row">
               <div className="expensas-monto-field">
@@ -850,7 +870,7 @@ export default function PagosScreen({
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredProps.map(p => {
+                        {pagedProps.map(p => {
                           const expensaActual = Number(p.expensaMensual) || 0;
                           const cargoExtra    = Number(p.cargoExtra)     || 0;
                           const total         = expensaActual + cargoExtra;
@@ -908,7 +928,7 @@ export default function PagosScreen({
 
                   {/* Tarjetas — mobile: nada que deslizar, todo en columna */}
                   <div className="expensas-props-cards">
-                    {filteredProps.map(p => {
+                    {pagedProps.map(p => {
                       const expensaActual = Number(p.expensaMensual) || 0;
                       const cargoExtra    = Number(p.cargoExtra)     || 0;
                       const total         = expensaActual + cargoExtra;
@@ -972,9 +992,13 @@ export default function PagosScreen({
                       );
                     })}
                   </div>
+
+                  <Pagination page={expensasPage} totalPages={expensasTotalPages} onPageChange={goToExpensasPage} />
                 </>
               )}
             </div>
+            </>
+            )}
           </section>
         );
       })()}
