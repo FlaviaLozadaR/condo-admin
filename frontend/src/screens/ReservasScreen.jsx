@@ -10,6 +10,8 @@ export default function ReservasScreen({
   reservasAreas,
   setReservasAreas,
   setPropiedadesData,
+  pagosData,
+  setPagosData,
   setEditingArea,
   setAreaForm,
   setAreaFormError,
@@ -70,6 +72,13 @@ export default function ReservasScreen({
     try {
       const updated = await api.aprobarReservaArea(id, estado, nota);
       setReservasAreas(prev => prev.map(r => r.id === id ? updated : r));
+    } catch (e) { alert('Error: ' + e.message); }
+  };
+
+  const handleAprobarPagoReserva = async (pagoId, estado) => {
+    try {
+      const updated = await api.updatePagoStatus(pagoId, estado);
+      setPagosData(prev => prev.map(p => String(p.id) === String(pagoId) ? updated : p));
     } catch (e) { alert('Error: ' + e.message); }
   };
 
@@ -242,6 +251,8 @@ export default function ReservasScreen({
             const areaImg = parseAreaImages(area?.imagenUrl)[0] || '';
             const precio  = Number(area?.precio) || 0;
             const necesitaCobro = precio > 0 && !r.cobrado;
+            const pago = precio > 0 ? pagosData.find(p => p.reservaId === r.id) : null;
+            const pagoNoAprobado = precio > 0 && r.cobrado && (!pago || pago.estado !== 'aprobado');
             return (
             <article key={r.id} className="reserva-area-card">
               {areaImg && <img src={areaImg} alt={r.areaNombre} className="reserva-area-card-img" />}
@@ -263,8 +274,40 @@ export default function ReservasScreen({
                   {r.nota && <p className="reserva-area-nota">"{r.nota}"</p>}
                   {precio > 0 && (
                     <p className={`reserva-cobro-status${r.cobrado ? ' reserva-cobro-status-ok' : ''}`}>
-                      {r.cobrado ? '✓ Cobrado — esperando que suba el comprobante' : `Sin cobrar — Bs. ${precio.toLocaleString()}`}
+                      {r.cobrado ? '✓ Cobrado' : `Sin cobrar — Bs. ${precio.toLocaleString()}`}
                     </p>
+                  )}
+                  {r.cobrado && precio > 0 && (
+                    <div className="reserva-pago-comprobante">
+                      {!pago ? (
+                        <p className="reserva-cobro-status reserva-cobro-status-pending">⏱ Esperando que suba el comprobante.</p>
+                      ) : (
+                        <>
+                          <p className="reserva-pago-linea">
+                            Pago: <span className={`pagos-status-chip pagos-status-${pago.estado}`}>{pago.estado}</span> · Bs. {Number(pago.monto).toLocaleString()}
+                          </p>
+                          {pago.comprobante && (() => {
+                            const url = pago.comprobante?.startsWith('http') ? pago.comprobante : api.getUploadUrl(`comprobantes/${pago.comprobante}`);
+                            const isPdf = url.toLowerCase().endsWith('.pdf');
+                            return isPdf ? (
+                              <a href={url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary pago-comprobante-pdf-link">Ver comprobante (PDF)</a>
+                            ) : (
+                              <img src={url} alt="Comprobante de pago" className="reserva-pago-comprobante-img" onClick={() => setZoomImageUrl(url)} title="Ver comprobante completo" />
+                            );
+                          })()}
+                          {pago.estado === 'pendiente' && (
+                            <div className="reserva-area-card-actions-row" style={{marginTop:'0.4rem'}}>
+                              <button className="btn btn-primary" style={{fontSize:'0.78rem',padding:'0.25rem 0.6rem'}} onClick={() => askConfirm('¿Aprobar este pago?', () => handleAprobarPagoReserva(pago.id, 'aprobado'))}>
+                                Aprobar pago
+                              </button>
+                              <button className="btn btn-secondary" style={{fontSize:'0.78rem',padding:'0.25rem 0.6rem'}} onClick={() => askConfirm('¿Rechazar este pago?', () => handleAprobarPagoReserva(pago.id, 'rechazado'))}>
+                                Rechazar pago
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
                 <span className={`pagos-status-chip pagos-status-${r.estado}`}>{r.estado}</span>
@@ -278,14 +321,9 @@ export default function ReservasScreen({
                     </button>
                   )}
                   <button className="btn btn-primary" style={{fontSize:'0.82rem',padding:'0.3rem 0.8rem'}}
-                    disabled={necesitaCobro}
-                    title={necesitaCobro ? 'Primero tenés que cobrar la reserva' : ''}
-                    onClick={() => askConfirm(
-                      precio > 0
-                        ? `¿Ya viste el pago de ${r.propietario} por el cargo extra de Bs. ${precio.toLocaleString()}? Esto aprueba la reserva.`
-                        : '¿Confirmás aprobar esta reserva?',
-                      () => handleAprobarReserva(r.id, 'aprobada')
-                    )}>
+                    disabled={necesitaCobro || pagoNoAprobado}
+                    title={necesitaCobro ? 'Primero tenés que cobrar la reserva' : pagoNoAprobado ? 'Esperá a que el pago esté aprobado' : ''}
+                    onClick={() => askConfirm('¿Confirmás aprobar esta reserva?', () => handleAprobarReserva(r.id, 'aprobada'))}>
                     Aprobar
                   </button>
                   <button className="btn btn-secondary" style={{fontSize:'0.82rem',padding:'0.3rem 0.8rem'}}

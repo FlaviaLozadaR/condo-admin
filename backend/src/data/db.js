@@ -273,20 +273,21 @@ async function updatePago(id, changes) {
   return rowToApp(await q(supabase.from('pagos').update(appToRow(changes)).eq('id', id).select().single()));
 }
 
-function applyPagosFilters(query, { estado, q: search, condo } = {}) {
+function applyPagosFilters(query, { estado, q: search, condo, tipo } = {}) {
   let result = query;
   if (estado && estado !== 'todos') result = result.eq('estado', estado);
+  if (tipo && tipo !== 'todos') result = result.eq('tipo', tipo);
   if (search) result = result.or(`propiedad.ilike.%${search}%,propietario.ilike.%${search}%,referencia.ilike.%${search}%,tipo.ilike.%${search}%`);
   if (condo) result = result.eq('condo', condo);
   return result;
 }
 
-async function getPagosPaged({ page = 1, limit = 20, estado, q: search, condo } = {}) {
+async function getPagosPaged({ page = 1, limit = 20, estado, q: search, condo, tipo } = {}) {
   const from = (page - 1) * limit;
 
   const dataQuery = applyPagosFilters(
     supabase.from('pagos').select('*', { count: 'exact' }).order('inserted_at', { ascending: false }),
-    { estado, q: search, condo }
+    { estado, q: search, condo, tipo }
   ).range(from, from + limit - 1);
 
   // KPIs: solo filtro de condo (igual que pagosByCondo), sin tab/búsqueda

@@ -22,6 +22,7 @@ export default function PagosScreen({
   // Filtros y tabla
   const [paymentCondoDropdownOpen, setPaymentCondoDropdownOpen] = useState(false);
   const [paymentTab, setPaymentTab] = useState("todos");
+  const [paymentTipoFilter, setPaymentTipoFilter] = useState("todos");
   const [paymentCondoFilter, setPaymentCondoFilter] = useState("todos");
   const [paymentSearchTerm, setPaymentSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -80,7 +81,7 @@ export default function PagosScreen({
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, paymentTab, selectedPaymentCondoName]);
+  }, [debouncedSearch, paymentTab, paymentTipoFilter, selectedPaymentCondoName]);
 
   const fetchPage = (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -88,6 +89,7 @@ export default function PagosScreen({
       page,
       limit: PAGE_SIZE,
       estado: paymentTab,
+      tipo: paymentTipoFilter === 'todos' ? undefined : paymentTipoFilter,
       q: debouncedSearch,
       condo: selectedPaymentCondoName,
     })
@@ -98,7 +100,7 @@ export default function PagosScreen({
 
   useEffect(() => {
     fetchPage();
-  }, [page, paymentTab, debouncedSearch, selectedPaymentCondoName]);
+  }, [page, paymentTab, paymentTipoFilter, debouncedSearch, selectedPaymentCondoName]);
 
   const pendingPaymentsCount  = pageData.totalPendientes;
   const approvedPaymentsTotal = pageData.approvedPaymentsTotal;
@@ -1021,6 +1023,12 @@ export default function PagosScreen({
           <button type="button" className={`pagos-tab${paymentTab === "pendiente" ? " pagos-tab-active" : ""}`} onClick={() => setPaymentTab("pendiente")}>Pendientes</button>
           <button type="button" className={`pagos-tab${paymentTab === "aprobado" ? " pagos-tab-active" : ""}`} onClick={() => setPaymentTab("aprobado")}>Aprobados</button>
           <button type="button" className={`pagos-tab${paymentTab === "rechazado" ? " pagos-tab-active" : ""}`} onClick={() => setPaymentTab("rechazado")}>Rechazados</button>
+        </div>
+
+        <div className="pagos-tabs pagos-tabs-tipo">
+          <button type="button" className={`pagos-tab${paymentTipoFilter === "todos" ? " pagos-tab-active" : ""}`} onClick={() => setPaymentTipoFilter("todos")}>Todos los tipos</button>
+          <button type="button" className={`pagos-tab${paymentTipoFilter === "Expensa" ? " pagos-tab-active" : ""}`} onClick={() => setPaymentTipoFilter("Expensa")}>💰 Expensas</button>
+          <button type="button" className={`pagos-tab${paymentTipoFilter === "Reserva" ? " pagos-tab-active" : ""}`} onClick={() => setPaymentTipoFilter("Reserva")}>📅 Reservas</button>
         </div>
 
         <div className="pagos-condo-filter-wrap">

@@ -303,7 +303,7 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
       <div className="visit-inside-grid">
         <article className="visit-security-card visit-inside-card">
           <h2>
-            🚗 Portería Vehicular
+            Portería Vehicular
             {insideVehicular.length > 0 && <span className="visit-inside-count">{insideVehicular.length}</span>}
           </h2>
           {renderInsideList(insideVehicular)}
@@ -311,7 +311,7 @@ export default function QrScanner({ visitPasses, setVisitPasses, selectedVisitPa
 
         <article className="visit-security-card visit-inside-card">
           <h2>
-            🚶 Portería Peatonal
+            Portería Peatonal
             {insidePeatonal.length > 0 && <span className="visit-inside-count">{insidePeatonal.length}</span>}
           </h2>
           {renderInsideList(insidePeatonal)}

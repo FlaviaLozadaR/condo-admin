@@ -29,14 +29,14 @@ const upload = multer({
 
 async function getAll(req, res) {
   try {
-    const { page, limit, estado, q } = req.query;
+    const { page, limit, estado, q, tipo } = req.query;
     // Solo Super Admin puede elegir condominio por query — el resto queda fijo al suyo.
     const condo = req.user.role === 'Super Admin' ? (req.query.condo || undefined) : req.user.condo;
     if (page) {
       const result = await db.getPagosPaged({
         page:  Math.max(1, parseInt(page) || 1),
         limit: Math.min(100, Math.max(1, parseInt(limit) || 20)),
-        estado, q, condo,
+        estado, q, condo, tipo,
       });
       const data = await Promise.all(result.data.map(PagoDTO.toResponse).map(withSignedComprobante));
       return res.json({ ...result, data });

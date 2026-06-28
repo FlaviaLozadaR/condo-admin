@@ -1595,6 +1595,8 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             reservasAreas={reservasAreas}
             setReservasAreas={setReservasAreas}
             setPropiedadesData={setPropiedadesData}
+            pagosData={pagosData}
+            setPagosData={setPagosData}
             setEditingArea={setEditingArea}
             setAreaForm={setAreaForm}
             setAreaFormError={setAreaFormError}

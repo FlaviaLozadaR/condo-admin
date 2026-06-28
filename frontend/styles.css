@@ -2291,6 +2291,27 @@ h2,
   -webkit-user-drag: none;
 }
 
+.reserva-pago-comprobante {
+  margin-top: 0.4rem;
+  padding: 0.6rem;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+.reserva-pago-linea { margin: 0 0 0.4rem; font-size: 0.82rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; }
+.reserva-pago-comprobante-img {
+  width: 110px;
+  height: 110px;
+  object-fit: contain;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: zoom-in;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+[data-theme="dark"] .reserva-pago-comprobante { background: #1a1a1a; }
+[data-theme="dark"] .reserva-pago-comprobante-img { background: #262626; border-color: #363636; }
+
 .pago-comprobante-pdf-link {
   width: fit-content;
   min-height: 38px;
@@ -4834,6 +4855,11 @@ h2,
   grid-template-columns: repeat(4, 1fr);
   gap: 0.55rem;
   width: 100%;
+}
+
+.pagos-tabs-tipo {
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 0.55rem;
 }
 
 .pagos-condo-filter-wrap {
