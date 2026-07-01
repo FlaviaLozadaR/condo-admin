@@ -15,6 +15,8 @@ const rateLimit = require('express-rate-limit');
 const morgan    = require('morgan');
 const path      = require('path');
 const fs        = require('fs');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./src/swagger');
 
 const app = express();
 
@@ -78,6 +80,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ── Uploaded documents (authenticated via route-level middleware in asambleas routes)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// ── API docs (Swagger UI) — solo documentación, no requiere login para
+// verla; cada endpoint protegido sigue pidiendo su token vía "Authorize".
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.get('/api-docs.json', (req, res) => res.json(swaggerSpec));
+
 // ── API Routes ─────────────────────────────────────────────────
 app.use('/api/auth',              require('./src/routes/auth'));
 app.use('/api/condominios',       require('./src/routes/condominios'));
@@ -114,5 +121,6 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`\n✓ Backend corriendo en http://localhost:${PORT}`);
   console.log(`✓ Entorno: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`✓ Email:   ${process.env.BREVO_SENDER_EMAIL}\n`);
+  console.log(`✓ Email:   ${process.env.BREVO_SENDER_EMAIL}`);
+  console.log(`✓ Docs:    http://localhost:${PORT}/api-docs\n`);
 });
