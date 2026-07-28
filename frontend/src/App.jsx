@@ -1528,6 +1528,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
           <UsuariosScreen
             user={user}
             isSuperAdministrator={isSuperAdministrator}
+            isMaster={user.isMaster === true}
             condominiosData={condominiosData}
             superAdminDashboards={superAdminDashboards}
             usuariosData={usuariosData}

@@ -34,6 +34,12 @@ async function getSeguridad(req, res) {
 // quedan reservados para que los gestione únicamente un Super Admin.
 const ROLES_ASIGNABLES_POR_ADMIN = ['Propietario', 'Inquilino', 'Seguridad'];
 
+// Solo el Super Admin master (is_master=true) puede crear/editar/borrar otros Super Admins.
+// Los Super Admins regulares pueden hacer todo lo demás igual que antes.
+function isMasterAdmin(req) {
+  return req.user.role === 'Super Admin' && req.user.isMaster === true;
+}
+
 async function create(req, res) {
   try {
     const data = UserDTO.fromRequest(req.body);
@@ -42,8 +48,12 @@ async function create(req, res) {
       if (!ROLES_ASIGNABLES_POR_ADMIN.includes(data.role)) {
         return res.status(403).json({ error: 'Solo un Super Admin puede asignar ese rol' });
       }
-      // Un Administrador solo puede crear usuarios en su propio condominio.
       data.condo = req.user.condo;
+    }
+
+    // Solo el master puede crear otros Super Admins
+    if (data.role === 'Super Admin' && !isMasterAdmin(req)) {
+      return res.status(403).json({ error: 'Solo el Super Admin principal puede crear otros Super Admins' });
     }
 
     const exists = await db.getUsuarioByEmail(data.email);
@@ -56,8 +66,6 @@ async function create(req, res) {
       password: await bcrypt.hash(plainPassword, 10),
     });
 
-    // El usuario ya quedó creado — no hace falta esperar a que salga el email
-    // (Gmail puede tardar) para responder. Se manda de fondo, sin bloquear.
     sendWelcomeEmail(nuevo.email, nuevo.name, plainPassword, nuevo.role)
       .catch(err => console.error('Email de bienvenida no enviado:', err.message));
 
@@ -76,12 +84,24 @@ async function update(req, res) {
     }
 
     if (isAdmin && !isSuperAdmin) {
-      // Un Administrador solo puede tocar residentes/seguridad de su propio
-      // condominio — nunca a otro Admin/Super Admin, ni reasignarlos de condominio.
       const target = await db.getUsuarioById(req.params.id);
       if (!target || target.condo !== req.user.condo || !ROLES_ASIGNABLES_POR_ADMIN.includes(target.role)) {
         return res.status(403).json({ error: 'No autorizado para este usuario' });
       }
+    }
+
+    // Super Admin no-master no puede editar a otros Super Admins ni al master
+    if (isSuperAdmin && !isMasterAdmin(req)) {
+      const target = await db.getUsuarioById(req.params.id);
+      const isSelf = String(req.user.id) === String(req.params.id);
+      if (!isSelf && target?.role === 'Super Admin') {
+        return res.status(403).json({ error: 'No tenés permiso para editar a otro Super Admin' });
+      }
+    }
+
+    // Solo el master puede cambiar el rol a Super Admin o quitar ese rol
+    if (role === 'Super Admin' && !isMasterAdmin(req)) {
+      return res.status(403).json({ error: 'Solo el Super Admin principal puede asignar ese rol' });
     }
 
     const changes = {
@@ -101,14 +121,25 @@ async function update(req, res) {
 
 async function remove(req, res) {
   try {
+    const target = await db.getUsuarioById(req.params.id);
+    if (!target) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    // Nadie puede borrarse a sí mismo
+    if (String(req.user.id) === String(req.params.id)) {
+      return res.status(403).json({ error: 'No podés eliminar tu propia cuenta' });
+    }
+
+    // Solo el master puede borrar Super Admins
+    if (target.role === 'Super Admin' && !isMasterAdmin(req)) {
+      return res.status(403).json({ error: 'Solo el Super Admin principal puede eliminar otros Super Admins' });
+    }
+
     if (req.user.role === 'Administrador') {
-      // Un Administrador solo puede borrar residentes/seguridad de su propio
-      // condominio — nunca a otro Admin ni a un Super Admin.
-      const target = await db.getUsuarioById(req.params.id);
-      if (!target || target.condo !== req.user.condo || !ROLES_ASIGNABLES_POR_ADMIN.includes(target.role)) {
+      if (target.condo !== req.user.condo || !ROLES_ASIGNABLES_POR_ADMIN.includes(target.role)) {
         return res.status(403).json({ error: 'No autorizado para este usuario' });
       }
     }
+
     await db.deleteUsuario(req.params.id);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }

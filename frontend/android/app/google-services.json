@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "931745235629",
+    "project_id": "sevilla-real",
+    "storage_bucket": "sevilla-real.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:931745235629:android:11b1d9a1ad7253ded67c24",
+        "android_client_info": {
+          "package_name": "com.ignitel.condoadmin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAcB9cfILu2ctRKu8X3dwiUOmhBqjlU2pY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

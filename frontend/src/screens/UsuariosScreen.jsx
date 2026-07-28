@@ -8,6 +8,7 @@ const ROLE_ORDER = ["Super Admin", "Administrador", "Propietario", "Inquilino", 
 export default function UsuariosScreen({
   user,
   isSuperAdministrator,
+  isMaster,
   condominiosData,
   superAdminDashboards,
   usuariosData,
@@ -208,9 +209,11 @@ export default function UsuariosScreen({
             })()}
 
             <div className="usuarios-action-grid">
-              <button className="btn btn-secondary" type="button" onClick={() => setIsCreateCondoModalOpen(true)}>
-                <span>+</span> Nuevo Condominio
-              </button>
+              {isMaster && (
+                <button className="btn btn-secondary" type="button" onClick={() => setIsCreateCondoModalOpen(true)}>
+                  <span>+</span> Nuevo Condominio
+                </button>
+              )}
               <button
                 className="btn btn-primary"
                 type="button"
@@ -301,6 +304,7 @@ export default function UsuariosScreen({
                   <td>{usuario.property}</td>
                   <td>
                     <div className="usuario-actions">
+                      {(usuario.role !== 'Super Admin' || isMaster) && (<>
                       <button className="usuario-action-btn" title="Editar" type="button" onClick={() => {
                         setEditingUser(usuario);
                         setIsEditUserModalOpen(true);
@@ -314,6 +318,7 @@ export default function UsuariosScreen({
                           <path d="M6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V7H6V19ZM8 9H16V19H8V9ZM15.5 4L14.5 3H9.5L8.5 4H5V6H19V4H15.5Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </button>
+                      </>)}
                     </div>
                   </td>
                 </tr>

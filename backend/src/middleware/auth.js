@@ -36,7 +36,7 @@ async function requireAuth(req, res, next) {
     if (!user) {
       return res.status(401).json({ error: 'Tu cuenta ya no existe. Ingresá nuevamente.', expired: true });
     }
-    req.user = { id: user.id, role: user.role, condo: user.condo || null };
+    req.user = { id: user.id, role: user.role, condo: user.condo || null, isMaster: user.isMaster || false };
     next();
   } catch (e) {
     res.status(500).json({ error: 'Error verificando la sesión.' });
