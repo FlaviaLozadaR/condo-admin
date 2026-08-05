@@ -3178,12 +3178,20 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
 }
 
 export default function App() {
+  const hasToken = !!localStorage.getItem("condo_token");
   const [screen, setScreen]           = useState(() =>
-    localStorage.getItem("ignitel_visited") === "true" ? "login" : "landing"
+    hasToken ? "loading" : localStorage.getItem("ignitel_visited") === "true" ? "login" : "landing"
   );
   const [sessionUser, setSessionUser] = useState(null);
   const [expiredMsg, setExpiredMsg]   = useState("");
   const [isDarkMode, setIsDarkMode]   = useState(() => localStorage.getItem("theme") === "dark");
+
+  useEffect(() => {
+    if (screen !== "loading") return;
+    api.getMe()
+      .then(data => { setSessionUser(data.user); setScreen("dashboard"); })
+      .catch(() => { api.logout(); setScreen("login"); });
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", isDarkMode ? "dark" : "light");
@@ -3206,6 +3214,10 @@ export default function App() {
     });
     return unsub;
   }, []);
+
+  if (screen === "loading") {
+    return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--bg-primary, #f8f9fa)" }}><div className="spinner" /></div>;
+  }
 
   if (screen === "login") {
     return (

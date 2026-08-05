@@ -72,4 +72,19 @@ async function resetPassword(req, res) {
   }
 }
 
-module.exports = { login, forgotPassword, resetPassword };
+async function me(req, res) {
+  try {
+    const user = await db.getUsuarioById(req.user.id);
+    if (!user) return res.status(401).json({ error: 'Usuario no encontrado' });
+    const condo     = user.role === 'Super Admin' ? undefined : user.condo;
+    const dbData    = await db.getDataForDashboard(condo);
+    const dashboard = computeDashboard(user, dbData);
+    const { password: _, ...userClean } = user;
+    res.json({ user: { ...userClean, dashboard } });
+  } catch (e) {
+    console.error('Me error:', e.message);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+}
+
+module.exports = { login, forgotPassword, resetPassword, me };

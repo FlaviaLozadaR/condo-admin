@@ -1,6 +1,7 @@
 const router      = require('express').Router();
 const rateLimit   = require('express-rate-limit');
 const ctrl        = require('../controllers/authController');
+const { requireAuth } = require('../middleware/auth');
 
 const authLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
@@ -93,5 +94,6 @@ router.post('/forgot-password', authLimiter, ctrl.forgotPassword);
  *       429: { description: Demasiados intentos (rate limit) }
  */
 router.post('/reset-password',  authLimiter, ctrl.resetPassword);
+router.get('/me',               requireAuth, ctrl.me);
 
 module.exports = router;

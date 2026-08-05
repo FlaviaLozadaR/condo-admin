@@ -78,6 +78,8 @@ export function logout() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+export const getMe = () => request('/auth/me');
+
 // Condominios
 export const getCondominios = () => request('/condominios');
 export const createCondo = (data) => request('/condominios', { method: 'POST', body: data });
