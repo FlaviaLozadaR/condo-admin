@@ -11,7 +11,7 @@
   "lang": "es",
   "icons": [
     {
-      "src": "/Sevilla Real.jpeg",
+      "src": "/sevilla-real.jpeg",
       "sizes": "512x512",
       "type": "image/jpeg",
       "purpose": "any maskable"

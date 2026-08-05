@@ -3501,7 +3501,7 @@ export default function App() {
   if (screen === "loading") {
     return (
       <div className="splash-screen">
-        <img src="/Sevilla Real.jpeg" alt="Sevilla Real" className="splash-logo" />
+        <img src="/sevilla-real.jpeg" alt="Sevilla Real" className="splash-logo" />
         <span className="splash-name">Sevilla Real</span>
         <div className="splash-dots">
           <span /><span /><span />
