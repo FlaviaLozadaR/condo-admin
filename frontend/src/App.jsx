@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import * as api from "./api.js";
 import { onUnauthorized } from "./api.js";
 import { supabase } from "./supabase.js";
@@ -18,13 +18,14 @@ import OwnerPaymentsScreen from "./screens/OwnerPaymentsScreen.jsx";
 import SecurityVisitRegisterScreen from "./screens/SecurityVisitRegisterScreen.jsx";
 import PanicScreen from "./screens/PanicScreen.jsx";
 import ReservasScreen from "./screens/ReservasScreen.jsx";
-import DashboardScreen from "./screens/DashboardScreen.jsx";
-import SuperAdminDashboardScreen from "./screens/SuperAdminDashboardScreen.jsx";
 import PerfilScreen from "./screens/PerfilScreen.jsx";
 import MisReservasScreen from "./screens/MisReservasScreen.jsx";
 import SecurityHistoryScreen from "./screens/SecurityHistoryScreen.jsx";
 import { onEnterKey } from "./utils/keyboard.js";
 import { parseFecha } from "./screens/dashboardUtils.js";
+
+const DashboardScreen           = lazy(() => import("./screens/DashboardScreen.jsx"));
+const SuperAdminDashboardScreen = lazy(() => import("./screens/SuperAdminDashboardScreen.jsx"));
 
 const PHONE_PREFIX = "+591";
 const stripPhonePrefix = (phone) => (phone || "").replace(/^\+591[\s-]*/, "");
@@ -73,35 +74,8 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
     idDocumentBack: null,
     platePhoto: null
   });
-  const [visitPasses, setVisitPasses] = useState([
-    {
-      id: 1,
-      code: "QR-482917",
-      mode: "vehicular",
-      fullName: "María Gómez",
-      idNumber: "12345678",
-      property: "Calle Principal - A-101",
-      motive: "Visita familiar",
-      plate: "ABC-123",
-      createdBy: "Juan Pérez",
-      createdAt: "Hoy",
-      status: "Activo"
-    },
-    {
-      id: 2,
-      code: "QR-729415",
-      mode: "peatonal",
-      fullName: "Pedro García",
-      idNumber: "87654321",
-      property: "Calle Principal - A-101",
-      motive: "Entrega de encomienda",
-      plate: "-",
-      createdBy: "Juan Pérez",
-      createdAt: "Ayer",
-      status: "Escaneado"
-    }
-  ]);
-  const [selectedVisitPassId, setSelectedVisitPassId] = useState(1);
+  const [visitPasses, setVisitPasses] = useState([]);
+  const [selectedVisitPassId, setSelectedVisitPassId] = useState(null);
   const [panicAlerts, setPanicAlerts] = useState(() => {
     try {
       const saved = localStorage.getItem(PANIC_ALERTS_STORAGE_KEY);
@@ -1739,30 +1713,32 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             setActiveSection={setActiveSection}
           />
         ) : activeSection === "Dashboard" ? (
-          isSuperAdministrator ? (
-            <SuperAdminDashboardScreen
-              condominiosData={condominiosData}
-              superAdminDashboards={superAdminDashboards}
-              pagosData={pagosData}
-              historialVisitasData={historialVisitasData}
-              selectedDashboardCondoId={selectedDashboardCondoId}
-              setSelectedDashboardCondoId={setSelectedDashboardCondoId}
-              setActiveSection={setActiveSection}
-            />
-          ) : (
-            <DashboardScreen
-              user={user}
-              adminCondoName={adminCondoName}
-              propiedadesData={propiedadesData}
-              pagosData={pagosData}
-              historialVisitasData={historialVisitasData}
-              visitPasses={visitPasses}
-              panicAlerts={panicAlerts}
-              setActiveSection={setActiveSection}
-              exportToPDF={exportToPDF}
-              onToast={addToast}
-            />
-          )
+          <Suspense fallback={<div className="skeleton-screen"><div className="skeleton-cards-row">{[0,1,2,3].map(i=><div key={i} className="skeleton-stat-card"><div className="skeleton-pulse skeleton-stat-icon"/><div className="skeleton-pulse skeleton-stat-value"/><div className="skeleton-pulse skeleton-stat-label"/></div>)}</div></div>}>
+            {isSuperAdministrator ? (
+              <SuperAdminDashboardScreen
+                condominiosData={condominiosData}
+                superAdminDashboards={superAdminDashboards}
+                pagosData={pagosData}
+                historialVisitasData={historialVisitasData}
+                selectedDashboardCondoId={selectedDashboardCondoId}
+                setSelectedDashboardCondoId={setSelectedDashboardCondoId}
+                setActiveSection={setActiveSection}
+              />
+            ) : (
+              <DashboardScreen
+                user={user}
+                adminCondoName={adminCondoName}
+                propiedadesData={propiedadesData}
+                pagosData={pagosData}
+                historialVisitasData={historialVisitasData}
+                visitPasses={visitPasses}
+                panicAlerts={panicAlerts}
+                setActiveSection={setActiveSection}
+                exportToPDF={exportToPDF}
+                onToast={addToast}
+              />
+            )}
+          </Suspense>
         ) : activeSection === "Usuarios" ? (
           <UsuariosScreen
             user={user}
@@ -3418,6 +3394,7 @@ export default function App() {
   const [sessionWarning, setSessionWarning] = useState("");
   const [isDarkMode, setIsDarkMode]   = useState(() => localStorage.getItem("theme") === "dark");
   const [isOnline, setIsOnline]       = useState(navigator.onLine);
+  const [splashSlow, setSplashSlow]   = useState(false);
   const autoLogoutTimerRef            = useRef(null);
 
   useEffect(() => {
@@ -3434,6 +3411,12 @@ export default function App() {
   useEffect(() => {
     return () => { if (autoLogoutTimerRef.current) clearTimeout(autoLogoutTimerRef.current); };
   }, []);
+
+  useEffect(() => {
+    if (screen !== "loading") return;
+    const t = setTimeout(() => setSplashSlow(true), 8000);
+    return () => clearTimeout(t);
+  }, [screen]);
 
   useEffect(() => {
     if (screen !== "loading") return;
@@ -3512,6 +3495,11 @@ export default function App() {
         <div className="splash-dots">
           <span /><span /><span />
         </div>
+        {splashSlow && (
+          <p className="splash-slow-msg">
+            El servidor está iniciando,<br />aguardá un momento...
+          </p>
+        )}
       </div>
     );
   }
