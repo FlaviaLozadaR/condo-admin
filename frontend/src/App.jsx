@@ -32,6 +32,7 @@ const MAX_AREA_IMAGES = 6;
 function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: toggleDarkMode }) {
   const PANIC_ALERTS_STORAGE_KEY = "ignitel_panic_alerts";
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
   const [activeSection, setActiveSection] = useState(
     user.role === "Propietario" || user.role === "Inquilino"
       ? "Inicio"
@@ -481,6 +482,11 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
         .subscribe();
       channels.push(ch);
     };
+
+    // Canal dedicado solo para trackear el estado de la conexión WebSocket
+    const connChannel = supabase.channel('connection-status')
+      .subscribe((status) => setWsConnected(status === 'SUBSCRIBED'));
+    channels.push(connChannel);
 
     // Anuncios — todos los roles
     subscribe('anuncios', async () => {
@@ -1494,7 +1500,21 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
           <span /><span /><span />
         </button>
         <span className="mobile-topbar-title">{activeSection}</span>
-        <span className="mobile-topbar-role">{user.role}</span>
+        <span className="mobile-topbar-right">
+          <span
+            title={wsConnected ? "Tiempo real conectado" : "Reconectando..."}
+            style={{
+              display: 'inline-block',
+              width: 8, height: 8,
+              borderRadius: '50%',
+              background: wsConnected ? '#22c55e' : '#f59e0b',
+              boxShadow: wsConnected ? '0 0 6px #22c55e' : '0 0 6px #f59e0b',
+              marginRight: '0.5rem',
+              flexShrink: 0,
+            }}
+          />
+          <span className="mobile-topbar-role">{user.role}</span>
+        </span>
       </header>
 
       {/* Overlay for mobile sidebar */}

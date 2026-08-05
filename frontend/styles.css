@@ -8223,6 +8223,13 @@ h2,
     text-overflow: ellipsis;
   }
 
+  .mobile-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-shrink: 0;
+  }
+
   .mobile-topbar-role {
     font-size: 0.72rem;
     color: #667085;
