@@ -257,15 +257,20 @@ export default function PerfilScreen({
               ✓ Notificaciones activadas en este dispositivo.
             </p>
           )}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: "0.5rem 1rem", alignItems: "center", marginBottom: "0.5rem" }}>
+            <span />
+            <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textAlign: "center" }}>🔔 Push</span>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textAlign: "center" }}>📧 Email</span>
+          </div>
           {[
-            { key: "paymentApproved",     label: "Pago aprobado",               desc: "Cuando aprueban tu comprobante" },
-            { key: "paymentSubmitted",     label: "Nuevo comprobante recibido",   desc: "Cuando un residente envía un pago" },
-            { key: "announcement",         label: "Nuevos anuncios",              desc: "Cuando se publica un anuncio" },
-            { key: "panic",                label: "Alerta de pánico",             desc: "Cuando alguien activa el botón de emergencia" },
-            { key: "reservationApproved",  label: "Reserva aprobada",            desc: "Cuando aprueban tu reserva de área" },
-            { key: "reservationRequested", label: "Nueva solicitud de reserva",   desc: "Cuando un residente solicita una reserva" },
-          ].map(({ key, label, desc }) => (
-            <div key={key} className="perfil-appearance-row" style={{ marginBottom: "0.75rem" }}>
+            { key: "paymentApproved",     emailKey: "emailPaymentApproved",     label: "Pago aprobado",               desc: "Cuando aprueban tu comprobante" },
+            { key: "paymentSubmitted",     emailKey: "emailPaymentSubmitted",     label: "Nuevo comprobante recibido",   desc: "Cuando un residente envía un pago" },
+            { key: "announcement",         emailKey: "emailAnnouncement",         label: "Nuevos anuncios",              desc: "Cuando se publica un anuncio" },
+            { key: "panic",                emailKey: "emailPanic",                label: "Alerta de pánico",             desc: "Cuando alguien activa el botón de emergencia" },
+            { key: "reservationApproved",  emailKey: "emailReservationApproved",  label: "Reserva aprobada",            desc: "Cuando aprueban tu reserva de área" },
+            { key: "reservationRequested", emailKey: "emailReservationRequested", label: "Nueva solicitud de reserva",   desc: "Cuando un residente solicita una reserva" },
+          ].map(({ key, emailKey, label, desc }) => (
+            <div key={key} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: "0.5rem 1rem", alignItems: "center", marginBottom: "0.75rem" }}>
               <div className="perfil-appearance-info">
                 <span className="perfil-appearance-label">{label}</span>
                 <span className="perfil-appearance-desc">{desc}</span>
@@ -275,7 +280,16 @@ export default function PerfilScreen({
                 className={`perfil-theme-toggle${notifPrefs[key] ? " perfil-theme-toggle-dark" : ""}`}
                 onClick={() => handleTogglePref(key)}
                 disabled={notifSaving}
-                aria-label={notifPrefs[key] ? "Desactivar" : "Activar"}
+                aria-label={notifPrefs[key] ? "Desactivar push" : "Activar push"}
+              >
+                <span className="perfil-theme-toggle-knob" />
+              </button>
+              <button
+                type="button"
+                className={`perfil-theme-toggle${notifPrefs[emailKey] ? " perfil-theme-toggle-dark" : ""}`}
+                onClick={() => handleTogglePref(emailKey)}
+                disabled={notifSaving}
+                aria-label={notifPrefs[emailKey] ? "Desactivar email" : "Activar email"}
               >
                 <span className="perfil-theme-toggle-knob" />
               </button>
