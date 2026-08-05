@@ -21,14 +21,20 @@ function _notifyUnauthorized(expired) {
   _unauthorizedCallbacks.forEach(cb => cb(expired));
 }
 
+const REQUEST_TIMEOUT_MS = 15000;
+
 async function request(path, options = {}) {
   const token = getToken();
   const isFormData = options.body instanceof FormData;
+
+  const controller = new AbortController();
+  const timeoutId  = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   let res;
   try {
     res = await fetch(`${BASE_URL}${path}`, {
       ...options,
+      signal: controller.signal,
       headers: {
         ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -36,8 +42,13 @@ async function request(path, options = {}) {
       },
       body: isFormData ? options.body : (options.body !== undefined ? JSON.stringify(options.body) : undefined),
     });
-  } catch {
-    throw new Error('Sin conexión con el servidor. Verificá que el backend esté corriendo.');
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('El servidor tardó demasiado en responder. Intentá de nuevo.');
+    }
+    throw new Error('Sin conexión con el servidor. Verificá tu conexión a internet.');
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   let data;
