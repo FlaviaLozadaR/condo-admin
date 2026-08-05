@@ -10014,3 +10014,91 @@ h2,
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* ── Skeleton loading ────────────────────────────────────────────────────── */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton-pulse {
+  border-radius: 6px;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 800px 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-color-scheme: dark) {
+  .skeleton-pulse {
+    background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+    background-size: 800px 100%;
+  }
+}
+:root[data-theme="dark"] .skeleton-pulse {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+  background-size: 800px 100%;
+}
+:root[data-theme="light"] .skeleton-pulse {
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 800px 100%;
+}
+
+.skeleton-screen {
+  padding: 1.5rem 1.5rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  max-width: 900px;
+}
+
+.skeleton-header-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.skeleton-title  { height: 26px; width: 220px; }
+.skeleton-subtitle { height: 16px; width: 160px; }
+
+.skeleton-cards-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+@media (max-width: 768px) {
+  .skeleton-cards-row { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 420px) {
+  .skeleton-cards-row { grid-template-columns: 1fr 1fr; }
+}
+
+.skeleton-stat-card {
+  background: var(--dash-card-bg, #fff);
+  border-radius: 12px;
+  border: 1px solid var(--dash-border, #e2e8f0);
+  padding: 1.1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.skeleton-stat-icon  { height: 32px; width: 32px; border-radius: 8px; }
+.skeleton-stat-value { height: 28px; width: 60%; }
+.skeleton-stat-label { height: 14px; width: 80%; }
+
+.skeleton-section-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.skeleton-section-title { height: 18px; width: 140px; }
+
+.skeleton-list-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--dash-border, #e2e8f0);
+}
+.skeleton-list-avatar { height: 36px; width: 36px; border-radius: 50%; flex-shrink: 0; }
+.skeleton-list-lines  { display: flex; flex-direction: column; gap: 0.4rem; flex: 1; }
+.skeleton-list-line-a { height: 14px; width: 55%; }
+.skeleton-list-line-b { height: 12px; width: 40%; }

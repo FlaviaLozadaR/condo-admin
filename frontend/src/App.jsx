@@ -33,6 +33,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
   const PANIC_ALERTS_STORAGE_KEY = "ignitel_panic_alerts";
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [activeSection, setActiveSection] = useState(
     user.role === "Propietario" || user.role === "Inquilino"
       ? "Inicio"
@@ -335,6 +336,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
       anuncios.forEach(a => knownAnuncioIdsRef.current.add(String(a.id)));
       pagos.forEach(p => knownPagoIdsRef.current.add(String(p.id)));
       visitas.forEach(v => knownVisitIdsRef.current.add(String(v.id)));
+      setIsDataLoaded(true);
     };
     loadAll();
   }, []);
@@ -1660,7 +1662,47 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             <span>Actualizando…</span>
           </div>
         )}
-        {activeSection === "Inicio" ? (
+        {!isDataLoaded ? (
+          <div className="skeleton-screen">
+            <div className="skeleton-header-block">
+              <div className="skeleton-pulse skeleton-title" />
+              <div className="skeleton-pulse skeleton-subtitle" />
+            </div>
+            <div className="skeleton-cards-row">
+              {[0,1,2,3].map(i => (
+                <div key={i} className="skeleton-stat-card">
+                  <div className="skeleton-pulse skeleton-stat-icon" />
+                  <div className="skeleton-pulse skeleton-stat-value" />
+                  <div className="skeleton-pulse skeleton-stat-label" />
+                </div>
+              ))}
+            </div>
+            <div className="skeleton-section-block">
+              <div className="skeleton-pulse skeleton-section-title" />
+              {[0,1,2].map(i => (
+                <div key={i} className="skeleton-list-row">
+                  <div className="skeleton-pulse skeleton-list-avatar" />
+                  <div className="skeleton-list-lines">
+                    <div className="skeleton-pulse skeleton-list-line-a" />
+                    <div className="skeleton-pulse skeleton-list-line-b" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="skeleton-section-block">
+              <div className="skeleton-pulse skeleton-section-title" />
+              {[0,1,2].map(i => (
+                <div key={i} className="skeleton-list-row">
+                  <div className="skeleton-pulse skeleton-list-avatar" />
+                  <div className="skeleton-list-lines">
+                    <div className="skeleton-pulse skeleton-list-line-a" />
+                    <div className="skeleton-pulse skeleton-list-line-b" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : activeSection === "Inicio" ? (
           <OwnerHomeScreen
             user={user}
             anunciosData={anunciosData}
