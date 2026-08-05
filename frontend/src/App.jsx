@@ -333,6 +333,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
       panic.forEach(a => knownPanicIdsRef.current.add(String(a.id)));
       anuncios.forEach(a => knownAnuncioIdsRef.current.add(String(a.id)));
       pagos.forEach(p => knownPagoIdsRef.current.add(String(p.id)));
+      visitas.forEach(v => knownVisitIdsRef.current.add(String(v.id)));
     };
     loadAll();
   }, []);
