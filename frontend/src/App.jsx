@@ -51,6 +51,8 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
   const lastResidentCargoExtraRef = useRef(null);
   const lastReservaEstadosRef = useRef(new Map());
   const knownVisitIdsRef = useRef(new Set());
+  const pollRef = useRef(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [visitMode, setVisitMode] = useState("peatonal");
   const [visitRegistrationForm, setVisitRegistrationForm] = useState({
     fullName: "",
@@ -527,6 +529,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
       } catch { /* sin conexión, ignorar */ }
     };
 
+    pollRef.current = poll;
     const interval = setInterval(poll, 30000);
     return () => clearInterval(interval);
   }, [user.role]);
@@ -1529,7 +1532,45 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
         </div>
       </aside>
 
-      <section className={`dashboard-content${isResidentRole ? " owner-content" : ""}`}>
+      <section
+        className={`dashboard-content${isResidentRole ? " owner-content" : ""}`}
+        onTouchStart={(e) => {
+          if (e.currentTarget.scrollTop > 0) return;
+          e.currentTarget._ptrStartY = e.touches[0].clientY;
+        }}
+        onTouchMove={(e) => {
+          if (e.currentTarget._ptrStartY == null) return;
+          const dy = e.touches[0].clientY - e.currentTarget._ptrStartY;
+          if (dy > 0 && e.currentTarget.scrollTop <= 0) {
+            e.currentTarget._ptrPulling = true;
+            e.currentTarget._ptrDy = dy;
+          }
+        }}
+        onTouchEnd={async (e) => {
+          const dy = e.currentTarget._ptrDy || 0;
+          e.currentTarget._ptrStartY = null;
+          e.currentTarget._ptrDy = null;
+          if (!e.currentTarget._ptrPulling || dy < 65) { e.currentTarget._ptrPulling = false; return; }
+          e.currentTarget._ptrPulling = false;
+          if (isRefreshing || !pollRef.current) return;
+          setIsRefreshing(true);
+          try {
+            const { Capacitor } = await import('@capacitor/core');
+            if (Capacitor.isNativePlatform()) {
+              const { Haptics, ImpactStyle } = await import('@capacitor/haptics');
+              await Haptics.impact({ style: ImpactStyle.Light });
+            }
+          } catch { }
+          await pollRef.current();
+          setIsRefreshing(false);
+        }}
+      >
+        {isRefreshing && (
+          <div className="ptr-indicator">
+            <div className="ptr-spinner" />
+            <span>Actualizando…</span>
+          </div>
+        )}
         {activeSection === "Inicio" ? (
           <OwnerHomeScreen
             user={user}

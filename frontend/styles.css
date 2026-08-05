@@ -9975,3 +9975,33 @@ h2,
 @media (prefers-reduced-motion: reduce) {
   .splash-screen, .splash-logo, .splash-name, .splash-dots { animation: none; }
 }
+
+/* ── Pull-to-refresh indicator ───────────────────────────────── */
+.ptr-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  color: var(--accent, #5b5cff);
+  animation: ptrFadeIn 0.2s ease;
+}
+
+.ptr-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(91,92,255,0.2);
+  border-top-color: var(--accent, #5b5cff);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes ptrFadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
