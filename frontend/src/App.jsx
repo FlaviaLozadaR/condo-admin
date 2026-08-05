@@ -3241,7 +3241,7 @@ export default function App() {
               if (isAvailable) {
                 await NativeBiometric.verifyIdentity({
                   reason: 'Verificá tu identidad para acceder',
-                  title: 'Condo Admin',
+                  title: 'Sevilla Real',
                   subtitle: 'Usá tu huella o Face ID',
                   negativeButtonText: 'Usar contraseña',
                 });
@@ -3284,8 +3284,8 @@ export default function App() {
   if (screen === "loading") {
     return (
       <div className="splash-screen">
-        <img src="/icon-192.png" alt="Condo Admin" className="splash-logo" />
-        <span className="splash-name">Condo Admin</span>
+        <img src="/Sevilla Real.jpeg" alt="Sevilla Real" className="splash-logo" />
+        <span className="splash-name">Sevilla Real</span>
         <div className="splash-dots">
           <span /><span /><span />
         </div>

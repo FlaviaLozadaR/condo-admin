@@ -1,25 +1,19 @@
 {
-  "name": "Condo Admin — Gestión Condominial",
-  "short_name": "Condo Admin",
-  "description": "Plataforma de gestión inteligente para condominios residenciales.",
+  "name": "Sevilla Real",
+  "short_name": "Sevilla Real",
+  "description": "App de gestión del Condominio Privado Sevilla Real.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#0f172a",
-  "theme_color": "#4f46e5",
+  "background_color": "#ffffff",
+  "theme_color": "#1a5fa8",
   "categories": ["business", "productivity"],
   "lang": "es",
   "icons": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-512.png",
+      "src": "/Sevilla Real.jpeg",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/jpeg",
       "purpose": "any maskable"
     }
   ],
