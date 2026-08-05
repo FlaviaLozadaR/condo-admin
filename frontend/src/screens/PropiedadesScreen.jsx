@@ -163,7 +163,7 @@ export default function PropiedadesScreen({
           </svg>
           <input
             type="text"
-            placeholder="Buscar por calle o numero..."
+            placeholder="Buscar por calle, número o propietario..."
             className="propiedades-search-input"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
