@@ -29,7 +29,7 @@ const PHONE_PREFIX = "+591";
 const stripPhonePrefix = (phone) => (phone || "").replace(/^\+591[\s-]*/, "");
 const MAX_AREA_IMAGES = 6;
 
-function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: toggleDarkMode }) {
+function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: toggleDarkMode, sessionWarning, onDismissSessionWarning }) {
   const PANIC_ALERTS_STORAGE_KEY = "ignitel_panic_alerts";
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
@@ -1516,6 +1516,22 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
           <span className="mobile-topbar-role">{user.role}</span>
         </span>
       </header>
+
+      {/* Banner de sesión por vencer */}
+      {sessionWarning && (
+        <div style={{
+          position: 'fixed', top: '3.5rem', left: 0, right: 0, zIndex: 999,
+          background: '#f59e0b', color: '#1c1917', fontSize: '0.8rem',
+          padding: '0.5rem 1rem', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', gap: '0.5rem',
+        }}>
+          <span>⚠️ {sessionWarning}</span>
+          <button type="button" onClick={onDismissSessionWarning}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '1rem', color: '#1c1917' }}>
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Overlay for mobile sidebar */}
       {sidebarOpen && (
@@ -3284,6 +3300,7 @@ export default function App() {
   );
   const [sessionUser, setSessionUser] = useState(null);
   const [expiredMsg, setExpiredMsg]   = useState("");
+  const [sessionWarning, setSessionWarning] = useState("");
   const [isDarkMode, setIsDarkMode]   = useState(() => localStorage.getItem("theme") === "dark");
 
   useEffect(() => {
@@ -3313,6 +3330,12 @@ export default function App() {
           }
         }
         setSessionUser(data.user);
+        try {
+          const token = localStorage.getItem("condo_token");
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          const hoursLeft = Math.floor((payload.exp * 1000 - Date.now()) / 3600000);
+          if (hoursLeft < 24) setSessionWarning(`Tu sesión expira en ${hoursLeft} hora${hoursLeft !== 1 ? 's' : ''}. Cerrá sesión y volvé a entrar para renovarla.`);
+        } catch {}
         setScreen("dashboard");
       })
       .catch(() => { api.logout(); setScreen("login"); });
@@ -3373,6 +3396,8 @@ export default function App() {
         onUpdateUser={(patch) => setSessionUser((prev) => (prev ? { ...prev, ...patch } : prev))}
         isDarkMode={isDarkMode}
         onToggleDark={toggleDarkMode}
+        sessionWarning={sessionWarning}
+        onDismissSessionWarning={() => setSessionWarning("")}
         onLogout={() => {
           api.logout();
           setSessionUser(null);
