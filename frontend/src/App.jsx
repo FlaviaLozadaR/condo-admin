@@ -436,6 +436,20 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
     }
   };
 
+  // Advertencia al cerrar/recargar si hay un formulario abierto
+  const anyModalOpen = isPayExpensesModalOpen || isCreateAnnouncementModalOpen ||
+    isEditAnuncioModalOpen || isCreateAsambleaModalOpen || isCreateCondoModalOpen ||
+    isEditCondoModalOpen || isCreatePropertyModalOpen || isEditPropertyModalOpen ||
+    isCreateUserModalOpen || isCreateAreaModalOpen || isEditUserModalOpen ||
+    isEditAsambleaModalOpen;
+
+  useEffect(() => {
+    if (!anyModalOpen) return;
+    const handler = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [anyModalOpen]);
+
   // Función de refresco manual (pull-to-refresh)
   useEffect(() => {
     const poll = async () => {
