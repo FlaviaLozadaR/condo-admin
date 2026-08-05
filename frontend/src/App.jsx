@@ -3216,7 +3216,15 @@ export default function App() {
   }, []);
 
   if (screen === "loading") {
-    return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--bg-primary, #f8f9fa)" }}><div className="spinner" /></div>;
+    return (
+      <div className="splash-screen">
+        <img src="/icon-192.png" alt="Condo Admin" className="splash-logo" />
+        <span className="splash-name">Condo Admin</span>
+        <div className="splash-dots">
+          <span /><span /><span />
+        </div>
+      </div>
+    );
   }
 
   if (screen === "login") {
