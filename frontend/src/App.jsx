@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as api from "./api.js";
 import { onUnauthorized } from "./api.js";
+import { supabase } from "./supabase.js";
 import Landing from "./components/Landing.jsx";
 import Login from "./components/Login.jsx";
 import QrScannerScreen from "./components/QrScanner.jsx";
@@ -433,71 +434,112 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
     }
   };
 
-  // Polling en tiempo real cada 30 segundos
+  // Función de refresco manual (pull-to-refresh)
   useEffect(() => {
     const poll = async () => {
       try {
-        // Panic alerts — visible para Seguridad y Admin
         if (["Seguridad", "Administrador", "Super Admin"].includes(user.role)) {
           const alerts = await api.getPanicAlerts();
-          const newAlerts = alerts.filter(a => !knownPanicIdsRef.current.has(String(a.id)));
-          if (newAlerts.length > 0) {
-            newAlerts.forEach(a => {
-              knownPanicIdsRef.current.add(String(a.id));
-              addToast(`🚨 Alerta de pánico: ${a.resident} — ${a.address} ${a.unit}`, "panic");
-            });
-            setMenuBadges(prev => ({ ...prev, panic: (prev.panic || 0) + newAlerts.length }));
-          }
           setPanicAlerts(alerts);
         }
-
-        // Anuncios nuevos — todos los roles
         const anuncios = await api.getAnuncios();
-        const newAnuncios = anuncios.filter(a => !knownAnuncioIdsRef.current.has(String(a.id)));
-        if (newAnuncios.length > 0) {
-          newAnuncios.forEach(a => {
-            knownAnuncioIdsRef.current.add(String(a.id));
-            addToast(`📢 Nuevo anuncio: ${a.title}`, "anuncio");
-          });
-          setMenuBadges(prev => ({ ...prev, anuncios: (prev.anuncios || 0) + newAnuncios.length }));
-        }
         setAnunciosData(anuncios);
-
-        // Pagos pendientes — Admin/SuperAdmin: se actualiza siempre (no solo
-        // cuando hay un pago nuevo) para reflejar también cambios de estado
-        // hechos desde otra sesión/dispositivo.
         if (["Administrador", "Super Admin"].includes(user.role)) {
           const pagos = await api.getPagos();
-          const newPagos = pagos.filter(p => !knownPagoIdsRef.current.has(String(p.id)));
-          if (newPagos.length > 0) {
-            newPagos.forEach(p => {
-              knownPagoIdsRef.current.add(String(p.id));
-              addToast(`💰 Nuevo pago pendiente: ${p.propiedad} — Bs. ${p.monto}`, "pago");
-            });
-            setMenuBadges(prev => ({ ...prev, pagos: (prev.pagos || 0) + newPagos.length }));
-          }
           setPagosData(pagos);
-
-          // Propiedades — refleja cargos extra/expensas asignados desde
-          // cualquier lado (otra sesión, "Cobrar" de una reserva, etc.) sin
-          // esperar a un refresh manual. Alimenta el Dashboard y Gestión de Expensas.
           const propiedades = await api.getPropiedades();
           setPropiedadesData(propiedades);
         }
-
-        // Visitas nuevas — Seguridad (sin toast: solo mantiene la lista al día)
         if (user.role === "Seguridad") {
           const visitas = await api.getVisitas();
-          const newVisitas = visitas.filter(v => !knownVisitIdsRef.current.has(String(v.id)));
-          if (newVisitas.length > 0) {
-            newVisitas.forEach(v => knownVisitIdsRef.current.add(String(v.id)));
-            setVisitPasses(visitas);
-          }
+          setVisitPasses(visitas);
         }
-
-        // Expensas/cargo extra — Propietario/Inquilino: si el admin asigna o
-        // cambia el monto, se refleja solo sin esperar a un refresh manual.
         if (["Propietario", "Inquilino"].includes(user.role)) {
+          const prop = await api.getMyProperty();
+          setResidentExpensas(Number(prop.expensaMensual) || 0);
+          setResidentCargoExtra(Number(prop.cargoExtra) || 0);
+          setResidentCargoNota(prop.notaCargo || '');
+        }
+        if (["Propietario", "Inquilino", "Administrador", "Super Admin"].includes(user.role)) {
+          const reservas = await api.getReservasAreas();
+          setReservasAreas(reservas);
+        }
+      } catch { /* sin conexión, ignorar */ }
+    };
+    pollRef.current = poll;
+  }, [user.role]);
+
+  // Supabase Realtime — actualizaciones instantáneas por WebSocket
+  useEffect(() => {
+    const channels = [];
+
+    const subscribe = (table, handler) => {
+      const ch = supabase
+        .channel(`realtime-${table}-${user.role}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table }, handler)
+        .subscribe();
+      channels.push(ch);
+    };
+
+    // Anuncios — todos los roles
+    subscribe('anuncios', async () => {
+      try {
+        const anuncios = await api.getAnuncios();
+        const nuevos = anuncios.filter(a => !knownAnuncioIdsRef.current.has(String(a.id)));
+        if (nuevos.length > 0) {
+          nuevos.forEach(a => {
+            knownAnuncioIdsRef.current.add(String(a.id));
+            addToast(`📢 Nuevo anuncio: ${a.title}`, "anuncio");
+          });
+          setMenuBadges(prev => ({ ...prev, anuncios: (prev.anuncios || 0) + nuevos.length }));
+        }
+        setAnunciosData(anuncios);
+      } catch {}
+    });
+
+    // Pánico — Seguridad/Admin/Super Admin
+    if (["Seguridad", "Administrador", "Super Admin"].includes(user.role)) {
+      subscribe('panic_alerts', async () => {
+        try {
+          const alerts = await api.getPanicAlerts();
+          const nuevos = alerts.filter(a => !knownPanicIdsRef.current.has(String(a.id)));
+          if (nuevos.length > 0) {
+            nuevos.forEach(a => {
+              knownPanicIdsRef.current.add(String(a.id));
+              addToast(`🚨 ALERTA DE PÁNICO: ${a.resident} — ${a.address} ${a.unit}`, "panic");
+            });
+            setMenuBadges(prev => ({ ...prev, panic: (prev.panic || 0) + nuevos.length }));
+          }
+          setPanicAlerts(alerts);
+        } catch {}
+      });
+    }
+
+    // Pagos — Admin/Super Admin
+    if (["Administrador", "Super Admin"].includes(user.role)) {
+      subscribe('pagos', async () => {
+        try {
+          const pagos = await api.getPagos();
+          const nuevos = pagos.filter(p => !knownPagoIdsRef.current.has(String(p.id)));
+          if (nuevos.length > 0) {
+            nuevos.forEach(p => {
+              knownPagoIdsRef.current.add(String(p.id));
+              addToast(`💰 Nuevo pago pendiente: ${p.propiedad} — Bs. ${p.monto}`, "pago");
+            });
+            setMenuBadges(prev => ({ ...prev, pagos: (prev.pagos || 0) + nuevos.length }));
+          }
+          setPagosData(pagos);
+        } catch {}
+      });
+    }
+
+    // Propiedades — Admin ve todo; Residente ve su cargo extra
+    subscribe('propiedades', async () => {
+      try {
+        if (["Administrador", "Super Admin"].includes(user.role)) {
+          const propiedades = await api.getPropiedades();
+          setPropiedadesData(propiedades);
+        } else if (["Propietario", "Inquilino"].includes(user.role)) {
           const prop = await api.getMyProperty();
           const nuevoCargoExtra = Number(prop.cargoExtra) || 0;
           if (lastResidentCargoExtraRef.current !== null && nuevoCargoExtra > lastResidentCargoExtraRef.current) {
@@ -508,10 +550,27 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
           setResidentCargoExtra(nuevoCargoExtra);
           setResidentCargoNota(prop.notaCargo || '');
         }
+      } catch {}
+    });
 
-        // Reservas de áreas — se refresca para reflejar aprobaciones/rechazos
-        // del admin (o solicitudes nuevas de residentes) sin esperar un refresh manual.
-        if (["Propietario", "Inquilino", "Administrador", "Super Admin"].includes(user.role)) {
+    // Visitas — Seguridad
+    if (user.role === "Seguridad") {
+      subscribe('visitas', async () => {
+        try {
+          const visitas = await api.getVisitas();
+          const nuevas = visitas.filter(v => !knownVisitIdsRef.current.has(String(v.id)));
+          if (nuevas.length > 0) {
+            nuevas.forEach(v => knownVisitIdsRef.current.add(String(v.id)));
+            setVisitPasses(visitas);
+          }
+        } catch {}
+      });
+    }
+
+    // Reservas — Residentes y Admin
+    if (["Propietario", "Inquilino", "Administrador", "Super Admin"].includes(user.role)) {
+      subscribe('reservas_areas', async () => {
+        try {
           const reservas = await api.getReservasAreas();
           if (["Propietario", "Inquilino"].includes(user.role)) {
             reservas.forEach(r => {
@@ -525,34 +584,13 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             });
           }
           setReservasAreas(reservas);
-        }
-      } catch { /* sin conexión, ignorar */ }
-    };
+        } catch {}
+      });
+    }
 
-    pollRef.current = poll;
-    const interval = setInterval(poll, 30000);
-    return () => clearInterval(interval);
-  }, [user.role]);
-
-  // Polling rápido exclusivo para pánico (cada 10s) — notifica a seguridad/admin inmediatamente
-  useEffect(() => {
-    if (!["Seguridad", "Administrador", "Super Admin"].includes(user.role)) return;
-    const pollPanic = async () => {
-      try {
-        const alerts = await api.getPanicAlerts();
-        const newAlerts = alerts.filter(a => !knownPanicIdsRef.current.has(String(a.id)));
-        if (newAlerts.length > 0) {
-          newAlerts.forEach(a => {
-            knownPanicIdsRef.current.add(String(a.id));
-            addToast(`🚨 ALERTA DE PÁNICO: ${a.resident} — ${a.address} ${a.unit}`, "panic");
-          });
-          setMenuBadges(prev => ({ ...prev, panic: (prev.panic || 0) + newAlerts.length }));
-        }
-        setPanicAlerts(alerts);
-      } catch { /* ignorar */ }
+    return () => {
+      channels.forEach(ch => supabase.removeChannel(ch));
     };
-    const panicInterval = setInterval(pollPanic, 10000);
-    return () => clearInterval(panicInterval);
   }, [user.role]);
 
   const clearBadge = (key) => setMenuBadges(prev => ({ ...prev, [key]: 0 }));
