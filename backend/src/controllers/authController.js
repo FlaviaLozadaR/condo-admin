@@ -21,7 +21,7 @@ async function login(req, res) {
     const condo     = user.role === 'Super Admin' ? undefined : user.condo;
     const dbData    = await db.getDataForDashboard(condo);
     const dashboard = computeDashboard(user, dbData);
-    const token     = jwt.sign({ id: user.id, role: user.role, condo: user.condo || null }, JWT_SECRET, { expiresIn: '24h' });
+    const token     = jwt.sign({ id: user.id, role: user.role, condo: user.condo || null }, JWT_SECRET, { expiresIn: '7d' });
     const { password: _, ...userClean } = user;
 
     res.json({ token, user: { ...userClean, dashboard } });
