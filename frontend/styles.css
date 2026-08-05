@@ -222,7 +222,7 @@ h2,
   background:
     linear-gradient(180deg, rgba(14, 18, 32, 0.56) 0%, rgba(25, 34, 58, 0.48) 100%),
     radial-gradient(circle at 82% 0%, rgba(146, 166, 255, 0.2), transparent 36%),
-    url("/images/banner-condominio.png") center / cover no-repeat;
+    url("/imagendefondo.jpeg") center / cover no-repeat;
   border-radius: 0;
   height: 100vh;
   height: 100dvh;
@@ -648,7 +648,7 @@ h2,
   overflow: hidden;
   background:
     linear-gradient(160deg, rgba(6,6,22,0.92) 0%, rgba(18,10,44,0.88) 45%, rgba(8,18,50,0.91) 100%),
-    url("/images/banner-condominio.png") center / cover no-repeat;
+    url("/imagendefondo.jpeg") center / cover no-repeat;
 }
 
 .login-screen::before {
@@ -7987,7 +7987,7 @@ h2,
     background:
       linear-gradient(180deg, rgba(14, 18, 32, 0.56) 0%, rgba(25, 34, 58, 0.48) 100%),
       radial-gradient(circle at 82% 0%, rgba(146, 166, 255, 0.2), transparent 36%),
-      url("/images/banner-condominio.png") center / cover no-repeat;
+      url("/imagendefondo.jpeg") center / cover no-repeat;
   }
 
   .cta-row {
