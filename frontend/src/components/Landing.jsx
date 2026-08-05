@@ -18,7 +18,7 @@ export default function Landing({ onStartLogin, isDarkMode, onToggleDark }) {
       <header className="topbar">
         <div className="container nav-wrap">
           <button className="brand" type="button" onClick={() => {}}>
-            <img className="brand-logo" src="/Sevilla Real.jpeg" alt="Sevilla Real" style={{borderRadius:'8px', height:'36px', width:'36px', objectFit:'cover'}} />
+            <img className="brand-logo" src="/images/logo-ignitel.png" alt="Ignitel" />
           </button>
 
           <button className="btn btn-login" type="button" onClick={onStartLogin}>
