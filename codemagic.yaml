@@ -1,0 +1,45 @@
+workflows:
+  ios-release:
+    name: iOS Release
+    max_build_duration: 60
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.ignitel.condoadmin
+      vars:
+        BUNDLE_ID: com.ignitel.condoadmin
+        XCODE_WORKSPACE: ios/App/App.xcworkspace
+        XCODE_SCHEME: App
+    scripts:
+      - name: Install frontend dependencies
+        working_directory: frontend
+        script: npm install
+
+      - name: Build frontend
+        working_directory: frontend
+        script: npm run build
+
+      - name: Install Capacitor iOS
+        working_directory: frontend
+        script: |
+          npx cap sync ios
+
+      - name: Install CocoaPods
+        working_directory: frontend/ios/App
+        script: pod install
+
+      - name: Build iOS
+        working_directory: frontend
+        script: |
+          xcode-project build-ipa \
+            --workspace "$CM_BUILD_DIR/frontend/ios/App/App.xcworkspace" \
+            --scheme "App"
+
+    artifacts:
+      - frontend/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
