@@ -388,27 +388,40 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
     }
   };
 
-  // Registro de push notifications (solo en Android via Capacitor)
+  // Registro de push notifications (Capacitor en Android, Web Push en navegador)
   useEffect(() => {
     const registerPush = async () => {
       try {
-        const { PushNotifications } = await import('@capacitor/push-notifications');
         const { Capacitor } = await import('@capacitor/core');
-        if (!Capacitor.isNativePlatform()) return;
 
-        const permResult = await PushNotifications.requestPermissions();
-        if (permResult.receive !== 'granted') return;
+        if (Capacitor.isNativePlatform()) {
+          // Android nativo via Capacitor
+          const { PushNotifications } = await import('@capacitor/push-notifications');
+          const permResult = await PushNotifications.requestPermissions();
+          if (permResult.receive !== 'granted') return;
+          await PushNotifications.register();
+          PushNotifications.addListener('registration', async (token) => {
+            try { await api.registerFcmToken(token.value, 'android'); } catch { }
+          });
+          PushNotifications.addListener('pushNotificationReceived', (notification) => {
+            addToast(notification.body || notification.title || 'Nueva notificación', 'info');
+          });
+        } else if ('serviceWorker' in navigator && 'Notification' in window) {
+          // Web Push para navegador (iPhone Safari 16.4+, Chrome, etc.)
+          const permission = await Notification.requestPermission();
+          if (permission !== 'granted') return;
 
-        await PushNotifications.register();
-
-        PushNotifications.addListener('registration', async (token) => {
-          try { await api.registerFcmToken(token.value, 'android'); } catch { /* ignorar */ }
-        });
-
-        PushNotifications.addListener('pushNotificationReceived', (notification) => {
-          addToast(notification.body || notification.title || 'Nueva notificación', 'info');
-        });
-      } catch { /* web o error de importación, ignorar */ }
+          const { messaging, getToken, onMessage, VAPID_KEY } = await import('./firebase.js');
+          const sw = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+          const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: sw });
+          if (token) {
+            try { await api.registerFcmToken(token, 'web'); } catch { }
+          }
+          onMessage(messaging, (payload) => {
+            addToast(payload.notification?.body || payload.notification?.title || 'Nueva notificación', 'info');
+          });
+        }
+      } catch { }
     };
     registerPush();
   }, []);
