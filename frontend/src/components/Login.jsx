@@ -51,7 +51,7 @@ export default function Login({ onBack, onLogin, expiredMsg }) {
         <div className="login-card">
 
           <div className="login-brand">
-            <img src="/Sevilla%20Real.jpeg" alt="Sevilla Real" className="login-logo" style={{borderRadius:'12px', width:'80px', height:'80px', objectFit:'cover'}} />
+            <img src="/images/logo-ignitel-tight.png" alt="Ignitel" className="login-logo" />
           </div>
 
           {mode === "login" && (
