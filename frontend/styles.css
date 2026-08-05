@@ -9416,6 +9416,11 @@ h2,
   border: 1px solid #262626;
 }
 [data-theme="dark"] .panic-alert-item:hover { border-color: #363636; }
+[data-theme="dark"] .panic-alert-item strong { color: #f2f2f2; }
+[data-theme="dark"] .panic-alert-item p { color: #c0c0c0; }
+[data-theme="dark"] .panic-alert-item small { color: #888; }
+[data-theme="dark"] .panic-alert-item-done strong,
+[data-theme="dark"] .panic-alert-item-done p { color: #888; }
 [data-theme="dark"] .panic-owner-panel,
 [data-theme="dark"] .panic-security-panel {
   background: #0d0308;
