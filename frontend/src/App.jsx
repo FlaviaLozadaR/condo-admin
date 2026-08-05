@@ -57,6 +57,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
   const lastReservaEstadosRef = useRef(new Map());
   const knownVisitIdsRef = useRef(new Set());
   const pollRef = useRef(null);
+  const contentRef = useRef(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [visitMode, setVisitMode] = useState("peatonal");
   const [visitRegistrationForm, setVisitRegistrationForm] = useState({
@@ -453,6 +454,10 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [anyModalOpen]);
+
+  useEffect(() => {
+    contentRef.current?.scrollTo({ top: 0, behavior: 'instant' });
+  }, [activeSection]);
 
   // Función de refresco manual (pull-to-refresh)
   useEffect(() => {
@@ -1642,6 +1647,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
       </aside>
 
       <section
+        ref={contentRef}
         className={`dashboard-content${isResidentRole ? " owner-content" : ""}`}
         onTouchStart={(e) => {
           if (e.currentTarget.scrollTop > 0) return;
