@@ -12,6 +12,7 @@ export default function PerfilScreen({
   isDarkMode,
   toggleDarkMode,
   onProfileUpdated,
+  onEnableWebPush,
 }) {
   const [profileForm, setProfileForm] = useState({ name: user?.name || "", email: user?.email || "", phone: stripPhonePrefix(user?.phone) });
   const [profileSaving, setProfileSaving] = useState(false);
@@ -24,6 +25,11 @@ export default function PerfilScreen({
   const [notifPrefs, setNotifPrefs] = useState(DEFAULT_PREFS);
   const [notifSaving, setNotifSaving] = useState(false);
   const [notifMsg, setNotifMsg] = useState("");
+  const [webPushStatus, setWebPushStatus] = useState(() => {
+    if (typeof Notification === 'undefined') return 'unsupported';
+    return Notification.permission;
+  });
+  const [webPushLoading, setWebPushLoading] = useState(false);
 
   useEffect(() => {
     api.getNotificationPreferences().then(p => { if (p) setNotifPrefs({ ...DEFAULT_PREFS, ...p }); }).catch(() => {});
@@ -181,6 +187,34 @@ export default function PerfilScreen({
           <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginBottom: "1rem" }}>
             Elegí qué avisos querés recibir en tu celular.
           </p>
+          {webPushStatus !== 'unsupported' && webPushStatus !== 'granted' && onEnableWebPush && (
+            <div style={{ marginBottom: "1rem" }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={webPushLoading || webPushStatus === 'denied'}
+                onClick={async () => {
+                  setWebPushLoading(true);
+                  const result = await onEnableWebPush();
+                  if (result === 'granted') setWebPushStatus('granted');
+                  else if (result === 'denied') setWebPushStatus('denied');
+                  setWebPushLoading(false);
+                }}
+              >
+                {webPushLoading ? "Activando…" : "Activar notificaciones en este dispositivo"}
+              </button>
+              {webPushStatus === 'denied' && (
+                <p style={{ fontSize: "0.8rem", color: "var(--danger, #e53e3e)", marginTop: "0.5rem" }}>
+                  Permiso denegado. Habilitalo desde Ajustes → Safari → Notificaciones.
+                </p>
+              )}
+            </div>
+          )}
+          {webPushStatus === 'granted' && (
+            <p style={{ fontSize: "0.85rem", color: "var(--success, #38a169)", marginBottom: "1rem" }}>
+              ✓ Notificaciones activadas en este dispositivo.
+            </p>
+          )}
           {[
             { key: "paymentApproved",     label: "Pago aprobado",               desc: "Cuando aprueban tu comprobante" },
             { key: "paymentSubmitted",     label: "Nuevo comprobante recibido",   desc: "Cuando un residente envía un pago" },

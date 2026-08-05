@@ -388,43 +388,48 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
     }
   };
 
-  // Registro de push notifications (Capacitor en Android, Web Push en navegador)
+  // Registro de push notifications nativas (Android via Capacitor)
   useEffect(() => {
-    const registerPush = async () => {
+    const registerNativePush = async () => {
       try {
         const { Capacitor } = await import('@capacitor/core');
-
-        if (Capacitor.isNativePlatform()) {
-          // Android nativo via Capacitor
-          const { PushNotifications } = await import('@capacitor/push-notifications');
-          const permResult = await PushNotifications.requestPermissions();
-          if (permResult.receive !== 'granted') return;
-          await PushNotifications.register();
-          PushNotifications.addListener('registration', async (token) => {
-            try { await api.registerFcmToken(token.value, 'android'); } catch { }
-          });
-          PushNotifications.addListener('pushNotificationReceived', (notification) => {
-            addToast(notification.body || notification.title || 'Nueva notificación', 'info');
-          });
-        } else if ('serviceWorker' in navigator && 'Notification' in window) {
-          // Web Push para navegador (iPhone Safari 16.4+, Chrome, etc.)
-          const permission = await Notification.requestPermission();
-          if (permission !== 'granted') return;
-
-          const { messaging, getToken, onMessage, VAPID_KEY } = await import('./firebase.js');
-          const sw = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-          const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: sw });
-          if (token) {
-            try { await api.registerFcmToken(token, 'web'); } catch { }
-          }
-          onMessage(messaging, (payload) => {
-            addToast(payload.notification?.body || payload.notification?.title || 'Nueva notificación', 'info');
-          });
-        }
+        if (!Capacitor.isNativePlatform()) return;
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        const permResult = await PushNotifications.requestPermissions();
+        if (permResult.receive !== 'granted') return;
+        await PushNotifications.register();
+        PushNotifications.addListener('registration', async (token) => {
+          try { await api.registerFcmToken(token.value, 'android'); } catch { }
+        });
+        PushNotifications.addListener('pushNotificationReceived', (notification) => {
+          addToast(notification.body || notification.title || 'Nueva notificación', 'info');
+        });
       } catch { }
     };
-    registerPush();
+    registerNativePush();
   }, []);
+
+  // Web Push para navegador (requiere gesto del usuario — se llama desde Perfil)
+  const handleEnableWebPush = async () => {
+    if (!('serviceWorker' in navigator) || !('Notification' in window)) {
+      addToast('Tu navegador no soporta notificaciones push.', 'error');
+      return 'unsupported';
+    }
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return 'denied';
+    try {
+      const { messaging, getToken, onMessage, VAPID_KEY } = await import('./firebase.js');
+      const sw = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: sw });
+      if (token) await api.registerFcmToken(token, 'web');
+      onMessage(messaging, (payload) => {
+        addToast(payload.notification?.body || payload.notification?.title || 'Nueva notificación', 'info');
+      });
+      return 'granted';
+    } catch {
+      return 'error';
+    }
+  };
 
   // Polling en tiempo real cada 30 segundos
   useEffect(() => {
@@ -1678,6 +1683,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             isDarkMode={isDarkMode}
             toggleDarkMode={toggleDarkMode}
             onProfileUpdated={handleProfileUpdated}
+            onEnableWebPush={handleEnableWebPush}
           />
         ) : activeSection === "Mis Pagos" && !isTenant ? (
           <OwnerPaymentsScreen
