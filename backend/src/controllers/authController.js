@@ -7,16 +7,54 @@ const { sendResetEmail }   = require('../services/mailer');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
+const MAX_ATTEMPTS  = 5;
+const LOCKOUT_MS    = 15 * 60 * 1000; // 15 minutos
+const loginAttempts = new Map();       // email → { count, lockedUntil }
+
+// Limpia entradas viejas cada hora para no acumular memoria
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of loginAttempts) {
+    if (val.lockedUntil < now && val.count < MAX_ATTEMPTS) loginAttempts.delete(key);
+    else if (val.lockedUntil < now - LOCKOUT_MS)           loginAttempts.delete(key);
+  }
+}, 60 * 60 * 1000);
+
 async function login(req, res) {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) return res.status(400).json({ error: 'Email y contraseña requeridos' });
 
-    const user = await db.getUsuarioByEmail(email.trim());
-    if (!user) return res.status(401).json({ error: 'Credenciales inválidas' });
+    const key    = email.trim().toLowerCase();
+    const record = loginAttempts.get(key) || { count: 0, lockedUntil: 0 };
 
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.status(401).json({ error: 'Credenciales inválidas' });
+    if (record.lockedUntil > Date.now()) {
+      const minsLeft = Math.ceil((record.lockedUntil - Date.now()) / 60000);
+      return res.status(429).json({
+        error: `Demasiados intentos fallidos. Intentá nuevamente en ${minsLeft} minuto${minsLeft !== 1 ? 's' : ''}.`
+      });
+    }
+
+    const user = await db.getUsuarioByEmail(email.trim());
+    const valid = user && await bcrypt.compare(password, user.password);
+
+    if (!valid) {
+      record.count += 1;
+      if (record.count >= MAX_ATTEMPTS) {
+        record.lockedUntil = Date.now() + LOCKOUT_MS;
+        loginAttempts.set(key, record);
+        return res.status(429).json({
+          error: `Demasiados intentos fallidos. Tu cuenta está bloqueada por 15 minutos.`
+        });
+      }
+      const remaining = MAX_ATTEMPTS - record.count;
+      loginAttempts.set(key, record);
+      return res.status(401).json({
+        error: `Credenciales inválidas. Te ${remaining === 1 ? 'queda' : 'quedan'} ${remaining} intento${remaining !== 1 ? 's' : ''}.`
+      });
+    }
+
+    loginAttempts.delete(key);
 
     const condo     = user.role === 'Super Admin' ? undefined : user.condo;
     const dbData    = await db.getDataForDashboard(condo);

@@ -235,7 +235,7 @@ async function propiedadExists(code, street) {
 function applyPropiedadesFilters(query, { q: search, condo } = {}) {
   let result = query;
   if (condo) result = result.eq('condo', condo);
-  if (search) result = result.or(`code.ilike.%${search}%,street.ilike.%${search}%`);
+  if (search) result = result.or(`code.ilike.%${search}%,street.ilike.%${search}%,owner.ilike.%${search}%`);
   return result;
 }
 
@@ -693,6 +693,12 @@ async function getNotificationPreferencesBatch(usuarioIds) {
   const data = await q(supabase.from('notification_preferences').select('*').in('usuario_id', usuarioIds));
   return (data || []).map(rowToApp);
 }
+async function getUsuariosByIds(ids) {
+  if (!ids.length) return [];
+  const data = await q(supabase.from('usuarios').select('id, name, email').in('id', ids));
+  return (data || []).map(rowToApp);
+}
+
 async function upsertNotificationPreferences(usuarioId, prefs) {
   return rowToApp(await q(
     supabase.from('notification_preferences')
@@ -718,5 +724,6 @@ module.exports = {
   getAreasSociales, createAreaSocial, updateAreaSocial, deleteAreaSocial,
   getReservasAreas, createReservaArea, updateReservaArea, deleteReservaArea,
   saveFcmToken, removeFcmToken, getFcmTokensByUsuario, getFcmTokensByUserIds,
-  getUsuarioIdsByRole, getNotificationPreferences, getNotificationPreferencesBatch, upsertNotificationPreferences,
+  getUsuarioIdsByRole, getUsuariosByIds,
+  getNotificationPreferences, getNotificationPreferencesBatch, upsertNotificationPreferences,
 };

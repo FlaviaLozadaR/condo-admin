@@ -1,4 +1,7 @@
 const db = require('../data/db');
+const mailer = require('./mailer');
+
+const emailKey = (prefKey) => prefKey ? 'email' + prefKey[0].toUpperCase() + prefKey.slice(1) : null;
 
 let messagingInstance = null;
 
@@ -52,12 +55,20 @@ async function sendToTokens(tokens, title, body, data = {}) {
 // Notifica a un usuario específico si tiene la preferencia habilitada
 async function notifyUser(usuarioId, prefKey, title, body, data = {}) {
   try {
-    if (prefKey) {
-      const prefs = await db.getNotificationPreferences(usuarioId);
-      if (prefs && prefs[prefKey] === false) return;
+    const prefs = prefKey ? await db.getNotificationPreferences(usuarioId) : null;
+
+    // Push
+    if (!prefs || prefs[prefKey] !== false) {
+      const tokens = await db.getFcmTokensByUsuario(usuarioId);
+      await sendToTokens(tokens, title, body, data);
     }
-    const tokens = await db.getFcmTokensByUsuario(usuarioId);
-    await sendToTokens(tokens, title, body, data);
+
+    // Email
+    const eKey = emailKey(prefKey);
+    if (eKey && prefs && prefs[eKey] === true) {
+      const user = await db.getUsuarioById(usuarioId);
+      if (user?.email) await mailer.sendNotificationEmail(user.email, user.name, title, body).catch(() => {});
+    }
   } catch (e) {
     console.error('[FCM] notifyUser error:', e.message);
   }
@@ -69,18 +80,29 @@ async function notifyRole(condo, roles, prefKey, title, body, data = {}) {
     const userIds = await db.getUsuarioIdsByRole(condo, roles);
     if (!userIds.length) return;
 
-    let validIds = userIds;
-    if (prefKey) {
-      const prefs = await db.getNotificationPreferencesBatch(userIds);
-      const prefMap = new Map(prefs.map(p => [p.usuarioId, p]));
-      validIds = userIds.filter(id => {
-        const pref = prefMap.get(id);
-        return !pref || pref[prefKey] !== false;
-      });
-    }
+    const prefs = prefKey ? await db.getNotificationPreferencesBatch(userIds) : [];
+    const prefMap = new Map(prefs.map(p => [p.usuarioId, p]));
+    const eKey = emailKey(prefKey);
 
-    const tokens = await db.getFcmTokensByUserIds(validIds);
+    // Push — usuarios con preferencia push habilitada
+    const pushIds = prefKey
+      ? userIds.filter(id => { const p = prefMap.get(id); return !p || p[prefKey] !== false; })
+      : userIds;
+    const tokens = await db.getFcmTokensByUserIds(pushIds);
     await sendToTokens([...new Set(tokens)], title, body, data);
+
+    // Email — usuarios con preferencia email habilitada
+    if (eKey) {
+      const emailIds = userIds.filter(id => prefMap.get(id)?.[eKey] === true);
+      if (emailIds.length) {
+        const users = await db.getUsuariosByIds(emailIds);
+        await Promise.all(
+          users.filter(u => u.email).map(u =>
+            mailer.sendNotificationEmail(u.email, u.name, title, body).catch(() => {})
+          )
+        );
+      }
+    }
   } catch (e) {
     console.error('[FCM] notifyRole error:', e.message);
   }

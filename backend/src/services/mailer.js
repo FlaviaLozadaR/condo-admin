@@ -13,7 +13,7 @@ async function sendViaBrevo({ to, cc, subject, html }) {
       'Accept': 'application/json',
     },
     body: JSON.stringify({
-      sender: { name: 'Condo Admin', email: BREVO_SENDER_EMAIL },
+      sender: { name: 'Sevilla Real', email: BREVO_SENDER_EMAIL },
       to: [{ email: to }],
       cc: cc ? [{ email: cc }] : undefined,
       subject,
@@ -33,12 +33,12 @@ async function sendResetEmail(to, name, token) {
   await sendViaBrevo({
     to,
     cc: to !== BREVO_SENDER_EMAIL ? BREVO_SENDER_EMAIL : undefined,
-    subject: 'Restablecer tu contraseña — Condo Admin',
+    subject: 'Restablecer tu contraseña — Sevilla Real',
     html: `
       <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:2rem;background:#f8fafc;border-radius:12px;">
         <div style="background:#0f172a;border-radius:10px;padding:2rem;">
-          <h2 style="color:#38bdf8;margin:0 0 0.5rem;">Condo Admin</h2>
-          <p style="color:#94a3b8;margin:0 0 1.5rem;font-size:0.85rem;">Sistema de Gestión Condominial</p>
+          <h2 style="color:#38bdf8;margin:0 0 0.5rem;">Sevilla Real</h2>
+          <p style="color:#94a3b8;margin:0 0 1.5rem;font-size:0.85rem;">Condominio Privado</p>
           <h3 style="color:#e2e8f0;margin:0 0 1rem;">Restablecer contraseña</h3>
           <p style="color:#94a3b8;margin:0 0 0.5rem;">Hola <strong style="color:#e2e8f0;">${name}</strong>,</p>
           <p style="color:#94a3b8;margin:0 0 1.5rem;">
@@ -64,12 +64,12 @@ async function sendWelcomeEmail(to, name, password, role) {
   await sendViaBrevo({
     to,
     cc: to !== BREVO_SENDER_EMAIL ? BREVO_SENDER_EMAIL : undefined,
-    subject: 'Bienvenido a Condo Admin — Tus credenciales de acceso',
+    subject: 'Bienvenido a Sevilla Real — Tus credenciales de acceso',
     html: `
       <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:2rem;background:#f8fafc;border-radius:12px;">
         <div style="background:#0f172a;border-radius:10px;padding:2rem;">
-          <h2 style="color:#38bdf8;margin:0 0 0.5rem;">Condo Admin</h2>
-          <p style="color:#94a3b8;margin:0 0 1.5rem;font-size:0.85rem;">Sistema de Gestión Condominial</p>
+          <h2 style="color:#38bdf8;margin:0 0 0.5rem;">Sevilla Real</h2>
+          <p style="color:#94a3b8;margin:0 0 1.5rem;font-size:0.85rem;">Condominio Privado</p>
           <h3 style="color:#e2e8f0;margin:0 0 1rem;">¡Hola, ${name}!</h3>
           <p style="color:#94a3b8;margin:0 0 1.5rem;">
             Tu cuenta fue creada con el rol de <strong style="color:#38bdf8;">${role}</strong>.
@@ -94,4 +94,30 @@ async function sendWelcomeEmail(to, name, password, role) {
   });
 }
 
-module.exports = { sendResetEmail, sendWelcomeEmail };
+async function sendNotificationEmail(to, name, subject, body) {
+  if (!BREVO_API_KEY || !BREVO_SENDER_EMAIL) return;
+  const appUrl = process.env.FRONTEND_URL || 'https://condo-admin-psi.vercel.app';
+  await sendViaBrevo({
+    to,
+    subject: `${subject} — Sevilla Real`,
+    html: `
+      <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:2rem;background:#f8fafc;border-radius:12px;">
+        <div style="background:#0f172a;border-radius:10px;padding:2rem;">
+          <h2 style="color:#5b5cff;margin:0 0 0.5rem;">Sevilla Real</h2>
+          <p style="color:#94a3b8;margin:0 0 1.5rem;font-size:0.85rem;">Condominio Privado</p>
+          <p style="color:#94a3b8;margin:0 0 0.5rem;">Hola <strong style="color:#e2e8f0;">${name}</strong>,</p>
+          <p style="color:#e2e8f0;margin:0 0 1.5rem;font-size:1rem;line-height:1.6;">${body}</p>
+          <a href="${appUrl}" style="display:inline-block;padding:0.75rem 1.75rem;background:#5b5cff;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.95rem;">
+            Ver en la app
+          </a>
+          <p style="color:#475569;font-size:0.75rem;margin:1.5rem 0 0;">
+            Recibís este email porque tenés las notificaciones por email activadas en la app Sevilla Real.
+            Podés desactivarlas desde Mi Perfil → Notificaciones.
+          </p>
+        </div>
+      </div>
+    `,
+  });
+}
+
+module.exports = { sendResetEmail, sendWelcomeEmail, sendNotificationEmail };
