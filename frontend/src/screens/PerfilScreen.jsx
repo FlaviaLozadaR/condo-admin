@@ -31,6 +31,48 @@ export default function PerfilScreen({
   });
   const [webPushLoading, setWebPushLoading] = useState(false);
 
+  const [biometricEnabled, setBiometricEnabled] = useState(
+    localStorage.getItem('biometric_enabled') === 'true'
+  );
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricMsg, setBiometricMsg] = useState("");
+
+  useEffect(() => {
+    const checkBiometric = async () => {
+      try {
+        const { Capacitor } = await import('@capacitor/core');
+        if (!Capacitor.isNativePlatform()) return;
+        const { NativeBiometric } = await import('capacitor-native-biometric');
+        const { isAvailable } = await NativeBiometric.isAvailable();
+        setBiometricAvailable(isAvailable);
+      } catch { }
+    };
+    checkBiometric();
+  }, []);
+
+  const handleToggleBiometric = async () => {
+    setBiometricMsg("");
+    try {
+      const { NativeBiometric } = await import('capacitor-native-biometric');
+      if (!biometricEnabled) {
+        await NativeBiometric.verifyIdentity({
+          reason: 'Confirmá tu identidad para activar la biometría',
+          title: 'Activar biometría',
+          subtitle: 'Usá tu huella o Face ID',
+          negativeButtonText: 'Cancelar',
+        });
+        localStorage.setItem('biometric_enabled', 'true');
+        setBiometricEnabled(true);
+        setBiometricMsg("Biometría activada.");
+      } else {
+        localStorage.removeItem('biometric_enabled');
+        setBiometricEnabled(false);
+        setBiometricMsg("Biometría desactivada.");
+      }
+      setTimeout(() => setBiometricMsg(""), 2500);
+    } catch { setBiometricMsg("Cancelado o no disponible."); setTimeout(() => setBiometricMsg(""), 2500); }
+  };
+
   useEffect(() => {
     api.getNotificationPreferences().then(p => { if (p) setNotifPrefs({ ...DEFAULT_PREFS, ...p }); }).catch(() => {});
   }, []);
@@ -241,6 +283,34 @@ export default function PerfilScreen({
           ))}
           {notifMsg && <p className={`perfil-msg${notifMsg.includes("Error") ? " perfil-msg-error" : " perfil-msg-ok"}`}>{notifMsg}</p>}
         </div>
+
+        {/* Biometría */}
+        {biometricAvailable && (
+          <div className="perfil-form-card">
+            <h3 className="perfil-form-title">Seguridad</h3>
+            <div className="perfil-appearance-row">
+              <div className="perfil-appearance-info">
+                <span className="perfil-appearance-label">Face ID / Huella digital</span>
+                <span className="perfil-appearance-desc">
+                  {biometricEnabled ? "Se pedirá al abrir la app" : "Activá para proteger tu cuenta"}
+                </span>
+              </div>
+              <button
+                type="button"
+                className={`perfil-theme-toggle${biometricEnabled ? " perfil-theme-toggle-dark" : ""}`}
+                onClick={handleToggleBiometric}
+                aria-label={biometricEnabled ? "Desactivar biometría" : "Activar biometría"}
+              >
+                <span className="perfil-theme-toggle-knob" />
+              </button>
+            </div>
+            {biometricMsg && (
+              <p className={`perfil-msg${biometricMsg.includes("desactivada") || biometricMsg.includes("Cancelado") ? " perfil-msg-error" : " perfil-msg-ok"}`}>
+                {biometricMsg}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Apariencia */}
         <div className="perfil-form-card">

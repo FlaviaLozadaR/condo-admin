@@ -3189,7 +3189,32 @@ export default function App() {
   useEffect(() => {
     if (screen !== "loading") return;
     api.getMe()
-      .then(data => { setSessionUser(data.user); setScreen("dashboard"); })
+      .then(async (data) => {
+        const biometricEnabled = localStorage.getItem('biometric_enabled') === 'true';
+        if (biometricEnabled) {
+          try {
+            const { Capacitor } = await import('@capacitor/core');
+            if (Capacitor.isNativePlatform()) {
+              const { NativeBiometric } = await import('capacitor-native-biometric');
+              const { isAvailable } = await NativeBiometric.isAvailable();
+              if (isAvailable) {
+                await NativeBiometric.verifyIdentity({
+                  reason: 'Verificá tu identidad para acceder',
+                  title: 'Condo Admin',
+                  subtitle: 'Usá tu huella o Face ID',
+                  negativeButtonText: 'Usar contraseña',
+                });
+              }
+            }
+          } catch {
+            api.logout();
+            setScreen("login");
+            return;
+          }
+        }
+        setSessionUser(data.user);
+        setScreen("dashboard");
+      })
       .catch(() => { api.logout(); setScreen("login"); });
   }, []);
 
