@@ -4,11 +4,11 @@ const AnuncioDTO = require('../dto/anuncioDto');
 const fcm = require('../services/fcm');
 
 const TARGET_ROLES = {
-  'Todos':            ['Propietario', 'Inquilino', 'Seguridad', 'Administrador'],
+  'Todos':            ['Propietario', 'Inquilino', 'Seguridad', 'Administrador', 'Super Admin'],
   'Propietarios':     ['Propietario'],
   'Inquilinos':       ['Inquilino'],
   'Seguridad':        ['Seguridad'],
-  'Administradores':  ['Administrador'],
+  'Administradores':  ['Administrador', 'Super Admin'],
 };
 
 async function getAll(req, res) {
