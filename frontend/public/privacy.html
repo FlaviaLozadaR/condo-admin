@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Política de Privacidad — Condo Admin</title>
+<style>
+  :root {
+    --bg:           #F7F8FC;
+    --bg-section:   #EEF2FF;
+    --surface:      #FFFFFF;
+    --text-primary: #1A1F2E;
+    --text-secondary: #6B7490;
+    --text-muted:   #9AA3BF;
+    --accent:       #2D6BE4;
+    --accent-dim:   #1A4DB8;
+    --border:       #E2E6F0;
+    --shadow:       0 1px 4px rgba(45,107,228,0.07);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:           #11151E;
+      --bg-section:   #1A2340;
+      --surface:      #181D2B;
+      --text-primary: #E8ECF4;
+      --text-secondary: #8A94B4;
+      --text-muted:   #4A5270;
+      --accent:       #5B8EF0;
+      --accent-dim:   #3D6CD4;
+      --border:       #252D45;
+      --shadow:       0 1px 4px rgba(0,0,0,0.3);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg:           #11151E;
+    --bg-section:   #1A2340;
+    --surface:      #181D2B;
+    --text-primary: #E8ECF4;
+    --text-secondary: #8A94B4;
+    --text-muted:   #4A5270;
+    --accent:       #5B8EF0;
+    --accent-dim:   #3D6CD4;
+    --border:       #252D45;
+    --shadow:       0 1px 4px rgba(0,0,0,0.3);
+  }
+
+  :root[data-theme="light"] {
+    --bg:           #F7F8FC;
+    --bg-section:   #EEF2FF;
+    --surface:      #FFFFFF;
+    --text-primary: #1A1F2E;
+    --text-secondary: #6B7490;
+    --text-muted:   #9AA3BF;
+    --accent:       #2D6BE4;
+    --accent-dim:   #1A4DB8;
+    --border:       #E2E6F0;
+    --shadow:       0 1px 4px rgba(45,107,228,0.07);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    padding: 2rem 1rem 4rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrapper {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .page-header {
+    padding: 2.5rem 0 2rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2.5rem;
+  }
+
+  .app-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1rem;
+  }
+
+  .app-badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+
+  h1 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: clamp(1.75rem, 4vw, 2.4rem);
+    font-weight: normal;
+    color: var(--text-primary);
+    line-height: 1.25;
+    text-wrap: balance;
+    margin-bottom: 0.75rem;
+  }
+
+  .meta {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+  }
+
+  .meta strong {
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  /* Intro */
+  .intro {
+    background: var(--bg-section);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 1rem 1.25rem;
+    margin-bottom: 2.5rem;
+    font-size: 0.925rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  /* Sections */
+  .section {
+    margin-bottom: 2.25rem;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 0.875rem;
+  }
+
+  .section-num {
+    font-family: Georgia, serif;
+    font-size: 0.8rem;
+    color: var(--accent);
+    font-weight: normal;
+    min-width: 1.5rem;
+    flex-shrink: 0;
+    padding-top: 0.1em;
+  }
+
+  h2 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 1.15rem;
+    font-weight: normal;
+    color: var(--text-primary);
+    text-wrap: balance;
+  }
+
+  .section-body {
+    padding-left: 2.25rem;
+  }
+
+  p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    margin-bottom: 0.75rem;
+  }
+
+  p:last-child { margin-bottom: 0; }
+
+  ul {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0;
+  }
+
+  ul li {
+    position: relative;
+    padding-left: 1.25rem;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    margin-bottom: 0.4rem;
+  }
+
+  ul li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.65em;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.6;
+  }
+
+  strong {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .highlight-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-top: 0.75rem;
+    box-shadow: var(--shadow);
+  }
+
+  .highlight-box p {
+    margin-bottom: 0.4rem;
+    font-size: 0.9rem;
+  }
+
+  /* Divider */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+  }
+
+  /* Footer */
+  .page-footer {
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2.5rem;
+  }
+
+  .footer-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+  }
+
+  .contact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .contact-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.875rem 1rem;
+    box-shadow: var(--shadow);
+  }
+
+  .contact-item-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.2rem;
+  }
+
+  .contact-item-value {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    font-weight: 500;
+    word-break: break-all;
+  }
+
+  .contact-item-value a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .contact-item-value a:hover {
+    text-decoration: underline;
+  }
+
+  .footer-note {
+    margin-top: 1.5rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  @media (max-width: 480px) {
+    .section-body { padding-left: 0; }
+    .section-header { flex-direction: column; gap: 0.2rem; }
+    .section-num { font-size: 0.7rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header class="page-header">
+    <div class="app-badge">
+      <span class="app-badge-dot"></span>
+      Condo Admin · Ignitel
+    </div>
+    <h1>Política de Privacidad</h1>
+    <p class="meta">Última actualización: <strong>5 de agosto de 2026</strong></p>
+  </header>
+
+  <div class="intro">
+    Esta política describe cómo Ignitel recopila, usa y protege la información personal de los usuarios de Condo Admin. Al usar la aplicación, usted acepta las prácticas descritas a continuación.
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">1.</span>
+      <h2>Información que recopilamos</h2>
+    </div>
+    <div class="section-body">
+      <p>Recopilamos la información que usted nos proporciona al registrarse y usar la aplicación:</p>
+      <ul>
+        <li><strong>Datos personales:</strong> nombre completo, correo electrónico, número de teléfono</li>
+        <li><strong>Información de propiedad:</strong> número de unidad y condominio al que pertenece</li>
+        <li><strong>Comprobantes de pago:</strong> imágenes de comprobantes de expensas y otros conceptos</li>
+        <li><strong>Registro de visitas:</strong> nombre, documento de identidad y fotografías de visitantes</li>
+        <li><strong>Tokens de dispositivo:</strong> identificadores técnicos para el envío de notificaciones push</li>
+        <li><strong>Preferencias:</strong> configuración de notificaciones y apariencia de la app</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">2.</span>
+      <h2>Cómo usamos la información</h2>
+    </div>
+    <div class="section-body">
+      <p>Utilizamos la información recopilada exclusivamente para operar el servicio:</p>
+      <ul>
+        <li>Gestionar su cuenta y verificar su identidad</li>
+        <li>Registrar y procesar pagos de expensas y otros conceptos</li>
+        <li>Enviar notificaciones sobre su condominio (alertas, anuncios, aprobaciones)</li>
+        <li>Gestionar el registro de visitas y control de acceso</li>
+        <li>Permitir la reserva de áreas comunes</li>
+        <li>Brindar soporte y mejorar la aplicación</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">3.</span>
+      <h2>Cómo compartimos la información</h2>
+    </div>
+    <div class="section-body">
+      <p>No vendemos ni alquilamos su información personal. Compartimos datos únicamente con los proveedores necesarios para operar el servicio:</p>
+      <ul>
+        <li><strong>Supabase</strong> — base de datos y almacenamiento de archivos</li>
+        <li><strong>Firebase (Google)</strong> — envío de notificaciones push</li>
+        <li><strong>Vercel / Render</strong> — alojamiento de la aplicación web y backend</li>
+      </ul>
+      <p>También podemos divulgar información cuando sea requerido por la ley o autoridades competentes.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">4.</span>
+      <h2>Notificaciones push</h2>
+    </div>
+    <div class="section-body">
+      <p>Con su consentimiento explícito, enviamos notificaciones push para informarle sobre eventos relevantes en su condominio. Puede desactivarlas en cualquier momento desde:</p>
+      <ul>
+        <li><strong>Dentro de la app:</strong> Mi Perfil → Notificaciones</li>
+        <li><strong>En su dispositivo:</strong> Configuración → Notificaciones → Condo Admin</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">5.</span>
+      <h2>Almacenamiento y seguridad</h2>
+    </div>
+    <div class="section-body">
+      <p>Sus datos se almacenan en servidores seguros de Supabase. Implementamos medidas de seguridad que incluyen cifrado en tránsito (HTTPS) y autenticación mediante tokens seguros. Sin embargo, ningún sistema es completamente infalible y no podemos garantizar seguridad absoluta.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">6.</span>
+      <h2>Retención de datos</h2>
+    </div>
+    <div class="section-body">
+      <p>Conservamos su información mientras su cuenta esté activa o sea necesaria para prestar el servicio. Si desea eliminar su cuenta y sus datos asociados, puede solicitarlo al administrador de su condominio o contactándonos directamente.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">7.</span>
+      <h2>Sus derechos</h2>
+    </div>
+    <div class="section-body">
+      <p>Usted tiene derecho a:</p>
+      <ul>
+        <li>Acceder a la información personal que tenemos sobre usted</li>
+        <li>Solicitar la corrección de datos inexactos o incompletos</li>
+        <li>Solicitar la eliminación de sus datos personales</li>
+        <li>Desactivar las notificaciones push en cualquier momento</li>
+        <li>Revocar su consentimiento para el procesamiento de sus datos</li>
+      </ul>
+      <p>Para ejercer estos derechos, contáctenos al correo indicado más abajo.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">8.</span>
+      <h2>Cambios a esta política</h2>
+    </div>
+    <div class="section-body">
+      <p>Podemos actualizar esta política periódicamente. Notificaremos cambios significativos mediante un aviso en la aplicación o por correo electrónico. El uso continuado de la aplicación tras dichos cambios constituye su aceptación de la política actualizada.</p>
+    </div>
+  </div>
+
+  <footer class="page-footer">
+    <div class="footer-label">Contacto</div>
+    <div class="contact-grid">
+      <div class="contact-item">
+        <div class="contact-item-label">Empresa</div>
+        <div class="contact-item-value">Ignitel</div>
+      </div>
+      <div class="contact-item">
+        <div class="contact-item-label">Correo electrónico</div>
+        <div class="contact-item-value">
+          <a href="mailto:flavialozadar@gmail.com">flavialozadar@gmail.com</a>
+        </div>
+      </div>
+      <div class="contact-item">
+        <div class="contact-item-label">País de operación</div>
+        <div class="contact-item-value">Bolivia</div>
+      </div>
+    </div>
+    <p class="footer-note">© 2026 Ignitel. Todos los derechos reservados.</p>
+  </footer>
+
+</div>
+</body>
+</html>
