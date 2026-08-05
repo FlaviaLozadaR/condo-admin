@@ -1,6 +1,15 @@
 const { v4: uuid } = require('uuid');
 const db  = require('../data/db');
 const AnuncioDTO = require('../dto/anuncioDto');
+const fcm = require('../services/fcm');
+
+const TARGET_ROLES = {
+  'Todos':            ['Propietario', 'Inquilino', 'Seguridad', 'Administrador'],
+  'Propietarios':     ['Propietario'],
+  'Inquilinos':       ['Inquilino'],
+  'Seguridad':        ['Seguridad'],
+  'Administradores':  ['Administrador'],
+};
 
 async function getAll(req, res) {
   try {
@@ -28,6 +37,15 @@ async function create(req, res) {
     if (req.user.role !== 'Super Admin') data.condo = req.user.condo;
     data.createdByRole = req.user.role;
     const nuevo = await db.createAnuncio({ id: uuid(), ...data });
+
+    // Notificar a los roles que corresponden según el target del anuncio
+    const roles = TARGET_ROLES[nuevo.target] || TARGET_ROLES['Todos'];
+    fcm.notifyRole(nuevo.condo, roles, 'announcement',
+      'Nuevo anuncio',
+      nuevo.title || 'Hay un nuevo anuncio en tu condominio',
+      { type: 'announcement', anuncioId: nuevo.id }
+    ).catch(() => {});
+
     res.status(201).json(AnuncioDTO.toResponse(nuevo));
   } catch (e) { res.status(400).json({ error: e.message }); }
 }

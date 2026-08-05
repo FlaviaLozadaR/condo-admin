@@ -1,6 +1,7 @@
 const { v4: uuid } = require('uuid');
 const db  = require('../data/db');
 const PanicDTO = require('../dto/panicDto');
+const fcm = require('../services/fcm');
 
 async function getAll(req, res) {
   try {
@@ -15,6 +16,14 @@ async function create(req, res) {
   try {
     const data  = PanicDTO.fromRequest(req.body, req.user.condo);
     const nuevo = await db.createPanicAlert({ id: uuid(), ...data });
+
+    // Notificar al personal de Seguridad del condo
+    fcm.notifyRole(nuevo.condo, ['Seguridad'], 'panic',
+      '🚨 Alerta de pánico',
+      `${nuevo.name || 'Un residente'} activó el botón de pánico`,
+      { type: 'panic', alertId: nuevo.id }
+    ).catch(() => {});
+
     res.status(201).json(PanicDTO.toResponse(nuevo));
   } catch (e) { res.status(400).json({ error: e.message }); }
 }

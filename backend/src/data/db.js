@@ -658,6 +658,49 @@ async function getDataForDashboard(condo) {
   return { propiedades, pagos, visitas, historialVisitas, panicAlerts };
 }
 
+// FCM TOKENS
+async function saveFcmToken(usuarioId, token, platform = 'android') {
+  await q(supabase.from('fcm_tokens').upsert({ usuario_id: usuarioId, token, platform }, { onConflict: 'usuario_id,token' }));
+}
+async function removeFcmToken(token) {
+  await q(supabase.from('fcm_tokens').delete().eq('token', token));
+}
+async function getFcmTokensByUsuario(usuarioId) {
+  const data = await q(supabase.from('fcm_tokens').select('token').eq('usuario_id', usuarioId));
+  return (data || []).map(r => r.token);
+}
+async function getFcmTokensByUserIds(usuarioIds) {
+  if (!usuarioIds.length) return [];
+  const data = await q(supabase.from('fcm_tokens').select('token').in('usuario_id', usuarioIds));
+  return (data || []).map(r => r.token);
+}
+async function getUsuarioIdsByRole(condo, roles) {
+  let query = supabase.from('usuarios').select('id').in('role', roles);
+  if (condo) query = query.eq('condo', condo);
+  const data = await q(query);
+  return (data || []).map(u => u.id);
+}
+
+// NOTIFICATION PREFERENCES
+async function getNotificationPreferences(usuarioId) {
+  const { data, error } = await supabase.from('notification_preferences').select('*').eq('usuario_id', usuarioId).single();
+  if (error?.code === 'PGRST116') return null;
+  if (error) throw error;
+  return rowToApp(data);
+}
+async function getNotificationPreferencesBatch(usuarioIds) {
+  if (!usuarioIds.length) return [];
+  const data = await q(supabase.from('notification_preferences').select('*').in('usuario_id', usuarioIds));
+  return (data || []).map(rowToApp);
+}
+async function upsertNotificationPreferences(usuarioId, prefs) {
+  return rowToApp(await q(
+    supabase.from('notification_preferences')
+      .upsert({ usuario_id: usuarioId, ...appToRow(prefs) }, { onConflict: 'usuario_id' })
+      .select().single()
+  ));
+}
+
 module.exports = {
   getUsuarios, getUsuarioById, getUsuarioByEmail, createUsuario, updateUsuario, deleteUsuario, getUsuariosPaged, getSeguridadContacts,
   getCondominios, createCondominio, updateCondominio, deleteCondominio,
@@ -674,4 +717,6 @@ module.exports = {
   getDataForDashboard,
   getAreasSociales, createAreaSocial, updateAreaSocial, deleteAreaSocial,
   getReservasAreas, createReservaArea, updateReservaArea, deleteReservaArea,
+  saveFcmToken, removeFcmToken, getFcmTokensByUsuario, getFcmTokensByUserIds,
+  getUsuarioIdsByRole, getNotificationPreferences, getNotificationPreferencesBatch, upsertNotificationPreferences,
 };

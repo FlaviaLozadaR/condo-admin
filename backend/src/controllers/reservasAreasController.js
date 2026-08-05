@@ -1,5 +1,6 @@
 const { v4: uuid } = require('uuid');
 const db = require('../data/db');
+const fcm = require('../services/fcm');
 
 function horariosConflictan(ini1, fin1, ini2, fin2) {
   return !(fin1 <= ini2 || ini1 >= fin2);
@@ -71,6 +72,14 @@ async function create(req, res) {
       nota:           nota || '',
       solicitudCambio: null,
     });
+
+    // Notificar a Administradores del condo que hay una reserva pendiente
+    fcm.notifyRole(nueva.condo, ['Administrador', 'Super Admin'], 'reservationRequested',
+      'Nueva solicitud de reserva',
+      `${nueva.propietario} solicitó reservar ${nueva.areaNombre} el ${nueva.fecha}`,
+      { type: 'reservation_requested', reservaId: nueva.id }
+    ).catch(() => {});
+
     res.status(201).json(nueva);
   } catch (e) { res.status(400).json({ error: e.message }); }
 }
@@ -97,6 +106,16 @@ async function updateEstado(req, res) {
       estado,
       ...(nota !== undefined && { nota }),
     });
+
+    // Notificar al propietario si su reserva fue aprobada
+    if (estado === 'aprobada' && reserva.propietario && reserva.condo) {
+      fcm.notifyUserByName(reserva.propietario, reserva.condo, 'reservationApproved',
+        'Reserva aprobada',
+        `Tu reserva de ${reserva.areaNombre} el ${reserva.fecha} fue aprobada`,
+        { type: 'reservation_approved', reservaId: id }
+      ).catch(() => {});
+    }
+
     res.json(updated);
   } catch (e) { res.status(400).json({ error: e.message }); }
 }

@@ -211,3 +211,9 @@ export const cobrarReservaArea = (id) => request(`/reservas-areas/${id}/cobrar`,
 export const solicitarCambioReserva = (id, data) => request(`/reservas-areas/${id}/solicitar-cambio`, { method: 'POST', body: data });
 export const responderCambioReserva = (id, aprobado) => request(`/reservas-areas/${id}/responder-cambio`, { method: 'PATCH', body: { aprobado } });
 export const deleteReservaArea = (id) => request(`/reservas-areas/${id}`, { method: 'DELETE' });
+
+// Notificaciones push
+export const registerFcmToken = (token, platform) => request('/notifications/token', { method: 'POST', body: { token, platform } });
+export const removeFcmToken   = (token) => request('/notifications/token', { method: 'DELETE', body: { token } });
+export const getNotificationPreferences = () => request('/notifications/preferences');
+export const updateNotificationPreferences = (prefs) => request('/notifications/preferences', { method: 'PUT', body: prefs });

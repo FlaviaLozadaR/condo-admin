@@ -388,6 +388,31 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
     }
   };
 
+  // Registro de push notifications (solo en Android via Capacitor)
+  useEffect(() => {
+    const registerPush = async () => {
+      try {
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        const { Capacitor } = await import('@capacitor/core');
+        if (!Capacitor.isNativePlatform()) return;
+
+        const permResult = await PushNotifications.requestPermissions();
+        if (permResult.receive !== 'granted') return;
+
+        await PushNotifications.register();
+
+        PushNotifications.addListener('registration', async (token) => {
+          try { await api.registerFcmToken(token.value, 'android'); } catch { /* ignorar */ }
+        });
+
+        PushNotifications.addListener('pushNotificationReceived', (notification) => {
+          addToast(notification.body || notification.title || 'Nueva notificación', 'info');
+        });
+      } catch { /* web o error de importación, ignorar */ }
+    };
+    registerPush();
+  }, []);
+
   // Polling en tiempo real cada 30 segundos
   useEffect(() => {
     const poll = async () => {

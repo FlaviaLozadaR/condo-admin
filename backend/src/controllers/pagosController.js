@@ -4,6 +4,7 @@ const { v4: uuid } = require('uuid');
 const db      = require('../data/db');
 const PagoDTO = require('../dto/pagoDto');
 const { uploadPrivateFile, getSignedUrl } = require('../services/supabase');
+const fcm = require('../services/fcm');
 
 // El comprobante se guarda como nombre de archivo (bucket privado) — al
 // devolver el pago al cliente se reemplaza por un link firmado, válido 10 minutos.
@@ -77,6 +78,14 @@ async function create(req, res) {
       createdByRole: req.user?.role || '',
       condo:         req.user?.condo || '',
     });
+
+    // Notificar a Administradores y Super Admin del condo que llegó un pago
+    fcm.notifyRole(nuevo.condo, ['Administrador', 'Super Admin'], 'paymentSubmitted',
+      'Nuevo comprobante de pago',
+      `${nuevo.propietario} envió un comprobante de pago`,
+      { type: 'payment_submitted', pagoId: nuevo.id }
+    ).catch(() => {});
+
     res.status(201).json(await withSignedComprobante(PagoDTO.toResponse(nuevo)));
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -149,6 +158,15 @@ async function updateStatus(req, res) {
           notaCargo: notaSaldo || `Saldo pendiente de pago del ${new Date().toLocaleDateString('es-BO')}`,
         }).catch(() => {});
       }
+    }
+
+    // Notificar al propietario si su pago fue aprobado
+    if (estado === 'aprobado' && updated.propietario && updated.condo) {
+      fcm.notifyUserByName(updated.propietario, updated.condo, 'paymentApproved',
+        'Pago aprobado',
+        `Tu pago de ${updated.tipo || 'expensa'} fue aprobado`,
+        { type: 'payment_approved', pagoId: updated.id }
+      ).catch(() => {});
     }
 
     res.json({ ...(await withSignedComprobante(PagoDTO.toResponse(updated))), propiedadActualizada });

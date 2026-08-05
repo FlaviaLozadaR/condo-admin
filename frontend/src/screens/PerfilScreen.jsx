@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import * as api from "../api.js";
 import { onEnterKey } from "../utils/keyboard.js";
 
@@ -19,6 +19,27 @@ export default function PerfilScreen({
   const [pwForm, setPwForm]   = useState({ current: "", next: "", confirm: "" });
   const [pwMsg,  setPwMsg]    = useState("");
   const [pwSaving, setPwSaving] = useState(false);
+
+  const DEFAULT_PREFS = { paymentApproved: true, paymentSubmitted: true, announcement: true, panic: true, reservationApproved: true, reservationRequested: true };
+  const [notifPrefs, setNotifPrefs] = useState(DEFAULT_PREFS);
+  const [notifSaving, setNotifSaving] = useState(false);
+  const [notifMsg, setNotifMsg] = useState("");
+
+  useEffect(() => {
+    api.getNotificationPreferences().then(p => { if (p) setNotifPrefs({ ...DEFAULT_PREFS, ...p }); }).catch(() => {});
+  }, []);
+
+  const handleTogglePref = async (key) => {
+    const updated = { ...notifPrefs, [key]: !notifPrefs[key] };
+    setNotifPrefs(updated);
+    setNotifSaving(true);
+    try {
+      await api.updateNotificationPreferences(updated);
+      setNotifMsg("Preferencias guardadas.");
+      setTimeout(() => setNotifMsg(""), 2000);
+    } catch { setNotifMsg("Error al guardar."); }
+    finally { setNotifSaving(false); }
+  };
 
   const handleProfilePhotoChange = (e) => {
     const file = e.target.files?.[0];
@@ -152,6 +173,39 @@ export default function PerfilScreen({
               {pwSaving ? "Guardando…" : "Cambiar contraseña"}
             </button>
           </div>
+        </div>
+
+        {/* Notificaciones push */}
+        <div className="perfil-form-card">
+          <h3 className="perfil-form-title">Notificaciones</h3>
+          <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginBottom: "1rem" }}>
+            Elegí qué avisos querés recibir en tu celular.
+          </p>
+          {[
+            { key: "paymentApproved",     label: "Pago aprobado",               desc: "Cuando aprueban tu comprobante" },
+            { key: "paymentSubmitted",     label: "Nuevo comprobante recibido",   desc: "Cuando un residente envía un pago" },
+            { key: "announcement",         label: "Nuevos anuncios",              desc: "Cuando se publica un anuncio" },
+            { key: "panic",                label: "Alerta de pánico",             desc: "Cuando alguien activa el botón de emergencia" },
+            { key: "reservationApproved",  label: "Reserva aprobada",            desc: "Cuando aprueban tu reserva de área" },
+            { key: "reservationRequested", label: "Nueva solicitud de reserva",   desc: "Cuando un residente solicita una reserva" },
+          ].map(({ key, label, desc }) => (
+            <div key={key} className="perfil-appearance-row" style={{ marginBottom: "0.75rem" }}>
+              <div className="perfil-appearance-info">
+                <span className="perfil-appearance-label">{label}</span>
+                <span className="perfil-appearance-desc">{desc}</span>
+              </div>
+              <button
+                type="button"
+                className={`perfil-theme-toggle${notifPrefs[key] ? " perfil-theme-toggle-dark" : ""}`}
+                onClick={() => handleTogglePref(key)}
+                disabled={notifSaving}
+                aria-label={notifPrefs[key] ? "Desactivar" : "Activar"}
+              >
+                <span className="perfil-theme-toggle-knob" />
+              </button>
+            </div>
+          ))}
+          {notifMsg && <p className={`perfil-msg${notifMsg.includes("Error") ? " perfil-msg-error" : " perfil-msg-ok"}`}>{notifMsg}</p>}
         </div>
 
         {/* Apariencia */}
