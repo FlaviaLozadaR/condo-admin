@@ -2,6 +2,7 @@ const router      = require('express').Router();
 const rateLimit   = require('express-rate-limit');
 const ctrl        = require('../controllers/authController');
 const { requireAuth } = require('../middleware/auth');
+const { sanitizeBody } = require('../middleware/sanitize');
 
 const authLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
@@ -44,7 +45,7 @@ const authLimiter = rateLimit({
  *       401: { description: Credenciales inválidas, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  *       429: { description: Demasiados intentos (rate limit) }
  */
-router.post('/login',           authLimiter, ctrl.login);
+router.post('/login',           authLimiter, sanitizeBody({ email: 255, password: 128 }), ctrl.login);
 
 /**
  * @swagger
@@ -69,7 +70,7 @@ router.post('/login',           authLimiter, ctrl.login);
  *         content: { application/json: { schema: { $ref: '#/components/schemas/Ok' } } }
  *       429: { description: Demasiados intentos (rate limit) }
  */
-router.post('/forgot-password', authLimiter, ctrl.forgotPassword);
+router.post('/forgot-password', authLimiter, sanitizeBody({ email: 255 }), ctrl.forgotPassword);
 
 /**
  * @swagger
@@ -93,7 +94,7 @@ router.post('/forgot-password', authLimiter, ctrl.forgotPassword);
  *       400: { description: Token inválido, expirado, o password muy corta, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  *       429: { description: Demasiados intentos (rate limit) }
  */
-router.post('/reset-password',  authLimiter, ctrl.resetPassword);
+router.post('/reset-password',  authLimiter, sanitizeBody({ token: 500, password: 128 }), ctrl.resetPassword);
 router.get('/me',               requireAuth, ctrl.me);
 
 module.exports = router;

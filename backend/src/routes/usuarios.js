@@ -1,6 +1,9 @@
 const router = require('express').Router();
 const ctrl   = require('../controllers/usuariosController');
 const { requireAuth, requireRole, requireSelfOrAdmin } = require('../middleware/auth');
+const { sanitizeBody } = require('../middleware/sanitize');
+
+const userSanitize = sanitizeBody({ name: 100, email: 255, phone: 30, password: 128, property: 200, condo: 100, role: 50 });
 
 const ADMIN = ['Super Admin', 'Administrador'];
 
@@ -59,7 +62,7 @@ router.get('/seguridad',              requireAuth, ctrl.getSeguridad);
  *       409: { description: Ya existe un usuario con ese email, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  */
 router.get('/',                      requireAuth, requireRole(...ADMIN), ctrl.getAll);
-router.post('/',                     requireAuth, requireRole(...ADMIN), ctrl.create);
+router.post('/',                     requireAuth, requireRole(...ADMIN), userSanitize, ctrl.create);
 
 /**
  * @swagger
@@ -96,7 +99,7 @@ router.post('/',                     requireAuth, requireRole(...ADMIN), ctrl.cr
  *       200: { description: Eliminado, content: { application/json: { schema: { $ref: '#/components/schemas/Ok' } } } }
  *       403: { $ref: '#/components/responses/Forbidden' }
  */
-router.put('/:id',                   requireAuth, requireSelfOrAdmin,    ctrl.update);
+router.put('/:id',                   requireAuth, requireSelfOrAdmin,    userSanitize, ctrl.update);
 
 /**
  * @swagger

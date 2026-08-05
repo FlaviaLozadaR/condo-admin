@@ -3,6 +3,7 @@ import * as api from "./api.js";
 import { onUnauthorized } from "./api.js";
 import { supabase } from "./supabase.js";
 import Landing from "./components/Landing.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import Login from "./components/Login.jsx";
 import QrScannerScreen from "./components/QrScanner.jsx";
 import HistorialVisitasScreen from "./screens/HistorialVisitasScreen.jsx";
@@ -29,11 +30,12 @@ const PHONE_PREFIX = "+591";
 const stripPhonePrefix = (phone) => (phone || "").replace(/^\+591[\s-]*/, "");
 const MAX_AREA_IMAGES = 6;
 
-function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: toggleDarkMode, sessionWarning, onDismissSessionWarning }) {
+function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: toggleDarkMode, sessionWarning, onDismissSessionWarning, isOnline = true }) {
   const PANIC_ALERTS_STORAGE_KEY = "ignitel_panic_alerts";
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [activeSection, setActiveSection] = useState(
     user.role === "Propietario" || user.role === "Inquilino"
       ? "Inicio"
@@ -443,7 +445,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
     isEditAnuncioModalOpen || isCreateAsambleaModalOpen || isCreateCondoModalOpen ||
     isEditCondoModalOpen || isCreatePropertyModalOpen || isEditPropertyModalOpen ||
     isCreateUserModalOpen || isCreateAreaModalOpen || isEditUserModalOpen ||
-    isEditAsambleaModalOpen;
+    isEditAsambleaModalOpen || isLogoutConfirmOpen;
 
   useEffect(() => {
     if (!anyModalOpen) return;
@@ -1533,6 +1535,22 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
         </span>
       </header>
 
+      {/* Banner sin conexión */}
+      {!isOnline && (
+        <div className="offline-banner" role="alert">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="1" y1="1" x2="23" y2="23"/>
+            <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+            <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+            <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
+            <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+            <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+            <line x1="12" y1="20" x2="12.01" y2="20"/>
+          </svg>
+          Sin conexión a internet — los cambios no se guardarán hasta que se restablezca.
+        </div>
+      )}
+
       {/* Banner de sesión por vencer */}
       {sessionWarning && (
         <div style={{
@@ -1617,7 +1635,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             </div>
             <svg className="dashboard-user-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
-          <button type="button" className="dashboard-logout" onClick={onLogout}>
+          <button type="button" className="dashboard-logout" onClick={() => setIsLogoutConfirmOpen(true)}>
             Cerrar Sesión
           </button>
         </div>
@@ -2491,6 +2509,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
                           value={createPropertyForm.calle}
                           onChange={(e) => setCreatePropertyForm({ ...createPropertyForm, calle: e.target.value })}
                           onKeyDown={onEnterKey(handleCreateProperty)}
+                          autoFocus
                         />
                       </div>
                       <div className="form-group-simple">
@@ -2917,6 +2936,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
                   value={newAnnouncementForm.title}
                   onChange={(e) => setNewAnnouncementForm({ ...newAnnouncementForm, title: e.target.value })}
                   onKeyDown={onEnterKey(handleCreateAnnouncement, createAnnouncementLoading)}
+                  autoFocus
                 />
               </div>
 
@@ -3057,6 +3077,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
                     value={payForm.monto}
                     onChange={e => setPayForm({ ...payForm, monto: e.target.value })}
                     style={{flex:1}}
+                    autoFocus
                   />
                 </div>
                 {payForm.tipo !== "Reserva" && totalDue > 0 && (
@@ -3334,6 +3355,38 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
         </div>
       )}
 
+      {isLogoutConfirmOpen && (
+        <div className="modal-overlay" onClick={() => setIsLogoutConfirmOpen(false)}>
+          <div className="modal-content" style={{ maxWidth: '380px' }} onClick={e => e.stopPropagation()}>
+            <header className="modal-header">
+              <h2>Cerrar sesión</h2>
+              <button className="modal-close" type="button" onClick={() => setIsLogoutConfirmOpen(false)}>✕</button>
+            </header>
+            <div className="modal-body-simple" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '1.75rem 1.5rem 0.75rem' }}>
+              <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(99,102,241,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                  <polyline points="16 17 21 12 16 7"/>
+                  <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+              </div>
+              <p style={{ margin: '0 0 0.4rem', fontWeight: 700, fontSize: '1.05rem' }}>¿Cerrar sesión?</p>
+              <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--dash-text-2, #667085)', lineHeight: 1.5 }}>
+                Tendrás que volver a ingresar tus credenciales para acceder.
+              </p>
+            </div>
+            <footer className="modal-footer">
+              <button className="btn btn-secondary" type="button" onClick={() => setIsLogoutConfirmOpen(false)}>
+                Cancelar
+              </button>
+              <button className="btn btn-primary" type="button" onClick={() => { setIsLogoutConfirmOpen(false); onLogout(); }}>
+                Sí, cerrar sesión
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
       {toasts.length > 0 && (
         <div className="toast-container">
           {toasts.map(t => (
@@ -3358,6 +3411,23 @@ export default function App() {
   const [expiredMsg, setExpiredMsg]   = useState("");
   const [sessionWarning, setSessionWarning] = useState("");
   const [isDarkMode, setIsDarkMode]   = useState(() => localStorage.getItem("theme") === "dark");
+  const [isOnline, setIsOnline]       = useState(navigator.onLine);
+  const autoLogoutTimerRef            = useRef(null);
+
+  useEffect(() => {
+    const goOnline  = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener('online',  goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      window.removeEventListener('online',  goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => { if (autoLogoutTimerRef.current) clearTimeout(autoLogoutTimerRef.current); };
+  }, []);
 
   useEffect(() => {
     if (screen !== "loading") return;
@@ -3389,8 +3459,17 @@ export default function App() {
         try {
           const token = localStorage.getItem("condo_token");
           const payload = JSON.parse(atob(token.split('.')[1]));
-          const hoursLeft = Math.floor((payload.exp * 1000 - Date.now()) / 3600000);
+          const msLeft = payload.exp * 1000 - Date.now();
+          const hoursLeft = Math.floor(msLeft / 3600000);
           if (hoursLeft < 24) setSessionWarning(`Tu sesión expira en ${hoursLeft} hora${hoursLeft !== 1 ? 's' : ''}. Cerrá sesión y volvé a entrar para renovarla.`);
+          if (msLeft > 0) {
+            autoLogoutTimerRef.current = setTimeout(() => {
+              api.logout();
+              setSessionUser(null);
+              setExpiredMsg("Tu sesión expiró. Ingresá nuevamente.");
+              setScreen("login");
+            }, msLeft);
+          }
         } catch {}
         setScreen("dashboard");
       })
@@ -3447,19 +3526,23 @@ export default function App() {
 
   if (screen === "dashboard" && sessionUser) {
     return (
-      <Dashboard
-        user={sessionUser}
-        onUpdateUser={(patch) => setSessionUser((prev) => (prev ? { ...prev, ...patch } : prev))}
-        isDarkMode={isDarkMode}
-        onToggleDark={toggleDarkMode}
-        sessionWarning={sessionWarning}
-        onDismissSessionWarning={() => setSessionWarning("")}
-        onLogout={() => {
-          api.logout();
-          setSessionUser(null);
-          setScreen("landing");
-        }}
-      />
+      <ErrorBoundary>
+        <Dashboard
+          user={sessionUser}
+          onUpdateUser={(patch) => setSessionUser((prev) => (prev ? { ...prev, ...patch } : prev))}
+          isDarkMode={isDarkMode}
+          onToggleDark={toggleDarkMode}
+          sessionWarning={sessionWarning}
+          onDismissSessionWarning={() => setSessionWarning("")}
+          isOnline={isOnline}
+          onLogout={() => {
+            if (autoLogoutTimerRef.current) clearTimeout(autoLogoutTimerRef.current);
+            api.logout();
+            setSessionUser(null);
+            setScreen("landing");
+          }}
+        />
+      </ErrorBoundary>
     );
   }
 
