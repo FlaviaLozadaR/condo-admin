@@ -42,7 +42,14 @@ export default function Login({ onBack, onLogin, expiredMsg }) {
   };
 
   return (
-    <main className="login-screen">
+    <main
+      className="login-screen"
+      onTouchStart={(e) => { e.currentTarget._swipeStartX = e.touches[0].clientX; }}
+      onTouchEnd={(e) => {
+        const dx = e.changedTouches[0].clientX - (e.currentTarget._swipeStartX || 0);
+        if (dx > 80) onBack();
+      }}
+    >
       <button className="login-back-link" type="button" onClick={onBack} aria-label="Volver al inicio">
         ← Volver al inicio
       </button>
