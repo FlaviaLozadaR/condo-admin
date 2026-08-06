@@ -69,6 +69,7 @@ export default function PagosScreen({
   const [editCargoMonto, setEditCargoMonto] = useState('');
   const [editCargoMotivo, setEditCargoMotivo] = useState('');
   const [cargoExtraLoading, setCargoExtraLoading] = useState(false);
+  const [cargoExtraToDelete, setCargoExtraToDelete] = useState(null); // { propId, cargoId, monto, motivo }
   const [editingExpensaId, setEditingExpensaId] = useState(null);
   const [expensaEditVal, setExpensaEditVal] = useState('');
   const [expensaEditLoading, setExpensaEditLoading] = useState(false);
@@ -421,7 +422,13 @@ export default function PagosScreen({
     }
   };
 
-  const handleDeleteCargoExtra = async (propId, cargoId) => {
+  const handleDeleteCargoExtra = (propId, cargoId, monto, motivo) => {
+    setCargoExtraToDelete({ propId, cargoId, monto, motivo });
+  };
+
+  const confirmDeleteCargoExtra = async () => {
+    if (!cargoExtraToDelete) return;
+    const { propId, cargoId } = cargoExtraToDelete;
     setCargoExtraLoading(true);
     try {
       await api.removeCargoExtra(propId, cargoId);
@@ -431,6 +438,7 @@ export default function PagosScreen({
       onToast?.(e.message || 'No se pudo borrar el cargo extra.', 'error');
     } finally {
       setCargoExtraLoading(false);
+      setCargoExtraToDelete(null);
     }
   };
 
@@ -1338,7 +1346,7 @@ export default function PagosScreen({
                         {c.motivo && <span>{c.motivo}</span>}
                       </div>
                       <button className="expensas-edit-btn" onClick={() => { setEditingCargoItemId(c.id); setEditCargoMonto(String(c.monto)); setEditCargoMotivo(c.motivo || ''); }}>Editar</button>
-                      <button type="button" className="anuncio-action-btn anuncio-action-delete" title="Borrar" onClick={() => handleDeleteCargoExtra(cargoExtraModalProp.id, c.id)}>
+                      <button type="button" className="anuncio-action-btn anuncio-action-delete" title="Borrar" onClick={() => handleDeleteCargoExtra(cargoExtraModalProp.id, c.id, c.monto, c.motivo)}>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V7H6V19ZM8 9H16V19H8V9ZM15.5 4L14.5 3H9.5L8.5 4H5V6H19V4H15.5Z"/></svg>
                       </button>
                     </>
@@ -1356,6 +1364,41 @@ export default function PagosScreen({
             <div className="confirm-modal-actions">
               <button type="button" className="confirm-modal-cancel" onClick={() => { setCargoExtraModalProp(null); setEditingCargoItemId(null); setNewCargoMonto(''); setNewCargoMotivo(''); }}>Cerrar</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {cargoExtraToDelete && (
+        <div className="modal-overlay" style={{ zIndex: 1200 }} onClick={() => setCargoExtraToDelete(null)}>
+          <div className="modal-content" style={{ maxWidth: '380px' }} onClick={e => e.stopPropagation()}>
+            <header className="modal-header">
+              <h2>Eliminar cargo extra</h2>
+              <button className="modal-close" type="button" onClick={() => setCargoExtraToDelete(null)}>✕</button>
+            </header>
+            <div className="modal-body-simple" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '1.75rem 1.5rem 0.75rem' }}>
+              <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                </svg>
+              </div>
+              <p style={{ margin: '0 0 0.4rem', fontWeight: 700, fontSize: '1.05rem' }}>
+                ¿Eliminar cargo de Bs. {Number(cargoExtraToDelete.monto).toLocaleString()}?
+              </p>
+              {cargoExtraToDelete.motivo && (
+                <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--dash-text-2, #667085)' }}>
+                  {cargoExtraToDelete.motivo}
+                </p>
+              )}
+              <p style={{ margin: '0.5rem 0 0', fontSize: '0.82rem', color: 'var(--dash-text-2, #9ca3af)' }}>
+                Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <footer className="modal-footer">
+              <button className="btn btn-secondary" type="button" onClick={() => setCargoExtraToDelete(null)}>Cancelar</button>
+              <button className="btn" type="button" style={{ background: '#ef4444', color: '#fff', border: 'none' }} onClick={confirmDeleteCargoExtra} disabled={cargoExtraLoading}>
+                {cargoExtraLoading ? 'Eliminando...' : 'Sí, eliminar'}
+              </button>
+            </footer>
           </div>
         </div>
       )}

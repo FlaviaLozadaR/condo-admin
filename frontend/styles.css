@@ -8092,15 +8092,18 @@ h2,
 .toast span { flex: 1; }
 
 .toast-close {
-  background: none;
+  background: rgba(255,255,255,0.15);
   border: none;
-  color: rgba(255,255,255,0.8);
+  color: rgba(255,255,255,0.9);
   cursor: pointer;
   font-size: 0.85rem;
-  padding: 0;
   line-height: 1;
+  padding: 0.3rem 0.45rem;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: background 0.15s;
 }
-.toast-close:hover { color: #fff; }
+.toast-close:hover { background: rgba(255,255,255,0.25); color: #fff; }
 
 .toast-panic   { background: #e53e3e; }
 .toast-info    { background: #3182ce; }
