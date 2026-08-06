@@ -592,7 +592,7 @@ export default function PagosScreen({
         </div>
       </header>
 
-      <div className="areas-tabs" style={{marginBottom:'0.5rem'}}>
+      <div className="areas-tabs">
         <button className={`areas-tab${pagosMainTab === 'pagos' ? ' areas-tab-active' : ''}`} onClick={() => setPagosMainTab('pagos')}>
           Pagos{pendingPaymentsCount > 0 ? ` (${pendingPaymentsCount})` : ''}
         </button>
@@ -603,69 +603,6 @@ export default function PagosScreen({
           Configuración
         </button>
       </div>
-
-      <div className="export-actions-wrap" style={{display: pagosMainTab === 'pagos' ? '' : 'none'}}>
-          <div className="management-condo-field export-months-field">
-            <label>Período a exportar</label>
-            <div className="condo-dropdown" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setExportMonthsDropdownOpen(false); }} tabIndex={-1}>
-              <button
-                type="button"
-                className="condo-dropdown-trigger"
-                onClick={() => setExportMonthsDropdownOpen((o) => !o)}
-                aria-expanded={exportMonthsDropdownOpen}
-              >
-                <span className="condo-dropdown-value">
-                  {exportMonthsFilter.size === 0
-                    ? "Todos los meses"
-                    : `${exportMonthsFilter.size} mes${exportMonthsFilter.size !== 1 ? "es" : ""} seleccionado${exportMonthsFilter.size !== 1 ? "s" : ""}`}
-                </span>
-                <svg className={`condo-dropdown-chevron${exportMonthsDropdownOpen ? " open" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-              </button>
-              {exportMonthsDropdownOpen && (
-                <ul className="condo-dropdown-list export-months-list" role="listbox">
-                  <li
-                    className="condo-dropdown-item export-months-item export-months-item-all"
-                    onMouseDown={(e) => { e.preventDefault(); toggleAllExportMonths(); }}
-                  >
-                    <input type="checkbox" readOnly checked={exportMonthOptions.length > 0 && exportMonthsFilter.size === exportMonthOptions.length} />
-                    <span>{exportMonthsFilter.size === exportMonthOptions.length ? "Quitar todos" : "Seleccionar todos"}</span>
-                  </li>
-                  {exportMonthOptions.length === 0 ? (
-                    <li className="export-months-empty">Sin pagos registrados todavía.</li>
-                  ) : exportMonthOptions.map((opt) => (
-                    <li
-                      key={opt.key}
-                      role="option"
-                      aria-selected={exportMonthsFilter.has(opt.key)}
-                      className="condo-dropdown-item export-months-item"
-                      onMouseDown={(e) => { e.preventDefault(); toggleExportMonth(opt.key); }}
-                    >
-                      <input type="checkbox" readOnly checked={exportMonthsFilter.has(opt.key)} />
-                      <span>{opt.label}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-
-          <div className="export-btn-group">
-            <button type="button" className="export-btn export-btn-excel" onClick={() => handleExportPagos("excel")} title="Exportar a Excel">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
-                <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><polyline points="10 9 9 9 8 9"/>
-              </svg>
-              Excel
-            </button>
-            <button type="button" className="export-btn export-btn-pdf" onClick={() => handleExportPagos("pdf")} title="Exportar a PDF">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
-                <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="11" y2="17"/>
-              </svg>
-              PDF
-            </button>
-          </div>
-        </div>
 
       {/* ── Panel QR de pago ── */}
       {pagosMainTab === 'config' && (() => {
@@ -1237,6 +1174,68 @@ export default function PagosScreen({
           <small>registros totales</small>
         </article>
       </section>
+
+      <div className="export-actions-wrap">
+        <div className="management-condo-field export-months-field">
+          <label>Período a exportar</label>
+          <div className="condo-dropdown" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setExportMonthsDropdownOpen(false); }} tabIndex={-1}>
+            <button
+              type="button"
+              className="condo-dropdown-trigger"
+              onClick={() => setExportMonthsDropdownOpen((o) => !o)}
+              aria-expanded={exportMonthsDropdownOpen}
+            >
+              <span className="condo-dropdown-value">
+                {exportMonthsFilter.size === 0
+                  ? "Todos los meses"
+                  : `${exportMonthsFilter.size} mes${exportMonthsFilter.size !== 1 ? "es" : ""} seleccionado${exportMonthsFilter.size !== 1 ? "s" : ""}`}
+              </span>
+              <svg className={`condo-dropdown-chevron${exportMonthsDropdownOpen ? " open" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {exportMonthsDropdownOpen && (
+              <ul className="condo-dropdown-list export-months-list" role="listbox">
+                <li
+                  className="condo-dropdown-item export-months-item export-months-item-all"
+                  onMouseDown={(e) => { e.preventDefault(); toggleAllExportMonths(); }}
+                >
+                  <input type="checkbox" readOnly checked={exportMonthOptions.length > 0 && exportMonthsFilter.size === exportMonthOptions.length} />
+                  <span>{exportMonthsFilter.size === exportMonthOptions.length ? "Quitar todos" : "Seleccionar todos"}</span>
+                </li>
+                {exportMonthOptions.length === 0 ? (
+                  <li className="export-months-empty">Sin pagos registrados todavía.</li>
+                ) : exportMonthOptions.map((opt) => (
+                  <li
+                    key={opt.key}
+                    role="option"
+                    aria-selected={exportMonthsFilter.has(opt.key)}
+                    className="condo-dropdown-item export-months-item"
+                    onMouseDown={(e) => { e.preventDefault(); toggleExportMonth(opt.key); }}
+                  >
+                    <input type="checkbox" readOnly checked={exportMonthsFilter.has(opt.key)} />
+                    <span>{opt.label}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+        <div className="export-btn-group">
+          <button type="button" className="export-btn export-btn-excel" onClick={() => handleExportPagos("excel")} title="Exportar a Excel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+              <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><polyline points="10 9 9 9 8 9"/>
+            </svg>
+            Excel
+          </button>
+          <button type="button" className="export-btn export-btn-pdf" onClick={() => handleExportPagos("pdf")} title="Exportar a PDF">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+              <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="11" y2="17"/>
+            </svg>
+            PDF
+          </button>
+        </div>
+      </div>
 
       <section className="pagos-tabs-wrap">
         <div className="pagos-search-wrap">
