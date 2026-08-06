@@ -9859,6 +9859,47 @@ h2,
   padding: 1.2rem 0;
   margin: 0;
 }
+.historial-search-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.4rem 0.75rem;
+  margin-bottom: 0.85rem;
+}
+.historial-search-input {
+  border: none;
+  background: transparent;
+  font-size: 0.88rem;
+  color: #374151;
+  flex: 1;
+  outline: none;
+  min-width: 0;
+}
+.historial-search-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  font-size: 0.8rem;
+  padding: 0 0.1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.historial-search-clear:hover { color: #374151; }
+.historial-results-count {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin: 0 0 0.5rem;
+}
+[data-theme="dark"] .historial-search-row {
+  background: #1e1e1e;
+  border-color: #2a2a2a;
+}
+[data-theme="dark"] .historial-search-input { color: #e8e8e8; }
+[data-theme="dark"] .historial-search-clear:hover { color: #e8e8e8; }
 .historial-entry {
   border-bottom: 1px solid #f3f4f6;
   padding: 0.9rem 0;

@@ -78,6 +78,9 @@ export default function PagosScreen({
   const [historial, setHistorial] = useState([]);
   const [historialLoading, setHistorialLoading] = useState(false);
   const [historialExpanded, setHistorialExpanded] = useState(false);
+  const [historialSearch, setHistorialSearch] = useState('');
+  const [historialPage, setHistorialPage] = useState(1);
+  const HISTORIAL_PAGE_SIZE = 10;
   const historialLoadedForRef = useRef(null);
 
   const selectedPaymentCondoName =
@@ -93,6 +96,10 @@ export default function PagosScreen({
   useEffect(() => {
     setExpensasPage(1);
   }, [cargoExtraSearch]);
+
+  useEffect(() => {
+    setHistorialPage(1);
+  }, [historialSearch]);
 
   useEffect(() => {
     setPage(1);
@@ -1100,37 +1107,92 @@ export default function PagosScreen({
               <div className="expensas-historial-body">
                 {historialLoading ? (
                   <p className="expensas-historial-empty">Cargando historial…</p>
-                ) : historial.length === 0 ? (
-                  <p className="expensas-historial-empty">Sin registros todavía.</p>
-                ) : historial.map(entry => {
-                  const props = Array.isArray(entry.propiedades) ? entry.propiedades : [];
-                  return (
-                    <details key={entry.id} className="historial-entry">
-                      <summary className="historial-entry-summary">
-                        <span className={`historial-tipo-badge historial-tipo-${entry.tipo}`}>
-                          {entry.tipo === 'edicion' ? 'Edición' : 'Asignación'}
-                        </span>
-                        <span className="historial-monto">Bs. {Number(entry.monto).toLocaleString()}</span>
-                        <span className="historial-props-count">{props.length} propiedad{props.length !== 1 ? 'es' : ''}</span>
-                        <span className="historial-assignedby">{entry.assigned_by}</span>
-                        <span className="historial-date">{fmtHist(entry.created_at)}</span>
-                      </summary>
-                      <div className="historial-entry-detail">
-                        {props.map((p, i) => (
-                          <div key={i} className="historial-prop-row">
-                            <span className="historial-prop-code">{p.code || p.street || '—'}</span>
-                            <span className="historial-prop-owner">{p.owner || '—'}</span>
-                            <span className="historial-prop-change">
-                              Bs. {Number(p.expensaAnterior || 0).toLocaleString()}
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:12,height:12,display:'inline',margin:'0 0.3rem'}}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
-                              Bs. {Number(p.expensaNueva || 0).toLocaleString()}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </details>
+                ) : (() => {
+                  const q = historialSearch.trim().toLowerCase();
+                  const filtered = q
+                    ? historial.filter(entry => {
+                        const props = Array.isArray(entry.propiedades) ? entry.propiedades : [];
+                        return (
+                          entry.assigned_by?.toLowerCase().includes(q) ||
+                          String(entry.monto).includes(q) ||
+                          props.some(p =>
+                            p.code?.toLowerCase().includes(q) ||
+                            p.owner?.toLowerCase().includes(q)
+                          )
+                        );
+                      })
+                    : historial;
+
+                  const totalPages = Math.max(1, Math.ceil(filtered.length / HISTORIAL_PAGE_SIZE));
+                  const paged = filtered.slice(
+                    (historialPage - 1) * HISTORIAL_PAGE_SIZE,
+                    historialPage * HISTORIAL_PAGE_SIZE
                   );
-                })}
+
+                  return (
+                    <>
+                      {/* Buscador */}
+                      <div className="historial-search-row">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{width:15,height:15,color:'#9ca3af',flexShrink:0}}>
+                          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                        <input
+                          type="text"
+                          className="historial-search-input"
+                          placeholder="Buscar por unidad, propietario, usuario o monto…"
+                          value={historialSearch}
+                          onChange={e => setHistorialSearch(e.target.value)}
+                        />
+                        {historialSearch && (
+                          <button className="historial-search-clear" onClick={() => setHistorialSearch('')} aria-label="Limpiar búsqueda">✕</button>
+                        )}
+                      </div>
+
+                      {filtered.length === 0 ? (
+                        <p className="expensas-historial-empty">
+                          {historial.length === 0 ? 'Sin registros todavía.' : 'No hay resultados para esa búsqueda.'}
+                        </p>
+                      ) : (
+                        <>
+                          <p className="historial-results-count">
+                            {filtered.length} registro{filtered.length !== 1 ? 's' : ''}
+                            {q ? ` · "${historialSearch}"` : ''}
+                          </p>
+                          {paged.map(entry => {
+                            const props = Array.isArray(entry.propiedades) ? entry.propiedades : [];
+                            return (
+                              <details key={entry.id} className="historial-entry">
+                                <summary className="historial-entry-summary">
+                                  <span className={`historial-tipo-badge historial-tipo-${entry.tipo}`}>
+                                    {entry.tipo === 'edicion' ? 'Edición' : 'Asignación'}
+                                  </span>
+                                  <span className="historial-monto">Bs. {Number(entry.monto).toLocaleString()}</span>
+                                  <span className="historial-props-count">{props.length} propiedad{props.length !== 1 ? 'es' : ''}</span>
+                                  <span className="historial-assignedby">{entry.assigned_by}</span>
+                                  <span className="historial-date">{fmtHist(entry.created_at)}</span>
+                                </summary>
+                                <div className="historial-entry-detail">
+                                  {props.map((p, i) => (
+                                    <div key={i} className="historial-prop-row">
+                                      <span className="historial-prop-code">{p.code || p.street || '—'}</span>
+                                      <span className="historial-prop-owner">{p.owner || '—'}</span>
+                                      <span className="historial-prop-change">
+                                        Bs. {Number(p.expensaAnterior || 0).toLocaleString()}
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:12,height:12,display:'inline',margin:'0 0.3rem'}}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+                                        Bs. {Number(p.expensaNueva || 0).toLocaleString()}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
+                            );
+                          })}
+                          <Pagination page={historialPage} totalPages={totalPages} onPageChange={setHistorialPage} />
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             )}
           </section>
