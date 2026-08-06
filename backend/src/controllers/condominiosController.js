@@ -112,16 +112,95 @@ async function asignarExpensas(req, res) {
     const propiedadesDelCondo = new Map((await db.getPropiedades(condo.name)).map(p => [String(p.id), p]));
     const montoNum = Math.max(0, Number(monto) || 0);
     const updated  = [];
+    const historialProps = [];
     for (const propId of propiedadIds) {
       const propActual = propiedadesDelCondo.get(String(propId));
       if (!propActual) continue;
-      // Cada asignación se suma a lo que la propiedad ya tenía — no la reemplaza.
-      const nuevoTotal = (Number(propActual.expensaMensual) || 0) + montoNum;
+      const expensaAnterior = Number(propActual.expensaMensual) || 0;
+      const nuevoTotal      = expensaAnterior + montoNum;
       const result = await db.updatePropiedad(propId, { expensaMensual: nuevoTotal });
-      if (result) updated.push(result);
+      if (result) {
+        updated.push(result);
+        historialProps.push({
+          id:               String(propActual.id),
+          code:             propActual.code,
+          street:           propActual.street,
+          owner:            propActual.owner || '—',
+          expensaAnterior,
+          expensaNueva:     nuevoTotal,
+        });
+      }
     }
-    res.json({ ok: true, updated });
+
+    if (historialProps.length > 0) {
+      const me = await db.getUsuarioById(req.user.id).catch(() => null);
+      await db.createExpensaHistorial({
+        condo:      condo.name,
+        monto:      montoNum,
+        tipo:       'asignacion',
+        propiedades: historialProps,
+        assignedBy: me?.name || req.user?.email || 'Sistema',
+      }).catch(() => {});
+    }
+
+    res.json({ ok: true, updated, historialProps });
   } catch (e) { res.status(400).json({ error: e.message }); }
+}
+
+// PUT /condominios/:condoId/propiedades/:propId/expensa — editar expensa individual
+async function editarExpensaIndividual(req, res) {
+  try {
+    const { condoId, propId } = req.params;
+    const { monto } = req.body || {};
+    if (monto === undefined || monto === null) return res.status(400).json({ error: 'Falta el monto' });
+
+    const condos = await db.getCondominios();
+    const condo  = condos.find(c => String(c.id) === String(condoId));
+    if (!condo) return res.status(404).json({ error: 'Condominio no encontrado' });
+
+    if (req.user.role === 'Administrador') {
+      const adminUser = await db.getUsuarioById(req.user.id);
+      if (condo.name !== adminUser?.condo) return res.status(403).json({ error: 'Solo podés modificar tu propio condominio' });
+    }
+
+    const propiedades = await db.getPropiedades(condo.name);
+    const propActual  = propiedades.find(p => String(p.id) === String(propId));
+    if (!propActual) return res.status(404).json({ error: 'Propiedad no encontrada en este condominio' });
+
+    const montoNum       = Math.max(0, Number(monto) || 0);
+    const expensaAnterior = Number(propActual.expensaMensual) || 0;
+    const result = await db.updatePropiedad(propId, { expensaMensual: montoNum });
+
+    const me = await db.getUsuarioById(req.user.id).catch(() => null);
+    await db.createExpensaHistorial({
+      condo:      condo.name,
+      monto:      montoNum,
+      tipo:       'edicion',
+      propiedades: [{
+        id:              String(propActual.id),
+        code:            propActual.code,
+        street:          propActual.street,
+        owner:           propActual.owner || '—',
+        expensaAnterior,
+        expensaNueva:    montoNum,
+      }],
+      assignedBy: me?.name || req.user?.email || 'Sistema',
+    }).catch(() => {});
+
+    res.json({ ok: true, propiedad: result });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+}
+
+// GET /condominios/:id/expensas-historial
+async function getExpensasHistorial(req, res) {
+  try {
+    const { id } = req.params;
+    const condos = await db.getCondominios();
+    const condo  = condos.find(c => String(c.id) === String(id));
+    if (!condo) return res.status(404).json({ error: 'Condominio no encontrado' });
+    const historial = await db.getExpensasHistorial(condo.name);
+    res.json(historial);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
 // PUT /condominios/:id/payment-qr — el admin sube o reemplaza el QR
@@ -180,4 +259,4 @@ async function deletePaymentQr(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
-module.exports = { getAll, create, update, remove, upload, uploadPaymentQr, deletePaymentQr, getMyPaymentQr, asignarExpensas };
+module.exports = { getAll, create, update, remove, upload, uploadPaymentQr, deletePaymentQr, getMyPaymentQr, asignarExpensas, editarExpensaIndividual, getExpensasHistorial };

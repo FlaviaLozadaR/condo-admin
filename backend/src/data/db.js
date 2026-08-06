@@ -707,6 +707,27 @@ async function upsertNotificationPreferences(usuarioId, prefs) {
   ));
 }
 
+async function createExpensaHistorial({ condo, monto, tipo, propiedades, assignedBy }) {
+  const { data, error } = await supabase
+    .from('expensas_historial')
+    .insert([{ condo, monto, tipo, propiedades, assigned_by: assignedBy }])
+    .select().single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+async function getExpensasHistorial(condo) {
+  let q = supabase
+    .from('expensas_historial')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (condo) q = q.eq('condo', condo);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
 module.exports = {
   getUsuarios, getUsuarioById, getUsuarioByEmail, createUsuario, updateUsuario, deleteUsuario, getUsuariosPaged, getSeguridadContacts,
   getCondominios, createCondominio, updateCondominio, deleteCondominio,
@@ -726,4 +747,5 @@ module.exports = {
   saveFcmToken, removeFcmToken, getFcmTokensByUsuario, getFcmTokensByUserIds,
   getUsuarioIdsByRole, getUsuariosByIds,
   getNotificationPreferences, getNotificationPreferencesBatch, upsertNotificationPreferences,
+  createExpensaHistorial, getExpensasHistorial,
 };

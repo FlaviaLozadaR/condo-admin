@@ -174,4 +174,7 @@ router.delete('/:id/payment-qr', requireAuth, requireRole(...ADMIN), ctrl.delete
  */
 router.put('/:id/asignar-expensas', requireAuth, requireRole(...ADMIN), ctrl.asignarExpensas);
 
+router.get('/:id/expensas-historial',                   requireAuth, requireRole(...ADMIN), ctrl.getExpensasHistorial);
+router.put('/:condoId/propiedades/:propId/expensa',      requireAuth, requireRole(...ADMIN), ctrl.editarExpensaIndividual);
+
 module.exports = router;

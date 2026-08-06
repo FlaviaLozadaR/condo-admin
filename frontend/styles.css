@@ -9824,6 +9824,120 @@ h2,
 }
 [data-theme="dark"] .expensas-search-input { color: #e8e8e8 !important; background: transparent; }
 
+/* ── Historial de expensas ─────────────────────────────────── */
+.expensas-historial-panel {
+  background: #ffffff;
+  border: 1px solid #e0e7ff;
+  border-radius: 14px;
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+.expensas-historial-body {
+  padding: 0 1.5rem 1.25rem;
+}
+.expensas-historial-empty {
+  color: #9ca3af;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 1.2rem 0;
+  margin: 0;
+}
+.historial-entry {
+  border-bottom: 1px solid #f3f4f6;
+  padding: 0.5rem 0;
+}
+.historial-entry:last-child { border-bottom: none; }
+.historial-entry-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+}
+.historial-entry-summary::-webkit-details-marker { display: none; }
+.historial-tipo-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.historial-tipo-asignacion { background: #ede9fe; color: #4f46e5; }
+.historial-tipo-edicion    { background: #fef3c7; color: #92400e; }
+.historial-monto    { font-weight: 700; color: #111827; }
+.historial-props-count { color: #6b7280; }
+.historial-assignedby  { color: #4f46e5; font-size: 0.8rem; }
+.historial-date        { color: #9ca3af; font-size: 0.78rem; margin-left: auto; }
+.historial-entry-detail {
+  padding: 0.4rem 0 0.4rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.historial-prop-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  font-size: 0.82rem;
+  flex-wrap: wrap;
+}
+.historial-prop-code  { font-weight: 600; color: #374151; min-width: 70px; }
+.historial-prop-owner { color: #6b7280; flex: 1; }
+.historial-prop-change { color: #374151; display: flex; align-items: center; gap: 0.25rem; white-space: nowrap; }
+
+/* ── Assignment summary modal ─────────────────────────────── */
+.asignacion-summary-modal { max-width: 480px; width: 90vw; padding: 1.5rem; }
+.asignacion-summary-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.asignacion-summary-header h2 { font-size: 1.05rem; }
+.asignacion-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  margin-bottom: 1.25rem;
+}
+.asignacion-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid #f3f4f6;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.asignacion-summary-row:last-child { border-bottom: none; }
+.asignacion-summary-prop { display: flex; flex-direction: column; gap: 0.1rem; }
+.asignacion-summary-prop strong { font-size: 0.88rem; color: #111827; }
+.asignacion-summary-prop span   { font-size: 0.78rem; color: #6b7280; }
+.asignacion-summary-amounts { display: flex; align-items: center; gap: 0.3rem; font-size: 0.82rem; }
+.asignacion-summary-prev { color: #9ca3af; text-decoration: line-through; }
+.asignacion-summary-next { font-weight: 700; color: #16a34a; }
+
+/* ── Dark mode — historial & summary ─────────────────────── */
+[data-theme="dark"] .expensas-historial-panel { background: #1a1a1a; border-color: #2a2a2a; }
+[data-theme="dark"] .historial-entry          { border-bottom-color: #2a2a2a; }
+[data-theme="dark"] .historial-monto          { color: #e8e8e8; }
+[data-theme="dark"] .historial-prop-code      { color: #d0d0d0; }
+[data-theme="dark"] .historial-prop-owner     { color: #737373; }
+[data-theme="dark"] .historial-prop-change    { color: #d0d0d0; }
+[data-theme="dark"] .asignacion-summary-list  { border-color: #2a2a2a; }
+[data-theme="dark"] .asignacion-summary-row   { border-bottom-color: #2a2a2a; }
+[data-theme="dark"] .asignacion-summary-prop strong { color: #e8e8e8; }
+[data-theme="dark"] .asignacion-summary-prev  { color: #555; }
+
 /* ── Area social cards — dark mode ──────────────────────────── */
 [data-theme="dark"] .area-card {
   background: #0d0b1a;

@@ -74,6 +74,12 @@ export default function PagosScreen({
   const [expensaEditVal, setExpensaEditVal] = useState('');
   const [expensaEditLoading, setExpensaEditLoading] = useState(false);
 
+  const [asignacionSummary, setAsignacionSummary] = useState(null);
+  const [historial, setHistorial] = useState([]);
+  const [historialLoading, setHistorialLoading] = useState(false);
+  const [historialExpanded, setHistorialExpanded] = useState(false);
+  const historialLoadedForRef = useRef(null);
+
   const selectedPaymentCondoName =
     paymentCondoFilter === "todos"
       ? ""
@@ -336,18 +342,39 @@ export default function PagosScreen({
     } catch {}
   };
 
+  const loadHistorial = async (condoId) => {
+    if (!condoId) return;
+    setHistorialLoading(true);
+    try {
+      const data = await api.getExpensasHistorial(condoId);
+      setHistorial(data);
+      historialLoadedForRef.current = condoId;
+    } catch (e) {
+      onToast?.(e.message || 'No se pudo cargar el historial.', 'error');
+    } finally {
+      setHistorialLoading(false);
+    }
+  };
+
   const handleSaveExpensas = async (condoId) => {
     const monto = parseFloat(expensasInputVal);
     if (isNaN(monto) || monto < 0 || expensasSelectedIds.size === 0) return;
     setExpensasLoading(true);
     setExpensasMsg('');
     try {
-      const { updated } = await api.asignarExpensas(condoId, monto, [...expensasSelectedIds]);
+      const { updated, historialProps } = await api.asignarExpensas(condoId, monto, [...expensasSelectedIds]);
       setPropiedadesData(prev => prev.map(p => {
         const match = updated?.find(u => String(u.id) === String(p.id));
         return match ? { ...p, expensaMensual: match.expensaMensual } : p;
       }));
+      setExpensasSelectedIds(new Set());
+      setExpensasInputVal('');
       setExpensasMsg('ok');
+      if (historialProps?.length > 0) {
+        setAsignacionSummary({ monto, props: historialProps });
+        historialLoadedForRef.current = null;
+        if (historialExpanded) loadHistorial(condoId);
+      }
     } catch (e) {
       setExpensasMsg('error:' + e.message);
     } finally {
@@ -360,10 +387,12 @@ export default function PagosScreen({
     if (isNaN(monto) || monto < 0) return;
     setExpensaEditLoading(true);
     try {
-      const { updated } = await api.asignarExpensas(condoId, monto, [propId]);
-      const nuevoTotal = updated?.[0]?.expensaMensual;
-      setPropiedadesData(prev => prev.map(p => String(p.id) === String(propId) ? { ...p, expensaMensual: nuevoTotal ?? p.expensaMensual } : p));
+      const { propiedad } = await api.editarExpensaIndividual(condoId, propId, monto);
+      const nuevoMonto = propiedad?.expensaMensual ?? monto;
+      setPropiedadesData(prev => prev.map(p => String(p.id) === String(propId) ? { ...p, expensaMensual: nuevoMonto } : p));
       setEditingExpensaId(null);
+      historialLoadedForRef.current = null;
+      if (historialExpanded) loadHistorial(condoId);
     } catch (e) {
       onToast?.(e.message || 'No se pudo actualizar la expensa.', 'error');
     } finally {
@@ -894,7 +923,7 @@ export default function PagosScreen({
                               <td>
                                 {editingExpensaId === p.id ? (
                                   <div style={{display:'flex',gap:'0.3rem',alignItems:'center'}}>
-                                    <input type="number" min="0" className="expensas-base-input" style={{width:80}} placeholder="+ Bs." value={expensaEditVal} onChange={e => setExpensaEditVal(e.target.value)} autoFocus />
+                                    <input type="number" min="0" className="expensas-base-input" style={{width:80}} placeholder="Bs." value={expensaEditVal} onChange={e => setExpensaEditVal(e.target.value)} autoFocus />
                                     <button className="btn btn-primary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} disabled={expensaEditLoading} onClick={() => handleSaveExpensaActual(p.id, adminCondoId)}>
                                       {expensaEditLoading ? '…' : 'OK'}
                                     </button>
@@ -903,7 +932,7 @@ export default function PagosScreen({
                                 ) : (
                                   <span
                                     className={`expensas-editable-value${expensaActual > 0 ? ' expensas-value-set' : ''}`}
-                                    title="Click para sumar un monto a la expensa de esta propiedad"
+                                    title="Click para editar la expensa de esta propiedad"
                                     onClick={() => { setEditingExpensaId(p.id); setExpensaEditVal(''); }}
                                   >
                                     {expensaActual > 0 ? `Bs. ${expensaActual.toLocaleString()}` : '—'}
@@ -960,7 +989,7 @@ export default function PagosScreen({
                             <span className="expensas-prop-card-label">Expensa actual</span>
                             {editingExpensaId === p.id ? (
                               <div style={{display:'flex',gap:'0.3rem',alignItems:'center'}}>
-                                <input type="number" min="0" className="expensas-base-input" style={{width:80}} placeholder="+ Bs." value={expensaEditVal} onChange={e => setExpensaEditVal(e.target.value)} autoFocus />
+                                <input type="number" min="0" className="expensas-base-input" style={{width:80}} placeholder="Bs." value={expensaEditVal} onChange={e => setExpensaEditVal(e.target.value)} autoFocus />
                                 <button className="btn btn-primary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} disabled={expensaEditLoading} onClick={() => handleSaveExpensaActual(p.id, adminCondoId)}>
                                   {expensaEditLoading ? '…' : 'OK'}
                                 </button>
@@ -1006,6 +1035,80 @@ export default function PagosScreen({
               )}
             </div>
             </>
+            )}
+          </section>
+        );
+      })()}
+
+      {/* ── Historial de asignaciones ── */}
+      {(() => {
+        const adminCondoId = isSuperAdministrator
+          ? (qrSelectedCondoId || (condominiosData[0] ? String(condominiosData[0].id) : ''))
+          : String(condominiosData.find(c => c.name === user.condo)?.id || '');
+
+        const fmtHist = (iso) => {
+          if (!iso) return '';
+          const d = new Date(iso);
+          if (isNaN(d)) return '';
+          return `${d.toLocaleDateString('es-AR')} ${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
+        };
+
+        const handleToggleHistorial = () => {
+          setHistorialExpanded(prev => {
+            const next = !prev;
+            if (next && historialLoadedForRef.current !== adminCondoId) loadHistorial(adminCondoId);
+            return next;
+          });
+        };
+
+        return (
+          <section className="expensas-historial-panel">
+            <button type="button" className="expensas-mgmt-header expensas-mgmt-header-toggle" onClick={handleToggleHistorial}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{width:20,height:20,flexShrink:0}}>
+                <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/>
+              </svg>
+              <span>Historial de Expensas</span>
+              <svg className={`expensas-mgmt-chevron${historialExpanded ? ' expensas-mgmt-chevron-open' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="18 15 12 9 6 15" />
+              </svg>
+            </button>
+
+            {historialExpanded && (
+              <div className="expensas-historial-body">
+                {historialLoading ? (
+                  <p className="expensas-historial-empty">Cargando historial…</p>
+                ) : historial.length === 0 ? (
+                  <p className="expensas-historial-empty">Sin registros todavía.</p>
+                ) : historial.map(entry => {
+                  const props = Array.isArray(entry.propiedades) ? entry.propiedades : [];
+                  return (
+                    <details key={entry.id} className="historial-entry">
+                      <summary className="historial-entry-summary">
+                        <span className={`historial-tipo-badge historial-tipo-${entry.tipo}`}>
+                          {entry.tipo === 'edicion' ? 'Edición' : 'Asignación'}
+                        </span>
+                        <span className="historial-monto">Bs. {Number(entry.monto).toLocaleString()}</span>
+                        <span className="historial-props-count">{props.length} propiedad{props.length !== 1 ? 'es' : ''}</span>
+                        <span className="historial-assignedby">{entry.assigned_by}</span>
+                        <span className="historial-date">{fmtHist(entry.created_at)}</span>
+                      </summary>
+                      <div className="historial-entry-detail">
+                        {props.map((p, i) => (
+                          <div key={i} className="historial-prop-row">
+                            <span className="historial-prop-code">{p.code || p.street || '—'}</span>
+                            <span className="historial-prop-owner">{p.owner || '—'}</span>
+                            <span className="historial-prop-change">
+                              Bs. {Number(p.expensaAnterior || 0).toLocaleString()}
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:12,height:12,display:'inline',margin:'0 0.3rem'}}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+                              Bs. {Number(p.expensaNueva || 0).toLocaleString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  );
+                })}
+              </div>
             )}
           </section>
         );
@@ -1363,6 +1466,44 @@ export default function PagosScreen({
             </div>
             <div className="confirm-modal-actions">
               <button type="button" className="confirm-modal-cancel" onClick={() => { setCargoExtraModalProp(null); setEditingCargoItemId(null); setNewCargoMonto(''); setNewCargoMotivo(''); }}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {asignacionSummary && (
+        <div className="modal-overlay modal-overlay-centered" onClick={() => setAsignacionSummary(null)}>
+          <div className="confirm-modal asignacion-summary-modal" onClick={e => e.stopPropagation()}>
+            <div className="asignacion-summary-header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{width:22,height:22,color:'#16a34a',flexShrink:0}}>
+                <path d="M7 13L10 16L17 9"/><circle cx="12" cy="12" r="9"/>
+              </svg>
+              <div>
+                <h2 style={{margin:0}}>Expensas asignadas</h2>
+                <p style={{margin:0,fontSize:'0.82rem',color:'#6b7280'}}>
+                  Se sumaron <strong>Bs. {Number(asignacionSummary.monto).toLocaleString()}</strong> a {asignacionSummary.props.length} propiedad{asignacionSummary.props.length !== 1 ? 'es' : ''}
+                </p>
+              </div>
+            </div>
+            <div className="asignacion-summary-list">
+              {asignacionSummary.props.map((p, i) => (
+                <div key={i} className="asignacion-summary-row">
+                  <div className="asignacion-summary-prop">
+                    <strong>{p.code || p.street || '—'}</strong>
+                    <span>{p.owner || '—'}</span>
+                  </div>
+                  <div className="asignacion-summary-amounts">
+                    <span className="asignacion-summary-prev">Bs. {Number(p.expensaAnterior || 0).toLocaleString()}</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:13,height:13,flexShrink:0,color:'#9ca3af'}}>
+                      <line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/>
+                    </svg>
+                    <span className="asignacion-summary-next">Bs. {Number(p.expensaNueva || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="confirm-modal-actions">
+              <button type="button" className="confirm-modal-cancel" onClick={() => setAsignacionSummary(null)}>Cerrar</button>
             </div>
           </div>
         </div>
