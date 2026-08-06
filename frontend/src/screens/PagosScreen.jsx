@@ -58,7 +58,7 @@ export default function PagosScreen({
   const [expensasMsg, setExpensasMsg] = useState('');
   const [expensasSelectedIds, setExpensasSelectedIds] = useState(new Set());
   const [cargoExtraSearch, setCargoExtraSearch] = useState('');
-  const [expensasCollapsed, setExpensasCollapsed] = useState(true);
+  const [pagosMainTab, setPagosMainTab] = useState('pagos'); // 'pagos' | 'expensas' | 'config'
   const [expensasPage, setExpensasPage] = useState(1);
   const expensasMgmtRef = useRef(null);
   const EXPENSAS_PAGE_SIZE = 15;
@@ -77,7 +77,6 @@ export default function PagosScreen({
   const [asignacionSummary, setAsignacionSummary] = useState(null);
   const [historial, setHistorial] = useState([]);
   const [historialLoading, setHistorialLoading] = useState(false);
-  const [historialExpanded, setHistorialExpanded] = useState(false);
   const [historialSearch, setHistorialSearch] = useState('');
   const [historialPage, setHistorialPage] = useState(1);
   const HISTORIAL_PAGE_SIZE = 10;
@@ -380,7 +379,7 @@ export default function PagosScreen({
       if (historialProps?.length > 0) {
         setAsignacionSummary({ monto, props: historialProps });
         historialLoadedForRef.current = null;
-        if (historialExpanded) loadHistorial(condoId);
+        if (pagosMainTab === 'expensas') loadHistorial(condoId);
       }
     } catch (e) {
       setExpensasMsg('error:' + e.message);
@@ -399,7 +398,7 @@ export default function PagosScreen({
       setPropiedadesData(prev => prev.map(p => String(p.id) === String(propId) ? { ...p, expensaMensual: nuevoMonto } : p));
       setEditingExpensaId(null);
       historialLoadedForRef.current = null;
-      if (historialExpanded) loadHistorial(condoId);
+      if (pagosMainTab === 'expensas') loadHistorial(condoId);
     } catch (e) {
       onToast?.(e.message || 'No se pudo actualizar la expensa.', 'error');
     } finally {
@@ -547,6 +546,19 @@ export default function PagosScreen({
 
   const askConfirm = (message, onAccept) => setConfirmPrompt({ message, onAccept });
 
+  const adminCondoId = isSuperAdministrator
+    ? (qrSelectedCondoId || (condominiosData[0] ? String(condominiosData[0].id) : ''))
+    : String(condominiosData.find(c => c.name === user.condo)?.id || '');
+  const adminCondo   = condominiosData.find(c => String(c.id) === adminCondoId);
+  const currentQrUrl = adminCondo?.paymentQrUrl || '';
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (pagosMainTab === 'expensas' && historialLoadedForRef.current !== adminCondoId) {
+      loadHistorial(adminCondoId);
+    }
+  }, [pagosMainTab]);
+
   const handleClickSiCumplio = (pago) => {
     const total = getExpensaTotal(pago);
     askConfirm(
@@ -573,12 +585,26 @@ export default function PagosScreen({
 
   return (
     <>
-      <header className="dashboard-header dashboard-header-with-actions">
+      <header className="dashboard-header">
         <div>
-          <h1>Gestion de Pagos</h1>
+          <h1>Gestión de Pagos</h1>
           <p>Administra los pagos de expensas y reservas</p>
         </div>
-        <div className="export-actions-wrap">
+      </header>
+
+      <div className="areas-tabs" style={{marginBottom:'0.5rem'}}>
+        <button className={`areas-tab${pagosMainTab === 'pagos' ? ' areas-tab-active' : ''}`} onClick={() => setPagosMainTab('pagos')}>
+          Pagos{pendingPaymentsCount > 0 ? ` (${pendingPaymentsCount})` : ''}
+        </button>
+        <button className={`areas-tab${pagosMainTab === 'expensas' ? ' areas-tab-active' : ''}`} onClick={() => setPagosMainTab('expensas')}>
+          Gestión de Expensas
+        </button>
+        <button className={`areas-tab${pagosMainTab === 'config' ? ' areas-tab-active' : ''}`} onClick={() => setPagosMainTab('config')}>
+          Configuración
+        </button>
+      </div>
+
+      <div className="export-actions-wrap" style={{display: pagosMainTab === 'pagos' ? '' : 'none'}}>
           <div className="management-condo-field export-months-field">
             <label>Período a exportar</label>
             <div className="condo-dropdown" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setExportMonthsDropdownOpen(false); }} tabIndex={-1}>
@@ -640,15 +666,11 @@ export default function PagosScreen({
             </button>
           </div>
         </div>
-      </header>
 
       {/* ── Panel QR de pago ── */}
-      {(() => {
-        const adminCondoId = isSuperAdministrator
-          ? (qrSelectedCondoId || (condominiosData[0] ? String(condominiosData[0].id) : ''))
-          : String(condominiosData.find(c => c.name === user.condo)?.id || '');
-        const activeCondo  = condominiosData.find(c => String(c.id) === adminCondoId);
-        const currentQr    = activeCondo?.paymentQrUrl || '';
+      {pagosMainTab === 'config' && (() => {
+        const activeCondo = adminCondo;
+        const currentQr   = currentQrUrl;
         return (
           <>
           <section className="payment-qr-panel">
@@ -787,11 +809,8 @@ export default function PagosScreen({
       })()}
 
       {/* ── Panel Gestión de Expensas ── */}
-      {(() => {
-        const adminCondoId = isSuperAdministrator
-          ? (qrSelectedCondoId || (condominiosData[0] ? String(condominiosData[0].id) : ''))
-          : String(condominiosData.find(c => c.name === user.condo)?.id || '');
-        const activeCondo = condominiosData.find(c => String(c.id) === adminCondoId);
+      {pagosMainTab === 'expensas' && (() => {
+        const activeCondo = adminCondo;
 
         const condoPropiedades = propiedadesData.filter(p =>
           isSuperAdministrator ? p.condo === activeCondo?.name : p.condo === user.condo
@@ -827,18 +846,13 @@ export default function PagosScreen({
 
         return (
           <section className="expensas-mgmt-panel" ref={expensasMgmtRef}>
-            <button type="button" className="expensas-mgmt-header expensas-mgmt-header-toggle" onClick={() => setExpensasCollapsed(c => !c)}>
+            <div className="expensas-mgmt-header">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{width:20,height:20,flexShrink:0}}>
                 <path d="M12 3V21M16.5 7.5C16.5 6.1 15 5 12.8 5H11.2C9 5 7.5 6.1 7.5 7.5C7.5 8.9 9 10 11.2 10H12.8C15 10 16.5 11.1 16.5 12.5C16.5 13.9 15 15 12.8 15H11.2C9 15 7.5 13.9 7.5 12.5" />
               </svg>
               <span>Gestión de Expensas</span>
               {activeCondo && <span className="payment-qr-condo-badge">{activeCondo.type}: {activeCondo.name}</span>}
-              <svg className={`expensas-mgmt-chevron${expensasCollapsed ? '' : ' expensas-mgmt-chevron-open'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="18 15 12 9 6 15" />
-              </svg>
-            </button>
-
-            {!expensasCollapsed && (
+            </div>
             <>
             {/* Monto + asignación */}
             <div className="expensas-asignar-row">
@@ -1065,17 +1079,12 @@ export default function PagosScreen({
               )}
             </div>
             </>
-            )}
           </section>
         );
       })()}
 
       {/* ── Historial de asignaciones ── */}
-      {(() => {
-        const adminCondoId = isSuperAdministrator
-          ? (qrSelectedCondoId || (condominiosData[0] ? String(condominiosData[0].id) : ''))
-          : String(condominiosData.find(c => c.name === user.condo)?.id || '');
-
+      {pagosMainTab === 'expensas' && (() => {
         const fmtHist = (iso) => {
           if (!iso) return '';
           const d = new Date(iso);
@@ -1083,28 +1092,16 @@ export default function PagosScreen({
           return `${d.toLocaleDateString('es-AR')} ${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
         };
 
-        const handleToggleHistorial = () => {
-          setHistorialExpanded(prev => {
-            const next = !prev;
-            if (next && historialLoadedForRef.current !== adminCondoId) loadHistorial(adminCondoId);
-            return next;
-          });
-        };
-
         return (
           <section className="expensas-historial-panel">
-            <button type="button" className="expensas-mgmt-header expensas-mgmt-header-toggle" onClick={handleToggleHistorial}>
+            <div className="expensas-mgmt-header">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{width:20,height:20,flexShrink:0}}>
                 <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/>
               </svg>
               <span>Historial de Expensas</span>
-              <svg className={`expensas-mgmt-chevron${historialExpanded ? ' expensas-mgmt-chevron-open' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="18 15 12 9 6 15" />
-              </svg>
-            </button>
+            </div>
 
-            {historialExpanded && (
-              <div className="expensas-historial-body">
+            <div className="expensas-historial-body">
                 {historialLoading ? (
                   <p className="expensas-historial-empty">Cargando historial…</p>
                 ) : (() => {
@@ -1194,11 +1191,12 @@ export default function PagosScreen({
                   );
                 })()}
               </div>
-            )}
           </section>
         );
       })()}
 
+      {pagosMainTab === 'pagos' && (
+      <>
       <section className="pagos-kpi-grid">
         <article className="pagos-kpi pagos-kpi-pending">
           <div className="pagos-kpi-head">
@@ -1394,6 +1392,8 @@ export default function PagosScreen({
       </section>
 
       <Pagination page={page} totalPages={pageData.totalPages} onPageChange={setPage} />
+      </>
+      )}
 
       {(() => {
         const reviewingItem = pageData.data.find(i => String(i.id) === String(reviewingPagoId));

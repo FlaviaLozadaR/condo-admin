@@ -9862,8 +9862,9 @@ h2,
   border-radius: 14px;
   margin-bottom: 1.5rem;
 }
-.expensas-historial-panel .expensas-mgmt-header-toggle {
-  padding: 1.1rem 1.2rem 1rem;
+.expensas-historial-panel .expensas-mgmt-header {
+  padding: 1.1rem 1.2rem 0;
+  margin-bottom: 0;
 }
 .expensas-historial-body {
   padding: 0.25rem 1.4rem 1.4rem;
@@ -10002,7 +10003,7 @@ h2,
 
 /* ── Responsive — expensas, historial & summary (≤ 700px) ─── */
 @media (max-width: 700px) {
-  .expensas-historial-panel .expensas-mgmt-header-toggle { padding: 0.85rem 0.9rem 0.75rem; }
+  .expensas-historial-panel .expensas-mgmt-header { padding: 0.85rem 0.9rem 0.5rem; }
   .expensas-historial-body { padding: 0 0.9rem 1rem; }
 
   .expensas-asignar-row { gap: 0.75rem; }
