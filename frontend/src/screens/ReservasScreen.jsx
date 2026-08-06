@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import * as api from "../api.js";
 import { parseAreaImages } from "../utils/images.js";
+import Pagination from "../components/Pagination.jsx";
 
 export default function ReservasScreen({
   user,
@@ -17,9 +18,11 @@ export default function ReservasScreen({
   setAreaFormError,
   setIsCreateAreaModalOpen,
 }) {
+  const RESERVAS_PAGE_SIZE = 8;
   const [areasTab, setAreasTab] = useState('areas'); // 'areas' | 'reservas' | 'cambios'
   const [reservasCondoFilter, setReservasCondoFilter] = useState('todos');
   const [reservasDateFilter, setReservasDateFilter] = useState('proximas'); // 'proximas' | 'pasadas'
+  const [reservasPage, setReservasPage] = useState(1);
   const [reservasCondoDropdownOpen, setReservasCondoDropdownOpen] = useState(false);
   const [confirmPrompt, setConfirmPrompt] = useState(null); // { message, onAccept }
   const [viewingArea, setViewingArea] = useState(null);
@@ -140,7 +143,10 @@ export default function ReservasScreen({
     return new Date(a.insertedAt) - new Date(b.insertedAt);
   });
   const reservasPasadas   = myReservas.filter(r => esReservaPasada(r)).sort((a, b) => `${b.fecha}T${b.horaFin}`.localeCompare(`${a.fecha}T${a.horaFin}`));
-  const reservasVisibles  = reservasDateFilter === 'pasadas' ? reservasPasadas : reservasProximas;
+  const reservasVisibles     = reservasDateFilter === 'pasadas' ? reservasPasadas : reservasProximas;
+  const reservasTotalPages   = Math.max(1, Math.ceil(reservasVisibles.length / RESERVAS_PAGE_SIZE));
+  const reservasPageSafe     = Math.min(reservasPage, reservasTotalPages);
+  const reservasPageItems    = reservasVisibles.slice((reservasPageSafe - 1) * RESERVAS_PAGE_SIZE, reservasPageSafe * RESERVAS_PAGE_SIZE);
 
   return (
     <>
@@ -176,11 +182,11 @@ export default function ReservasScreen({
               </button>
               {reservasCondoDropdownOpen && (
                 <ul className="condo-dropdown-list" role="listbox">
-                  <li role="option" aria-selected={reservasCondoFilter === 'todos'} className={`condo-dropdown-item${reservasCondoFilter === 'todos' ? ' selected' : ''}`} onMouseDown={() => { setReservasCondoFilter('todos'); setReservasCondoDropdownOpen(false); }}>
+                  <li role="option" aria-selected={reservasCondoFilter === 'todos'} className={`condo-dropdown-item${reservasCondoFilter === 'todos' ? ' selected' : ''}`} onMouseDown={() => { setReservasCondoFilter('todos'); setReservasCondoDropdownOpen(false); setReservasPage(1); }}>
                     Todos los condominios
                   </li>
                   {condominiosData.map(c => (
-                    <li key={c.id} role="option" aria-selected={reservasCondoFilter === String(c.id)} className={`condo-dropdown-item${reservasCondoFilter === String(c.id) ? ' selected' : ''}`} onMouseDown={() => { setReservasCondoFilter(String(c.id)); setReservasCondoDropdownOpen(false); }}>
+                    <li key={c.id} role="option" aria-selected={reservasCondoFilter === String(c.id)} className={`condo-dropdown-item${reservasCondoFilter === String(c.id) ? ' selected' : ''}`} onMouseDown={() => { setReservasCondoFilter(String(c.id)); setReservasCondoDropdownOpen(false); setReservasPage(1); }}>
                       {c.type}: {c.name}
                     </li>
                   ))}
@@ -239,17 +245,17 @@ export default function ReservasScreen({
       {areasTab === 'reservas' && (
         <div className="reservas-areas-list">
           <div className="areas-tabs" style={{marginBottom:'1rem'}}>
-            <button className={`areas-tab${reservasDateFilter === 'proximas' ? ' areas-tab-active' : ''}`} onClick={() => setReservasDateFilter('proximas')}>
+            <button className={`areas-tab${reservasDateFilter === 'proximas' ? ' areas-tab-active' : ''}`} onClick={() => { setReservasDateFilter('proximas'); setReservasPage(1); }}>
               Próximas{reservasProximas.length ? ` (${reservasProximas.length})` : ''}
             </button>
-            <button className={`areas-tab${reservasDateFilter === 'pasadas' ? ' areas-tab-active' : ''}`} onClick={() => setReservasDateFilter('pasadas')}>
+            <button className={`areas-tab${reservasDateFilter === 'pasadas' ? ' areas-tab-active' : ''}`} onClick={() => { setReservasDateFilter('pasadas'); setReservasPage(1); }}>
               Pasadas{reservasPasadas.length ? ` (${reservasPasadas.length})` : ''}
             </button>
           </div>
 
           {reservasVisibles.length === 0 ? (
             <div className="empty-state"><div className="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><p className="empty-state-title">{reservasDateFilter === 'pasadas' ? 'Sin reservas pasadas' : 'Sin reservas próximas'}</p><p className="empty-state-subtitle">{reservasDateFilter === 'pasadas' ? 'Las reservas finalizadas aparecerán aquí.' : 'Aún no hay solicitudes de reserva próximas.'}</p></div>
-          ) : reservasVisibles.map(r => {
+          ) : reservasPageItems.map(r => {
             const area    = areasSociales.find(a => a.id === r.areaId);
             const areaImg = parseAreaImages(area?.imagenUrl)[0] || '';
             const precio  = Number(area?.precio) || 0;
@@ -344,6 +350,9 @@ export default function ReservasScreen({
             </article>
             );
           })}
+          {reservasTotalPages > 1 && (
+            <Pagination page={reservasPageSafe} totalPages={reservasTotalPages} onPageChange={setReservasPage} />
+          )}
         </div>
       )}
 
