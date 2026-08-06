@@ -922,21 +922,32 @@ export default function PagosScreen({
                               <td style={{color:'#6b7280'}}>{getPropertyTenantsText(p) !== '-' ? getPropertyTenantsText(p) : '—'}</td>
                               <td>
                                 {editingExpensaId === p.id ? (
-                                  <div style={{display:'flex',gap:'0.3rem',alignItems:'center'}}>
-                                    <input type="number" min="0" className="expensas-base-input" style={{width:80}} placeholder="Bs." value={expensaEditVal} onChange={e => setExpensaEditVal(e.target.value)} autoFocus />
-                                    <button className="btn btn-primary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} disabled={expensaEditLoading} onClick={() => handleSaveExpensaActual(p.id, adminCondoId)}>
-                                      {expensaEditLoading ? '…' : 'OK'}
-                                    </button>
-                                    <button className="btn btn-secondary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} onClick={() => setEditingExpensaId(null)}>✕</button>
+                                  <div style={{display:'flex',flexDirection:'column',gap:'0.15rem'}}>
+                                    <div style={{display:'flex',gap:'0.3rem',alignItems:'center'}}>
+                                      <input type="number" min="0" className="expensas-base-input" style={{width:88}} placeholder="0" value={expensaEditVal} onChange={e => setExpensaEditVal(e.target.value)} autoFocus />
+                                      <button className="btn btn-primary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} disabled={expensaEditLoading} onClick={() => handleSaveExpensaActual(p.id, adminCondoId)}>
+                                        {expensaEditLoading ? '…' : 'OK'}
+                                      </button>
+                                      <button className="btn btn-secondary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} onClick={() => setEditingExpensaId(null)}>✕</button>
+                                    </div>
+                                    <span style={{fontSize:'0.68rem',color:'#9ca3af'}}>Valor final (reemplaza el actual)</span>
                                   </div>
                                 ) : (
-                                  <span
-                                    className={`expensas-editable-value${expensaActual > 0 ? ' expensas-value-set' : ''}`}
-                                    title="Click para editar la expensa de esta propiedad"
-                                    onClick={() => { setEditingExpensaId(p.id); setExpensaEditVal(''); }}
-                                  >
-                                    {expensaActual > 0 ? `Bs. ${expensaActual.toLocaleString()}` : '—'}
-                                  </span>
+                                  <div style={{display:'flex',alignItems:'center',gap:'0.35rem'}}>
+                                    <span className={`expensas-editable-value${expensaActual > 0 ? ' expensas-value-set' : ''}`}>
+                                      {expensaActual > 0 ? `Bs. ${expensaActual.toLocaleString()}` : '—'}
+                                    </span>
+                                    <button
+                                      className="expensa-edit-icon-btn"
+                                      title="Editar monto de expensa"
+                                      onClick={() => { setEditingExpensaId(p.id); setExpensaEditVal(String(expensaActual || '')); }}
+                                    >
+                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:13,height:13}}>
+                                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                      </svg>
+                                    </button>
+                                  </div>
                                 )}
                               </td>
                               <td>
@@ -988,20 +999,32 @@ export default function PagosScreen({
                           <div className="expensas-prop-card-row">
                             <span className="expensas-prop-card-label">Expensa actual</span>
                             {editingExpensaId === p.id ? (
-                              <div style={{display:'flex',gap:'0.3rem',alignItems:'center'}}>
-                                <input type="number" min="0" className="expensas-base-input" style={{width:80}} placeholder="Bs." value={expensaEditVal} onChange={e => setExpensaEditVal(e.target.value)} autoFocus />
-                                <button className="btn btn-primary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} disabled={expensaEditLoading} onClick={() => handleSaveExpensaActual(p.id, adminCondoId)}>
-                                  {expensaEditLoading ? '…' : 'OK'}
-                                </button>
-                                <button className="btn btn-secondary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} onClick={() => setEditingExpensaId(null)}>✕</button>
+                              <div style={{display:'flex',flexDirection:'column',gap:'0.15rem',alignItems:'flex-end'}}>
+                                <div style={{display:'flex',gap:'0.3rem',alignItems:'center'}}>
+                                  <input type="number" min="0" className="expensas-base-input" style={{width:80}} placeholder="0" value={expensaEditVal} onChange={e => setExpensaEditVal(e.target.value)} autoFocus />
+                                  <button className="btn btn-primary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} disabled={expensaEditLoading} onClick={() => handleSaveExpensaActual(p.id, adminCondoId)}>
+                                    {expensaEditLoading ? '…' : 'OK'}
+                                  </button>
+                                  <button className="btn btn-secondary" style={{padding:'0.2rem 0.6rem',fontSize:'0.78rem'}} onClick={() => setEditingExpensaId(null)}>✕</button>
+                                </div>
+                                <span style={{fontSize:'0.68rem',color:'#9ca3af'}}>Valor final (reemplaza el actual)</span>
                               </div>
                             ) : (
-                              <span
-                                className={`expensas-editable-value${expensaActual > 0 ? ' expensas-value-set' : ''}`}
-                                onClick={() => { setEditingExpensaId(p.id); setExpensaEditVal(''); }}
-                              >
-                                {expensaActual > 0 ? `Bs. ${expensaActual.toLocaleString()}` : '—'}
-                              </span>
+                              <div style={{display:'flex',alignItems:'center',gap:'0.35rem'}}>
+                                <span className={`expensas-editable-value${expensaActual > 0 ? ' expensas-value-set' : ''}`}>
+                                  {expensaActual > 0 ? `Bs. ${expensaActual.toLocaleString()}` : '—'}
+                                </span>
+                                <button
+                                  className="expensa-edit-icon-btn"
+                                  title="Editar monto de expensa"
+                                  onClick={() => { setEditingExpensaId(p.id); setExpensaEditVal(String(expensaActual || '')); }}
+                                >
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:13,height:13}}>
+                                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                  </svg>
+                                </button>
+                              </div>
                             )}
                           </div>
 
