@@ -4931,8 +4931,24 @@ h2,
 
 .pagos-tabs-tipo {
   grid-template-columns: repeat(3, 1fr);
-  margin-top: 0.55rem;
 }
+
+.pagos-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+.pagos-filter-group:first-of-type { margin-top: 0; }
+.pagos-filter-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+  padding-left: 0.1rem;
+}
+[data-theme="dark"] .pagos-filter-label { color: #555; }
 
 .pagos-condo-filter-wrap {
   margin-top: 0.75rem;
