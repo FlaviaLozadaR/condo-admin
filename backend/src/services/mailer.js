@@ -59,6 +59,7 @@ async function sendResetEmail(to, name, token) {
 }
 
 async function sendWelcomeEmail(to, name, password, role) {
+  if (!BREVO_API_KEY || !BREVO_SENDER_EMAIL) throw new Error('Brevo no configurado (faltan variables de entorno)');
   const loginUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
   await sendViaBrevo({

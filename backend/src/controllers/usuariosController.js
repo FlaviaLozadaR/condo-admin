@@ -66,10 +66,17 @@ async function create(req, res) {
       password: await bcrypt.hash(plainPassword, 10),
     });
 
-    sendWelcomeEmail(nuevo.email, nuevo.name, plainPassword, nuevo.role)
-      .catch(err => console.error('Email de bienvenida no enviado:', err.message));
+    let emailSent = false;
+    let emailError = null;
+    try {
+      await sendWelcomeEmail(nuevo.email, nuevo.name, plainPassword, nuevo.role);
+      emailSent = true;
+    } catch (err) {
+      emailError = err.message;
+      console.error('Email de bienvenida no enviado:', err.message);
+    }
 
-    res.status(201).json({ ...UserDTO.toResponse(nuevo), emailSent: true, emailError: null, tempPassword: plainPassword });
+    res.status(201).json({ ...UserDTO.toResponse(nuevo), emailSent, emailError, tempPassword: plainPassword });
   } catch (e) { res.status(400).json({ error: e.message }); }
 }
 
