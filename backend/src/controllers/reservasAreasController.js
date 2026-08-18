@@ -31,7 +31,7 @@ async function getAll(req, res) {
 
 async function create(req, res) {
   try {
-    const { areaId, areaNombre, fecha, horaInicio, horaFin, nota, diaCompleto } = req.body || {};
+    const { areaId, areaNombre, fecha, horaInicio, horaFin, nota, diaCompleto, manualPropietario, manualPropiedad } = req.body || {};
     const esDiaCompleto = !!diaCompleto;
     if (!areaId || !fecha || (!esDiaCompleto && (!horaInicio || !horaFin))) {
       return res.status(400).json({ error: 'Faltan datos: areaId, fecha y horario (o marcá día completo)' });
@@ -56,19 +56,24 @@ async function create(req, res) {
       return res.status(409).json({ error: conflict.diaCompleto ? 'Ese día ya está reservado por completo' : `Ese horario ya está reservado (${conflict.horaInicio}–${conflict.horaFin})` });
     }
 
-    const user   = await db.getUsuarioById(req.user.id);
+    const isManual = ['Administrador', 'Super Admin'].includes(req.user.role) && !!manualPropietario;
+    const adminUser = await db.getUsuarioById(req.user.id);
+    const condoVal      = adminUser?.condo    || '';
+    const propietarioVal = isManual ? manualPropietario : (adminUser?.name     || '');
+    const propiedadVal   = isManual ? (manualPropiedad || '') : (adminUser?.property || '');
+
     const nueva  = await db.createReservaArea({
       id:             uuid(),
       areaId,
       areaNombre:     areaNombre || '',
-      condo:          user?.condo    || '',
-      propiedad:      user?.property || '',
-      propietario:    user?.name     || '',
+      condo:          condoVal,
+      propiedad:      propiedadVal,
+      propietario:    propietarioVal,
       fecha,
       horaInicio:     horaInicioFinal,
       horaFin:        horaFinFinal,
       diaCompleto:    esDiaCompleto,
-      estado:         'pendiente',
+      estado:         isManual ? 'aprobada' : 'pendiente',
       nota:           nota || '',
       solicitudCambio: null,
     });
@@ -95,12 +100,6 @@ async function updateEstado(req, res) {
     if (!reserva) return res.status(404).json({ error: 'Reserva no encontrada' });
     if (req.user.role !== 'Super Admin' && reserva.condo !== req.user.condo) {
       return res.status(403).json({ error: 'No autorizado para este condominio' });
-    }
-    if (estado === 'aprobada' && !reserva.cobrado) {
-      const area = (await db.getAreasSociales()).find(a => String(a.id) === String(reserva.areaId));
-      if (Number(area?.precio) > 0) {
-        return res.status(400).json({ error: 'Primero tenés que cobrar la reserva antes de aprobarla.' });
-      }
     }
     const updated = await db.updateReservaArea(id, {
       estado,
