@@ -13,7 +13,7 @@ const TARGET_ROLES = {
 
 async function getAll(req, res) {
   try {
-    const { page, limit, dateFilter } = req.query;
+    const { page, limit, dateFilter, targetFilter } = req.query;
     // Solo Super Admin puede elegir condominio por query — el resto queda fijo al suyo.
     const condo = req.user.role === 'Super Admin' ? (req.query.condo || undefined) : req.user.condo;
     if (page) {
@@ -22,6 +22,7 @@ async function getAll(req, res) {
         limit: Math.min(100, Math.max(1, parseInt(limit) || 20)),
         condo,
         dateFilter,
+        targetFilter,
         viewerRole: req.user.role,
       });
       return res.json({ ...result, data: result.data.map(AnuncioDTO.toResponse) });

@@ -344,7 +344,7 @@ async function getAnuncios(condo) {
 // Replica server-side la visibilidad por rol que hoy calcula el cliente
 // (isAnnouncementVisibleForUser): solo SA/Admin pueden crear anuncios, así que
 // para cada rol alcanza con filtrar por target/creador.
-function applyAnunciosFilters(query, { condo, viewerRole, dateFilter } = {}) {
+function applyAnunciosFilters(query, { condo, viewerRole, dateFilter, targetFilter } = {}) {
   let result = query;
   if (condo) result = result.eq('condo', condo);
   if (viewerRole === 'Administrador') {
@@ -358,6 +358,10 @@ function applyAnunciosFilters(query, { condo, viewerRole, dateFilter } = {}) {
   }
   // Super Admin: sin filtro de visibilidad (ve todo)
 
+  if (targetFilter && targetFilter !== 'todos') {
+    result = result.eq('target', targetFilter);
+  }
+
   const DIA_MS = 24 * 60 * 60 * 1000;
   if (dateFilter === 'semana') {
     result = result.gte('inserted_at', new Date(Date.now() - 7 * DIA_MS).toISOString());
@@ -370,12 +374,12 @@ function applyAnunciosFilters(query, { condo, viewerRole, dateFilter } = {}) {
   return result;
 }
 
-async function getAnunciosPaged({ page = 1, limit = 20, condo, viewerRole, dateFilter } = {}) {
+async function getAnunciosPaged({ page = 1, limit = 20, condo, viewerRole, dateFilter, targetFilter } = {}) {
   const from = (page - 1) * limit;
 
   const { data, error, count } = await applyAnunciosFilters(
     supabase.from('anuncios').select('*', { count: 'exact' }).order('inserted_at', { ascending: false }),
-    { condo, viewerRole, dateFilter }
+    { condo, viewerRole, dateFilter, targetFilter }
   ).range(from, from + limit - 1);
   if (error) throw error;
 
