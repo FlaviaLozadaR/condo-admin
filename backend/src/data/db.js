@@ -528,7 +528,7 @@ async function getHistorial(condo) {
 function applyHistorialFilters(query, { tipo, q: search, condo, currentMonthOnly } = {}) {
   let result = query;
   if (tipo && tipo !== 'todos') result = result.eq('tipo', tipo);
-  if (search) result = result.or(`visitante.ilike.%${search}%,cedula.ilike.%${search}%,placa.ilike.%${search}%`);
+  if (search) result = result.or(`visitante.ilike.%${search}%,cedula.ilike.%${search}%,placa.ilike.%${search}%,propiedad.ilike.%${search}%`);
   if (condo) result = result.eq('condo', condo);
   if (currentMonthOnly) {
     const now = new Date();
