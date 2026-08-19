@@ -70,4 +70,10 @@ async function deleteFile(bucket, filename) {
   await supabase.storage.from(bucket).remove([name]);
 }
 
-module.exports = { supabase, uploadFile, uploadPrivateFile, getSignedUrl, deleteFile };
+function getPublicUrl(bucket, filename) {
+  if (!filename) return null;
+  const { data } = supabase.storage.from(bucket).getPublicUrl(filename);
+  return data.publicUrl;
+}
+
+module.exports = { supabase, uploadFile, uploadPrivateFile, getSignedUrl, getPublicUrl, deleteFile };

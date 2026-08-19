@@ -2,7 +2,7 @@ const path   = require('path');
 const multer = require('multer');
 const { v4: uuid } = require('uuid');
 const db = require('../data/db');
-const { uploadPrivateFile, getSignedUrl, deleteFile } = require('../services/supabase');
+const { uploadFile, getPublicUrl, deleteFile } = require('../services/supabase');
 
 const MAX_IMAGENES = 6;
 
@@ -40,20 +40,21 @@ async function uploadImagenes(files) {
   for (const file of files) {
     const ext      = path.extname(file.originalname).toLowerCase();
     const filename = `area_${Date.now()}_${uuid()}${ext}`;
-    urls.push(await uploadPrivateFile(file.buffer, 'areas-sociales', filename, file.mimetype));
+    urls.push(await uploadFile(file.buffer, 'areas-sociales', filename, file.mimetype));
   }
   return urls;
 }
 
-// imagenUrl se guarda como nombre(s) de archivo (bucket privado) — al
-// devolver el área al cliente se reemplazan por links firmados, válidos 2 horas.
-async function withSignedImages(area) {
+// imagenUrl se guarda como URL pública permanente (bucket público).
+function withPublicImages(area) {
   const filenames = parseImagenes(area.imagenUrl);
   if (!filenames.length) return area;
-  const signed = await Promise.all(
-    filenames.map((f) => getSignedUrl('areas-sociales', f, 7200).catch(() => ''))
-  );
-  return { ...area, imagenUrl: signed.filter(Boolean) };
+  // Si ya son URLs completas (http...) las devolvemos tal cual;
+  // si son nombres de archivo, generamos la URL pública.
+  const urls = filenames.map(f =>
+    f.startsWith('http') ? f : (getPublicUrl('areas-sociales', f) || '')
+  ).filter(Boolean);
+  return { ...area, imagenUrl: urls };
 }
 
 async function getAdminCondo(req) {
@@ -73,7 +74,7 @@ async function getAll(req, res) {
       const user = await db.getUsuarioById(req.user.id);
       filtered = areas.filter(a => a.condo === user?.condo && a.activo !== false);
     }
-    res.json(await Promise.all(filtered.map(withSignedImages)));
+    res.json(await Promise.all(filtered.map(withPublicImages)));
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
@@ -101,7 +102,7 @@ async function create(req, res) {
       imagenUrl,
       activo:      true,
     });
-    res.status(201).json(await withSignedImages(nueva));
+    res.status(201).json(await withPublicImages(nueva));
   } catch (e) { res.status(400).json({ error: e.message }); }
 }
 
@@ -117,16 +118,15 @@ async function update(req, res) {
       if (area.condo !== condo) return res.status(403).json({ error: 'Sin permisos' });
     }
 
-    const existentes = parseImagenes(area.imagenUrl); // nombres de archivo guardados en la DB
+    const existentes = parseImagenes(area.imagenUrl); // URLs o nombres guardados en la DB
     let conservadas = existentes;
     if (req.body.imagenesActuales !== undefined) {
       try {
         const lista = JSON.parse(req.body.imagenesActuales);
-        // El cliente recibió links firmados (con token y query string), no
-        // nombres de archivo — comparamos solo por el nombre base del archivo.
+        // Comparamos por nombre base del archivo (funciona tanto con URLs públicas como firmadas)
         if (Array.isArray(lista)) {
           const keepNames = lista.map((u) => String(u).split('?')[0].split('/').pop());
-          conservadas = existentes.filter((u) => keepNames.includes(u));
+          conservadas = existentes.filter((u) => keepNames.includes(String(u).split('?')[0].split('/').pop()));
         }
       } catch { /* ignorar valor inválido, conservar todas */ }
     }
@@ -150,7 +150,7 @@ async function update(req, res) {
       imagenUrl,
     };
     const updated = await db.updateAreaSocial(id, changes);
-    res.json(await withSignedImages(updated));
+    res.json(await withPublicImages(updated));
   } catch (e) { res.status(400).json({ error: e.message }); }
 }
 
