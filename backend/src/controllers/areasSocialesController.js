@@ -46,12 +46,12 @@ async function uploadImagenes(files) {
 }
 
 // imagenUrl se guarda como nombre(s) de archivo (bucket privado) — al
-// devolver el área al cliente se reemplazan por links firmados, válidos 10 minutos.
+// devolver el área al cliente se reemplazan por links firmados, válidos 2 horas.
 async function withSignedImages(area) {
   const filenames = parseImagenes(area.imagenUrl);
   if (!filenames.length) return area;
   const signed = await Promise.all(
-    filenames.map((f) => getSignedUrl('areas-sociales', f, 600).catch(() => ''))
+    filenames.map((f) => getSignedUrl('areas-sociales', f, 7200).catch(() => ''))
   );
   return { ...area, imagenUrl: signed.filter(Boolean) };
 }
