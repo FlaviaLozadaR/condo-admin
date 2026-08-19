@@ -732,10 +732,26 @@ async function getExpensasHistorial(condo) {
   return data || [];
 }
 
+// CALLES
+async function getCalles(condo) {
+  let query = supabase.from('calles').select('*').order('name');
+  if (condo) query = query.eq('condo', condo);
+  return (await q(query)).map(rowToApp);
+}
+async function createCalle(name, condo) {
+  const { data, error } = await supabase.from('calles').upsert({ name, condo }, { onConflict: 'name,condo' }).select().single();
+  if (error) throw error;
+  return rowToApp(data);
+}
+async function deleteCalle(id) {
+  return q(supabase.from('calles').delete().eq('id', id));
+}
+
 module.exports = {
   getUsuarios, getUsuarioById, getUsuarioByEmail, createUsuario, updateUsuario, deleteUsuario, getUsuariosPaged, getSeguridadContacts,
   getCondominios, createCondominio, updateCondominio, deleteCondominio,
   getPropiedades, createPropiedad, updatePropiedad, deletePropiedad, propiedadExists, getPropiedadesPaged,
+  getCalles, createCalle, deleteCalle,
   createCargoExtra, updateCargoExtraItem, deleteCargoExtraItem, getCargoExtraById,
   deleteCargosExtraByReservaId, deleteCargosExtraByPropiedadId,
   getPagos, getPagoById, createPago, updatePagoEstado, updatePago, getPagosPaged,

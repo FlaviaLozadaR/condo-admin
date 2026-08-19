@@ -251,4 +251,28 @@ async function removeCargoExtra(req, res) {
   } catch (e) { res.status(e.status || 400).json({ error: e.message }); }
 }
 
-module.exports = { getAll, create, update, remove, getMyProperty, getMyProperties, addCargoExtra, editCargoExtra, removeCargoExtra };
+async function getCalles(req, res) {
+  try {
+    const condo = req.user.role === 'Super Admin' ? (req.query.condo || undefined) : req.user.condo;
+    res.json(await db.getCalles(condo));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+}
+
+async function createCalle(req, res) {
+  try {
+    const { name, condo: bodyCondo } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'El nombre de la calle es requerido' });
+    const condo = req.user.role === 'Super Admin' ? (bodyCondo || req.user.condo) : req.user.condo;
+    const calle = await db.createCalle(name.trim(), condo);
+    res.status(201).json(calle);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+}
+
+async function removeCalle(req, res) {
+  try {
+    await db.deleteCalle(req.params.id);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+}
+
+module.exports = { getAll, create, update, remove, getMyProperty, getMyProperties, addCargoExtra, editCargoExtra, removeCargoExtra, getCalles, createCalle, removeCalle };

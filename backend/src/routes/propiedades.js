@@ -86,6 +86,10 @@ router.get('/my-properties',     requireAuth, requireRole(...ALL),   ctrl.getMyP
  *       400: { description: Faltan campos requeridos, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  *       409: { description: 'Código duplicado, o el inquilino ya está asignado a otra propiedad', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  */
+router.get('/calles',            requireAuth, requireRole(...MGMT),  ctrl.getCalles);
+router.post('/calles',           requireAuth, requireRole(...ADMIN), ctrl.createCalle);
+router.delete('/calles/:id',     requireAuth, requireRole(...ADMIN), ctrl.removeCalle);
+
 router.get('/',                  requireAuth, requireRole(...MGMT),  ctrl.getAll);
 router.post('/',                 requireAuth, requireRole(...ADMIN), ctrl.create);
 
