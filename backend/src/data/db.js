@@ -611,6 +611,9 @@ async function getPanicAlertById(id) {
 async function updatePanicStatus(id, status) {
   return rowToApp(await q(supabase.from('panic_alerts').update({ status }).eq('id', id).select().single()));
 }
+async function deletePanicAlert(id) {
+  await q(supabase.from('panic_alerts').delete().eq('id', id));
+}
 
 // ÁREAS SOCIALES
 async function getAreasSociales() {
@@ -759,7 +762,7 @@ module.exports = {
   getAsambleas, getAsambleaById, createAsamblea, updateAsamblea, deleteAsamblea, voteAsamblea, getAsambleasPaged,
   getVisitas, createVisita, getVisitaByCode, updateVisitaStatus, getVisitaById, updateVisita, deleteVisita,
   getHistorial, getHistorialPaged, createHistorial, getHistorialById, updateHistorial, deleteHistorial,
-  getPanicAlerts, createPanicAlert, getPanicAlertById, updatePanicStatus,
+  getPanicAlerts, createPanicAlert, getPanicAlertById, updatePanicStatus, deletePanicAlert,
   createResetToken, getResetToken, markTokenUsed,
   getDataForDashboard,
   getAreasSociales, createAreaSocial, updateAreaSocial, deleteAreaSocial,

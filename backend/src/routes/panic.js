@@ -65,5 +65,6 @@ router.post('/',            requireAuth, requireRole(...ALL),  ctrl.create);
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 router.patch('/:id/status', requireAuth, requireRole(...MGMT), ctrl.updateStatus);
+router.delete('/:id',       requireAuth, requireRole('Super Admin'), ctrl.remove);
 
 module.exports = router;

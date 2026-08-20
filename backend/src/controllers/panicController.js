@@ -42,4 +42,14 @@ async function updateStatus(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
-module.exports = { getAll, create, updateStatus };
+async function remove(req, res) {
+  try {
+    if (req.user.role !== 'Super Admin') return res.status(403).json({ error: 'Solo el Super Admin puede eliminar alertas' });
+    const existing = await db.getPanicAlertById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'No encontrado' });
+    await db.deletePanicAlert(req.params.id);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+}
+
+module.exports = { getAll, create, updateStatus, remove };
