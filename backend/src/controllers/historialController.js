@@ -41,6 +41,23 @@ async function updateSalida(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
+async function update(req, res) {
+  try {
+    const existing = await db.getHistorialById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'No encontrado' });
+    if (req.user.role !== 'Super Admin' && existing.condo !== req.user.condo) {
+      return res.status(403).json({ error: 'No autorizado para este condominio' });
+    }
+    const allowed = ['visitante', 'cedula', 'propiedad', 'tipo', 'placa', 'fecha', 'entrada', 'salida', 'motivo'];
+    const patch = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) patch[key] = req.body[key];
+    }
+    const updated = await db.updateHistorial(req.params.id, patch);
+    res.json(HistorialDTO.toResponse(updated));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+}
+
 async function remove(req, res) {
   try {
     const existing = await db.getHistorialById(req.params.id);
@@ -76,4 +93,4 @@ async function getMyVisits(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
-module.exports = { getAll, create, updateSalida, remove, getMyVisits };
+module.exports = { getAll, create, update, updateSalida, remove, getMyVisits };

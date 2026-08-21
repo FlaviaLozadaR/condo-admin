@@ -105,6 +105,7 @@ router.patch('/:id/salida', requireAuth, requireRole(...MGMT), ctrl.updateSalida
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  */
+router.patch('/:id',  requireAuth, requireRole(...MGMT), ctrl.update);
 router.delete('/:id', requireAuth, requireRole(...MGMT), ctrl.remove);
 
 module.exports = router;
