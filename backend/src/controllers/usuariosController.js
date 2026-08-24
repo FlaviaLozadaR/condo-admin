@@ -16,7 +16,6 @@ const avatarUpload = multer({
   },
   limits: { fileSize: 5 * 1024 * 1024 },
 });
-exports.avatarUpload = avatarUpload;
 
 async function getAll(req, res) {
   try {
@@ -216,4 +215,4 @@ async function uploadAvatar(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
-module.exports = { getAll, create, update, remove, changePassword, getSeguridad, uploadAvatar };
+module.exports = { getAll, create, update, remove, changePassword, getSeguridad, uploadAvatar, avatarUpload };
