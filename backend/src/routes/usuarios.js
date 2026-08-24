@@ -126,6 +126,7 @@ router.put('/:id',                   requireAuth, requireSelfOrAdmin,    userSan
  *       403: { $ref: '#/components/responses/Forbidden' }
  */
 router.post('/:id/change-password',  requireAuth, requireSelfOrAdmin,    ctrl.changePassword);
+router.post('/:id/avatar',           requireAuth, ctrl.avatarUpload.single('avatar'), ctrl.uploadAvatar);
 router.delete('/:id',                requireAuth, requireRole(...ADMIN),  ctrl.remove);
 
 module.exports = router;

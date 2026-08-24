@@ -1,8 +1,22 @@
+const path   = require('path');
+const multer = require('multer');
 const { v4: uuid } = require('uuid');
 const bcrypt = require('bcryptjs');
 const db     = require('../data/db');
 const UserDTO = require('../dto/userDto');
 const { sendWelcomeEmail } = require('../services/mailer');
+const { uploadFile } = require('../services/supabase');
+
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
+    if (allowed.includes(path.extname(file.originalname).toLowerCase())) return cb(null, true);
+    cb(new Error('Solo imágenes JPG, PNG o WEBP.'));
+  },
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+exports.avatarUpload = avatarUpload;
 
 async function getAll(req, res) {
   try {
@@ -185,4 +199,21 @@ async function changePassword(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
-module.exports = { getAll, create, update, remove, changePassword, getSeguridad };
+async function uploadAvatar(req, res) {
+  try {
+    const targetId = req.params.id;
+    const isSelf = String(req.user.id) === String(targetId);
+    const isAdmin = ['Super Admin', 'Administrador'].includes(req.user.role);
+    if (!isSelf && !isAdmin) return res.status(403).json({ error: 'No autorizado' });
+    if (!req.file) return res.status(400).json({ error: 'No se recibió ningún archivo' });
+
+    const ext = path.extname(req.file.originalname).toLowerCase() || '.jpg';
+    const filename = `avatars/${targetId}_${uuid()}${ext}`;
+    const publicUrl = await uploadFile(req.file.buffer, 'avatars', filename, req.file.mimetype);
+
+    const updated = await db.updateUsuario(targetId, { avatarUrl: publicUrl });
+    res.json({ avatarUrl: publicUrl, user: UserDTO.toResponse(updated) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+}
+
+module.exports = { getAll, create, update, remove, changePassword, getSeguridad, uploadAvatar };
