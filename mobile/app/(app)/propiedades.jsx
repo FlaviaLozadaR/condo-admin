@@ -5,7 +5,8 @@ import {
   Platform, Pressable, Alert,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ChevronDownIcon } from '../../src/components/Icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { colors, spacing, radius, font } from '../../src/theme';
@@ -63,24 +64,25 @@ function getTenantsText(p) {
   return t.length ? t.join(', ') : '-';
 }
 
-const styles = makeStyles(colors);
-
 // ── Inline dropdown ───────────────────────────────────────────────────────────
 function InlinePicker({ value, options, onSelect, placeholder, open, onToggle }) {
+  const { colors: c } = useTheme();
   return (
     <View style={{ zIndex: open ? 99 : 1 }}>
       <TouchableOpacity
-        style={[styles.pickerBtn, open && styles.pickerBtnOpen]}
+        style={[styles.pickerBtn, { backgroundColor: c.inputBg }, open && styles.pickerBtnOpen]}
         onPress={onToggle}
         activeOpacity={0.8}
       >
-        <Text style={[styles.pickerBtnText, !value && { color: colors.textMuted }]} numberOfLines={1}>
+        <Text style={[styles.pickerBtnText, !value && { color: c.textMuted }]} numberOfLines={1}>
           {value || placeholder || '— Seleccionar —'}
         </Text>
-        <Text style={styles.pickerArrow}>{open ? '∧' : '⌄'}</Text>
+        <View style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}>
+          <ChevronDownIcon size={16} color={open ? c.primary : c.textMuted} />
+        </View>
       </TouchableOpacity>
       {open && (
-        <View style={styles.inlineDrop}>
+        <View style={[styles.inlineDrop, { backgroundColor: c.surface }]}>
           {options.map(opt => (
             <TouchableOpacity
               key={opt.key ?? opt.label}
@@ -90,7 +92,7 @@ function InlinePicker({ value, options, onSelect, placeholder, open, onToggle })
               <Text style={[styles.inlineDropText, value === opt.label && styles.inlineDropTextActive]} numberOfLines={1}>
                 {opt.label}
               </Text>
-              {value === opt.label && <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>✓</Text>}
+              {value === opt.label && <Text style={{ color: c.primary, fontWeight: '700', fontSize: 13 }}>✓</Text>}
             </TouchableOpacity>
           ))}
         </View>
@@ -100,54 +102,84 @@ function InlinePicker({ value, options, onSelect, placeholder, open, onToggle })
 }
 
 // ── Searchable dropdown ───────────────────────────────────────────────────────
-function SearchablePicker({ value, options, onSelect, placeholder, open, onToggle }) {
+function SearchablePicker({ value, options, onSelect, placeholder, open, onToggle, title }) {
+  const { colors: c } = useTheme();
   const [q, setQ] = useState('');
-  const filtered = options.filter(o => o.label.toLowerCase().includes(q.toLowerCase()));
+  const filtered = options.filter(o => o.label.toLowerCase().includes(q.toLowerCase()) && o.key !== '');
+
+  const handleClose = () => { setQ(''); onToggle(); };
+  const handleSelect = (opt) => { onSelect(opt); handleClose(); };
+
   return (
-    <View style={{ zIndex: open ? 99 : 1 }}>
+    <View>
       <TouchableOpacity
-        style={[styles.pickerBtn, open && styles.pickerBtnOpen]}
+        style={[styles.pickerBtn, { backgroundColor: c.inputBg, borderColor: open ? c.primary : c.border }]}
         onPress={onToggle}
         activeOpacity={0.8}
       >
-        <Text style={[styles.pickerBtnText, !value && { color: colors.textMuted }]} numberOfLines={1}>
+        <Text style={[styles.pickerBtnText, { color: value ? c.text : c.textMuted }]} numberOfLines={1}>
           {value || placeholder || '— Seleccionar —'}
         </Text>
-        <Text style={styles.pickerArrow}>{open ? '∧' : '⌄'}</Text>
+        <ChevronDownIcon size={16} color={value ? c.primary : c.textMuted} />
       </TouchableOpacity>
-      {open && (
-        <View style={styles.inlineDrop}>
-          <View style={styles.streetPickerSearchRow}>
-            <SearchIcon />
-            <TextInput
-              style={styles.streetPickerInput}
-              placeholder="Buscar..."
-              placeholderTextColor={colors.textMuted}
-              value={q}
-              onChangeText={setQ}
-              autoCapitalize="none"
-            />
-          </View>
-          <ScrollView style={{ maxHeight: 308 }} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
-            {filtered.length === 0 ? (
-              <View style={styles.inlineDropItem}>
-                <Text style={[styles.inlineDropText, { color: colors.textMuted }]}>Sin resultados</Text>
-              </View>
-            ) : filtered.map(opt => (
-              <TouchableOpacity
-                key={opt.key ?? opt.label}
-                style={[styles.inlineDropItem, value === opt.label && styles.inlineDropItemActive]}
-                onPress={() => { onSelect(opt); onToggle(); setQ(''); }}
-              >
-                <Text style={[styles.inlineDropText, value === opt.label && styles.inlineDropTextActive]} numberOfLines={1}>
-                  {opt.label}
-                </Text>
-                {value === opt.label && <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>✓</Text>}
+
+      <Modal visible={open} transparent animationType="fade" statusBarTranslucent onRequestClose={handleClose}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: spacing.lg }} activeOpacity={1} onPress={handleClose}>
+          <Pressable style={{ backgroundColor: c.surface, borderRadius: radius.xl, overflow: 'hidden', maxHeight: '75%' }}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: c.border }}>
+              <Text style={{ fontSize: font.md, fontWeight: '700', color: c.text }}>{title || placeholder || 'Seleccionar'}</Text>
+              <TouchableOpacity onPress={handleClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={{ fontSize: 18, color: c.textMuted }}>✕</Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+            </View>
+            {/* Search */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, margin: spacing.md, padding: 10, backgroundColor: c.inputBg, borderRadius: radius.md, borderWidth: 1, borderColor: c.border }}>
+              <SearchIcon />
+              <TextInput
+                style={{ flex: 1, fontSize: font.sm, color: c.text }}
+                placeholder="Buscar..."
+                placeholderTextColor={c.textMuted}
+                value={q}
+                onChangeText={setQ}
+                autoCapitalize="none"
+                autoFocus
+              />
+              {q.length > 0 && (
+                <TouchableOpacity onPress={() => setQ('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={{ fontSize: 14, color: c.textMuted }}>✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {/* Selected pinned */}
+            {value && !q && (
+              <View style={{ marginHorizontal: spacing.md, marginBottom: spacing.sm, flexDirection: 'row', alignItems: 'center', backgroundColor: c.primarySoft, borderRadius: radius.md, padding: 12, gap: 8 }}>
+                <Text style={{ flex: 1, fontSize: font.sm, fontWeight: '700', color: c.primary }} numberOfLines={1}>{value}</Text>
+                <TouchableOpacity onPress={() => { onSelect({ key: '', label: '' }); handleClose(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={{ fontSize: 12, color: c.textMuted }}>✕ Quitar</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {/* List */}
+            <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 320 }}>
+              {filtered.length === 0 && (
+                <View style={{ padding: spacing.md }}>
+                  <Text style={{ fontSize: font.sm, color: c.textMuted }}>Sin resultados.</Text>
+                </View>
+              )}
+              {filtered.filter(o => o.label !== value).map(opt => (
+                <TouchableOpacity
+                  key={opt.key ?? opt.label}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 14, borderTopWidth: 1, borderTopColor: c.border }}
+                  onPress={() => handleSelect(opt)}
+                >
+                  <Text style={{ flex: 1, fontSize: font.sm, color: c.text }} numberOfLines={1}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Pressable>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -157,7 +189,14 @@ function FL({ children }) {
   return <Text style={styles.formLabel}>{children}</Text>;
 }
 function FI({ style, ...props }) {
-  return <TextInput style={[styles.formInput, style]} placeholderTextColor="rgba(0,0,0,0.3)" {...props} />;
+  const { colors: c } = useTheme();
+  return (
+    <TextInput
+      style={[styles.formInput, { backgroundColor: c.inputBg, color: c.text }, style]}
+      placeholderTextColor={c.textMuted}
+      {...props}
+    />
+  );
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -172,65 +211,94 @@ function Toast({ toast }) {
 
 // ── Street picker with search ─────────────────────────────────────────────────
 function StreetPicker({ value, streets, onSelect, open, onToggle }) {
+  const { colors: c } = useTheme();
   const [q, setQ] = useState('');
   const filtered = streets.filter(s => s.name.toLowerCase().includes(q.toLowerCase()));
   const showNew  = q.trim().length > 0 && !streets.some(s => s.name.toLowerCase() === q.trim().toLowerCase());
+
+  const handleClose = () => { setQ(''); onToggle(); };
+  const handleSelect = (name) => { onSelect(name); handleClose(); };
+
   return (
-    <View style={{ zIndex: open ? 99 : 1 }}>
-      <TouchableOpacity style={[styles.pickerBtn, open && styles.pickerBtnOpen]} onPress={onToggle} activeOpacity={0.8}>
-        <Text style={[styles.pickerBtnText, !value && { color: colors.textMuted }]} numberOfLines={1}>
-          {value || '— Seleccioná o creá una calle —'}
+    <View>
+      <TouchableOpacity
+        style={[styles.pickerBtn, { backgroundColor: c.inputBg, borderColor: open ? c.primary : c.border }]}
+        onPress={onToggle}
+        activeOpacity={0.8}
+      >
+        <Text style={[styles.pickerBtnText, { color: value ? c.text : c.textMuted }]} numberOfLines={1}>
+          {value || '— Seleccioná una calle —'}
         </Text>
-        <Text style={styles.pickerArrow}>{open ? '∧' : '⌄'}</Text>
+        <ChevronDownIcon size={16} color={value ? c.primary : c.textMuted} />
       </TouchableOpacity>
-      {open && (
-        <View style={styles.streetPickerDrop}>
-          <View style={styles.streetPickerSearchRow}>
-            <SearchIcon />
-            <TextInput
-              style={styles.streetPickerInput}
-              placeholder="Buscar o escribir nueva calle..."
-              placeholderTextColor={colors.textMuted}
-              value={q}
-              onChangeText={setQ}
-              autoCapitalize="words"
-              autoCorrect={false}
-            />
-          </View>
-          <ScrollView style={{ maxHeight: 308 }} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
-            {showNew && (
-              <TouchableOpacity
-                style={styles.streetPickerItem}
-                onPress={() => { onSelect(q.trim()); onToggle(); setQ(''); }}
-              >
-                <Text style={[styles.streetPickerItemText, { color: colors.primary, fontWeight: '700' }]}>
-                  + Nueva calle: "{q.trim()}"
-                </Text>
+
+      <Modal visible={open} transparent animationType="fade" statusBarTranslucent onRequestClose={handleClose}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: spacing.lg }} activeOpacity={1} onPress={handleClose}>
+          <Pressable style={{ backgroundColor: c.surface, borderRadius: radius.xl, overflow: 'hidden', maxHeight: '75%' }}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: c.border }}>
+              <Text style={{ fontSize: font.md, fontWeight: '700', color: c.text }}>Seleccionar Calle</Text>
+              <TouchableOpacity onPress={handleClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={{ fontSize: 18, color: c.textMuted }}>✕</Text>
               </TouchableOpacity>
-            )}
-            {filtered.length === 0 && !showNew && (
-              <View style={styles.streetPickerItem}>
-                <Text style={[styles.streetPickerItemText, { color: colors.textMuted }]}>
-                  Escribí para crear una calle nueva.
-                </Text>
+            </View>
+            {/* Search */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, margin: spacing.md, padding: 10, backgroundColor: c.inputBg, borderRadius: radius.md, borderWidth: 1, borderColor: c.border }}>
+              <SearchIcon />
+              <TextInput
+                style={{ flex: 1, fontSize: font.sm, color: c.text }}
+                placeholder="Buscar o escribir nueva calle..."
+                placeholderTextColor={c.textMuted}
+                value={q}
+                onChangeText={setQ}
+                autoCapitalize="words"
+                autoCorrect={false}
+                autoFocus
+              />
+              {q.length > 0 && (
+                <TouchableOpacity onPress={() => setQ('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={{ fontSize: 14, color: c.textMuted }}>✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {/* Selected pinned */}
+            {value && !q && (
+              <View style={{ marginHorizontal: spacing.md, marginBottom: spacing.sm, flexDirection: 'row', alignItems: 'center', backgroundColor: c.primarySoft, borderRadius: radius.md, padding: 12, gap: 8 }}>
+                <Text style={{ flex: 1, fontSize: font.sm, fontWeight: '700', color: c.primary }} numberOfLines={1}>{value}</Text>
+                <TouchableOpacity onPress={() => { onSelect(''); handleClose(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={{ fontSize: 12, color: c.textMuted }}>✕ Quitar</Text>
+                </TouchableOpacity>
               </View>
             )}
-            {filtered.map(s => (
-              <TouchableOpacity
-                key={s.name}
-                style={[styles.streetPickerItem, value === s.name && styles.streetPickerItemActive]}
-                onPress={() => { onSelect(s.name); onToggle(); setQ(''); }}
-              >
-                <Text style={[styles.streetPickerItemText, value === s.name && { color: colors.primary, fontWeight: '700' }]} numberOfLines={1}>
-                  {s.name}
-                </Text>
-                <Text style={styles.streetPickerCount}>{s.count} prop.</Text>
-                {value === s.name && <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>✓</Text>}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+            {/* List */}
+            <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 320 }}>
+              {showNew && (
+                <TouchableOpacity
+                  style={{ paddingHorizontal: spacing.md, paddingVertical: 14, borderTopWidth: 1, borderTopColor: c.border }}
+                  onPress={() => handleSelect(q.trim())}
+                >
+                  <Text style={{ fontSize: font.sm, color: c.primary, fontWeight: '700' }}>+ Crear: "{q.trim()}"</Text>
+                </TouchableOpacity>
+              )}
+              {filtered.length === 0 && !showNew && (
+                <View style={{ padding: spacing.md }}>
+                  <Text style={{ fontSize: font.sm, color: c.textMuted }}>Escribí para crear una calle nueva.</Text>
+                </View>
+              )}
+              {filtered.filter(s => s.name !== value).map(s => (
+                <TouchableOpacity
+                  key={s.name}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 14, borderTopWidth: 1, borderTopColor: c.border, gap: 8 }}
+                  onPress={() => handleSelect(s.name)}
+                >
+                  <Text style={{ flex: 1, fontSize: font.sm, color: c.text }} numberOfLines={1}>{s.name}</Text>
+                  <Text style={{ fontSize: 11, color: c.textMuted }}>{s.count} prop.</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Pressable>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -240,6 +308,7 @@ export default function PropiedadesScreen() {
   const { user, isSuperAdmin, isAdmin } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
   const roleLabel = isSuperAdmin ? 'Super Admin' : isAdmin ? 'Administrador' : 'Residente';
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -630,11 +699,12 @@ export default function PropiedadesScreen() {
       </ScrollView>
 
       {/* ── CREATE MODAL ── */}
-      <Modal visible={createModal} transparent animationType="none" onRequestClose={() => setCreateModal(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setCreateModal(false)}>
-            <Pressable style={styles.formSheet}>
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <Modal visible={createModal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setCreateModal(false)}>
+        <View style={{ flex: 1 }}>
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setCreateModal(false)} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <View style={[styles.bottomSheet, { position: 'relative' }]}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetContent}>
                 <View style={styles.sheetHeader}>
                   <Text style={styles.sheetTitle}>Crear Propiedad</Text>
                   <TouchableOpacity onPress={() => setCreateModal(false)}><Text style={styles.closeX}>✕</Text></TouchableOpacity>
@@ -676,6 +746,7 @@ export default function PropiedadesScreen() {
                   value={createForm.propietario}
                   options={[{ key: '', label: 'Seleccionar propietario' }, ...propietariosOptions]}
                   placeholder="Seleccionar propietario"
+                  title="Propietario"
                   open={openDrop === 'owner'}
                   onToggle={() => setOpenDrop(d => d === 'owner' ? null : 'owner')}
                   onSelect={opt => setCreateForm(f => ({ ...f, propietario: opt.key === '' ? '' : opt.label }))}
@@ -698,6 +769,7 @@ export default function PropiedadesScreen() {
                           value={inq}
                           options={[{ key: '', label: 'Seleccionar inquilino' }, ...available]}
                           placeholder="Seleccionar inquilino"
+                          title="Inquilino"
                           open={openDrop === `ti-${idx}`}
                           onToggle={() => setOpenDrop(d => d === `ti-${idx}` ? null : `ti-${idx}`)}
                           onSelect={opt => { updateTenant(createForm, setCreateForm, idx, opt.key === '' ? '' : opt.label); }}
@@ -724,17 +796,16 @@ export default function PropiedadesScreen() {
                   </TouchableOpacity>
                 </View>
               </ScrollView>
-            </Pressable>
-          </TouchableOpacity>
+        </View>
         </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* ── EDIT MODAL ── */}
-      <Modal visible={!!editModal} transparent animationType="none" onRequestClose={() => setEditModal(null)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setEditModal(null)}>
-            <Pressable style={styles.formSheet}>
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <Modal visible={!!editModal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setEditModal(null)}>
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setEditModal(null)} />
+        <View style={styles.bottomSheet}>
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetContent}>
                 <View style={styles.sheetHeader}>
                   <Text style={styles.sheetTitle}>Editar Propiedad</Text>
                   <TouchableOpacity onPress={() => setEditModal(null)}><Text style={styles.closeX}>✕</Text></TouchableOpacity>
@@ -762,6 +833,7 @@ export default function PropiedadesScreen() {
                   value={editModal?.propietario}
                   options={[{ key: '', label: 'Seleccionar propietario' }, ...propietariosOptions]}
                   placeholder="Seleccionar propietario"
+                  title="Propietario"
                   open={openDrop === 'eowner'}
                   onToggle={() => setOpenDrop(d => d === 'eowner' ? null : 'eowner')}
                   onSelect={opt => setEditModal(f => ({ ...f, propietario: opt.key === '' ? '' : opt.label }))}
@@ -784,6 +856,7 @@ export default function PropiedadesScreen() {
                           value={inq}
                           options={[{ key: '', label: 'Seleccionar inquilino' }, ...available]}
                           placeholder="Seleccionar inquilino"
+                          title="Inquilino"
                           open={openDrop === `ei-${idx}`}
                           onToggle={() => setOpenDrop(d => d === `ei-${idx}` ? null : `ei-${idx}`)}
                           onSelect={opt => { updateTenant(editModal, setEditModal, idx, opt.key === '' ? '' : opt.label); }}
@@ -811,13 +884,11 @@ export default function PropiedadesScreen() {
                   </TouchableOpacity>
                 </View>
               </ScrollView>
-            </Pressable>
-          </TouchableOpacity>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* ── DELETE CONFIRM ── */}
-      <Modal visible={!!deleteModal} transparent animationType="fade" onRequestClose={() => setDeleteModal(null)}>
+      <Modal visible={!!deleteModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setDeleteModal(null)}>
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmCard}>
             <View style={styles.confirmHeader}>
@@ -844,8 +915,8 @@ export default function PropiedadesScreen() {
       </Modal>
 
       {/* ── RENAME STREET MODAL ── */}
-      <Modal visible={!!renameModal} transparent animationType="fade" onRequestClose={() => setRenameModal(null)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <Modal visible={!!renameModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setRenameModal(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <TouchableOpacity style={styles.confirmOverlay} activeOpacity={1} onPress={() => setRenameModal(null)}>
             <Pressable style={[styles.confirmCard, { paddingBottom: spacing.lg }]}>
               <View style={styles.confirmHeader}>
@@ -878,22 +949,22 @@ export default function PropiedadesScreen() {
       </Modal>
 
       {/* ── Street action sheet ── */}
-      <Modal visible={!!streetMenu} transparent animationType="slide" onRequestClose={() => setStreetMenu(null)}>
+      <Modal visible={!!streetMenu} transparent animationType="fade" onRequestClose={() => setStreetMenu(null)}>
         <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }} activeOpacity={1} onPress={() => setStreetMenu(null)}>
-          <Pressable style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32, paddingTop: 8 }}>
+          <Pressable style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: Math.max(32, insets.bottom + 16), paddingTop: 8 }}>
             <View style={{ width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 }} />
             <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, textAlign: 'center', marginBottom: 20, paddingHorizontal: 20 }}>{streetMenu?.name}</Text>
             <TouchableOpacity
               style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: colors.border }}
               onPress={() => { setStreetMenu(null); setRenameModal({ name: streetMenu.name, newName: streetMenu.name }); }}
             >
-              <Text style={{ fontSize: 16, color: colors.text }}>✏️  Editar nombre</Text>
+              <Text style={{ fontSize: 16, color: colors.text }}>Editar nombre</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: colors.border }}
               onPress={() => { setDeleteStreet(streetMenu); setStreetMenu(null); }}
             >
-              <Text style={{ fontSize: 16, color: '#ef4444' }}>🗑️  Eliminar calle</Text>
+              <Text style={{ fontSize: 16, color: '#ef4444' }}>Eliminar calle</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={{ marginHorizontal: 20, marginTop: 8, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}
@@ -906,7 +977,7 @@ export default function PropiedadesScreen() {
       </Modal>
 
       {/* ── Confirm delete street ── */}
-      <Modal visible={!!deleteStreet} transparent animationType="fade" onRequestClose={() => setDeleteStreet(null)}>
+      <Modal visible={!!deleteStreet} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setDeleteStreet(null)}>
         <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 }} activeOpacity={1} onPress={() => setDeleteStreet(null)}>
           <Pressable style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 24 }}>
             <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 10 }}>Eliminar calle</Text>
@@ -926,8 +997,8 @@ export default function PropiedadesScreen() {
       </Modal>
 
       {/* ── Nueva Calle Modal ── */}
-      <Modal visible={newCalleModal} transparent animationType="fade" onRequestClose={() => setNewCalleModal(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <Modal visible={newCalleModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setNewCalleModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <TouchableOpacity style={styles.confirmOverlay} activeOpacity={1} onPress={() => setNewCalleModal(false)}>
             <Pressable style={[styles.confirmCard, { paddingBottom: spacing.lg }]}>
               <View style={styles.confirmHeader}>
@@ -1016,7 +1087,6 @@ function makeStyles(colors) {
     borderWidth: 1, borderColor: colors.border, ...SHADOW,
   },
   pickerText:  { fontSize: font.base, color: colors.text, fontWeight: '500', flex: 1 },
-  pickerArrow: { fontSize: 16, color: colors.textMuted },
 
   searchWrap: {
     flexDirection: 'row', alignItems: 'center',
@@ -1027,9 +1097,9 @@ function makeStyles(colors) {
   searchInput: { flex: 1, height: 44, paddingHorizontal: spacing.sm, fontSize: font.sm, color: colors.text },
 
   card: {
-    backgroundColor: 'rgba(255,255,255,0.92)', borderRadius: radius.lg,
+    backgroundColor: colors.cardBg, borderRadius: radius.lg,
     padding: spacing.md, marginBottom: spacing.sm,
-    borderWidth: 1, borderColor: 'rgba(228,231,236,0.8)', ...SHADOW,
+    borderWidth: 1, borderColor: colors.border, ...SHADOW,
   },
   cardHead:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
   cardTitleWrap:  { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
@@ -1089,10 +1159,10 @@ function makeStyles(colors) {
   // Picker inline
   pickerBtn: {
     height: 46, borderRadius: 10, borderWidth: 1, borderColor: colors.border,
-    backgroundColor: '#f9fafb', paddingHorizontal: 12,
+    backgroundColor: colors.surface, paddingHorizontal: 12,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  pickerBtnOpen: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomColor: 'transparent' },
+  pickerBtnOpen: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderColor: colors.primary, borderBottomColor: 'transparent' },
   pickerBtnText: { fontSize: font.sm, color: colors.text, flex: 1 },
 
   inlineDrop: {
@@ -1114,10 +1184,18 @@ function makeStyles(colors) {
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  backdrop: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.45)' },
+  bottomSheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    maxHeight: '82%',
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
+  },
+  sheetContent: { padding: spacing.lg, paddingBottom: spacing.md },
   formSheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
-    padding: spacing.lg, maxHeight: '92%',
+    padding: spacing.lg, maxHeight: '82%',
   },
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
   sheetTitle:  { fontSize: font.lg, fontWeight: '700', color: colors.text },
@@ -1126,7 +1204,7 @@ function makeStyles(colors) {
   formLabel: { fontSize: 11, fontWeight: '700', color: colors.textMuted, letterSpacing: 0.5, marginBottom: 6 },
   formInput: {
     height: 46, borderRadius: 10, borderWidth: 1, borderColor: colors.border,
-    backgroundColor: '#f9fafb', paddingHorizontal: 12, fontSize: font.sm, color: colors.text,
+    backgroundColor: colors.inputBg, paddingHorizontal: 12, fontSize: font.sm, color: colors.text,
   },
   formActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
 

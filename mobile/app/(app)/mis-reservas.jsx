@@ -9,7 +9,76 @@ import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { spacing, radius, font } from '../../src/theme';
 import AppDrawer from '../../src/components/Drawer';
+import { CalendarIcon, ClockIcon } from '../../src/components/Icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as api from '../../src/api';
+
+const DAY_NAMES = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'];
+const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function CustomCalendar({ selected, onSelect, minDate }) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const [viewYear, setViewYear]   = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+
+  const daysInMonth  = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstWeekDay = new Date(viewYear, viewMonth, 1).getDay();
+
+  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
+
+  const cells = [];
+  for (let i = 0; i < firstWeekDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  // pad to complete last row
+  while (cells.length % 7 !== 0) cells.push(null);
+  const rows = [];
+  for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+
+  return (
+    <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <TouchableOpacity onPress={prevMonth} style={{ padding: 8 }}>
+          <Text style={{ fontSize: 18, color: '#111827', fontWeight: '600' }}>‹</Text>
+        </TouchableOpacity>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>{MONTH_NAMES[viewMonth]} {viewYear}</Text>
+        <TouchableOpacity onPress={nextMonth} style={{ padding: 8 }}>
+          <Text style={{ fontSize: 18, color: '#111827', fontWeight: '600' }}>›</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+        {DAY_NAMES.map(d => (
+          <View key={d} style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={{ fontSize: 11, fontWeight: '600', color: '#6b7280' }}>{d}</Text>
+          </View>
+        ))}
+      </View>
+      {rows.map((row, ri) => (
+        <View key={ri} style={{ flexDirection: 'row' }}>
+          {row.map((day, ci) => {
+            if (!day) return <View key={`e-${ri}-${ci}`} style={{ flex: 1, height: 42 }} />;
+            const dateStr = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+            const cellDate = new Date(viewYear, viewMonth, day);
+            const isPast = minDate && cellDate < today;
+            const isSelected = selected === dateStr;
+            return (
+              <TouchableOpacity
+                key={day}
+                onPress={() => !isPast && onSelect(dateStr)}
+                disabled={isPast}
+                style={{ flex: 1, height: 42, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: isSelected ? '#6d28d9' : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 14, fontWeight: isSelected ? '700' : '400', color: isSelected ? '#fff' : isPast ? '#d1d5db' : '#111827' }}>{day}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
 
 const SHADOW = {
   shadowColor: '#101828', shadowOffset: { width: 0, height: 2 },
@@ -33,7 +102,7 @@ function reservasConflictan(a, b) {
 }
 
 export default function MisReservasScreen() {
-  const { user } = useAuth();
+  const { user, isSuperAdmin, isAdmin, isOwner, isTenant } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -42,6 +111,10 @@ export default function MisReservasScreen() {
   const [loading,  setLoading]  = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Area detail (before form)
+  const [detailArea, setDetailArea] = useState(null);
+  const [imgModal, setImgModal]     = useState(null);
 
   // Area selection + form
   const [selectedArea, setSelectedArea] = useState(null);
@@ -55,6 +128,98 @@ export default function MisReservasScreen() {
   const [changeLoading, setChangeLoading] = useState(false);
 
   const [reservaTab, setReservaTab] = useState('proximas');
+  const [reservaPage, setReservaPage] = useState(1);
+  const PAGE_SIZE = 10;
+  const [picker, setPicker] = useState({ visible: false, mode: 'date', target: 'fecha', form: 'main' });
+
+  const openPicker = (mode, target, form) => setPicker({ visible: true, mode, target, form });
+  const onPickerChange = (event, selected) => {
+    setPicker(p => ({ ...p, visible: false }));
+    if (!selected) return;
+    if (picker.mode === 'date') {
+      const dateStr = selected.toISOString().split('T')[0];
+      if (picker.form === 'main') setForm(f => ({ ...f, fecha: dateStr }));
+      else setChangeForm(f => ({ ...f, fecha: dateStr }));
+    } else {
+      const h = String(selected.getHours()).padStart(2, '0');
+      const m = String(selected.getMinutes()).padStart(2, '0');
+      const timeStr = `${h}:${m}`;
+      if (picker.form === 'main') setForm(f => ({ ...f, [picker.target]: timeStr }));
+      else setChangeForm(f => ({ ...f, [picker.target]: timeStr }));
+    }
+  };
+  const toTimeDate = (str) => { const [h, m] = (str || '08:00').split(':'); const d = new Date(); d.setHours(+h, +m, 0, 0); return d; };
+  const [iosPickerTemp, setIosPickerTemp] = useState(null);
+  const pickerValue = () => {
+    const isMain = picker.form === 'main';
+    if (picker.mode === 'date') {
+      const f = isMain ? form.fecha : changeForm.fecha;
+      return f ? new Date(f + 'T12:00:00') : new Date();
+    }
+    const t = isMain
+      ? (picker.target === 'horaInicio' ? form.horaInicio : form.horaFin)
+      : (picker.target === 'horaInicio' ? changeForm.horaInicio : changeForm.horaFin);
+    return toTimeDate(t);
+  };
+  const onIosConfirm = () => {
+    onPickerChange({ type: 'set' }, iosPickerTemp ?? new Date());
+    setIosPickerTemp(null);
+  };
+
+  const toDateStr = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth()+1).padStart(2,'0');
+    const d = String(date.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  };
+  const iosDateStr = iosPickerTemp ? toDateStr(iosPickerTemp) : toDateStr(new Date());
+
+  const pickerJSX = Platform.OS === 'ios' ? (
+    <Modal visible={picker.visible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => { setPicker(p => ({ ...p, visible: false })); setIosPickerTemp(null); }}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}>
+        <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 24 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' }}>
+            <TouchableOpacity onPress={() => { setPicker(p => ({ ...p, visible: false })); setIosPickerTemp(null); }}>
+              <Text style={{ fontSize: 16, color: '#6b7280' }}>Cancelar</Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>{picker.mode === 'date' ? 'Seleccioná fecha' : 'Seleccioná hora'}</Text>
+            <TouchableOpacity onPress={onIosConfirm}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.primary }}>Listo</Text>
+            </TouchableOpacity>
+          </View>
+          {picker.mode === 'date' ? (
+            <CustomCalendar
+              key={picker.visible ? 'open' : 'closed'}
+              selected={iosDateStr}
+              minDate={new Date()}
+              onSelect={(dateStr) => {
+                const [y, mo, d] = dateStr.split('-').map(Number);
+                const dt = new Date(y, mo - 1, d, 12, 0, 0);
+                setIosPickerTemp(dt);
+              }}
+            />
+          ) : (
+            <DateTimePicker
+              value={iosPickerTemp ?? pickerValue()}
+              mode="time"
+              display="spinner"
+              onChange={(e, d) => { if (d) setIosPickerTemp(d); }}
+              textColor="#000000"
+              style={{ alignSelf: 'center', width: '100%', backgroundColor: '#ffffff' }}
+            />
+          )}
+        </View>
+      </View>
+    </Modal>
+  ) : picker.visible ? (
+    <DateTimePicker
+      value={pickerValue()}
+      mode={picker.mode}
+      display={picker.mode === 'date' ? 'calendar' : 'clock'}
+      onChange={onPickerChange}
+      minimumDate={picker.mode === 'date' ? new Date() : undefined}
+    />
+  ) : null;
 
   const loadData = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -76,12 +241,13 @@ export default function MisReservasScreen() {
   useEffect(() => { loadData(); }, [loadData]);
   const onRefresh = () => { setRefreshing(true); loadData(false); };
 
-  const misReservas = reservas.filter(r => r.propietario === user?.name);
   const now = new Date();
   const esPasada = r => new Date(`${r.fecha}T${r.horaFin || '23:59'}`) < now;
-  const proximas = misReservas.filter(r => !esPasada(r));
-  const pasadas  = misReservas.filter(r => esPasada(r));
-  const visible  = reservaTab === 'pasadas' ? pasadas : proximas;
+  const proximas = reservas.filter(r => !esPasada(r));
+  const pasadas  = reservas.filter(r => esPasada(r));
+  const allVisible = reservaTab === 'pasadas' ? pasadas : proximas;
+  const totalPages = Math.max(1, Math.ceil(allVisible.length / PAGE_SIZE));
+  const visible = allVisible.slice((reservaPage - 1) * PAGE_SIZE, reservaPage * PAGE_SIZE);
 
   // Conflict detection
   const ocupados = selectedArea && form.fecha
@@ -144,6 +310,57 @@ export default function MisReservasScreen() {
     );
   }
 
+  // Area detail view
+  if (detailArea) {
+    const imgs = Array.isArray(detailArea.imagenUrl)
+      ? detailArea.imagenUrl
+      : (detailArea.imagenUrl ? [detailArea.imagenUrl] : []);
+    const firstImg = imgs[0] ?? null;
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={() => setDetailArea(null)} style={styles.hamburger}>
+            <Text style={[styles.hamburgerLines, { fontSize: 18 }]}>← Volver</Text>
+          </TouchableOpacity>
+          <View style={{ flex: 1 }} />
+        </View>
+        <ScrollView contentContainerStyle={styles.content}>
+          {firstImg && (
+            <TouchableOpacity onPress={() => setImgModal(firstImg)} activeOpacity={0.9}>
+              <Image source={{ uri: firstImg }} style={{ width: '100%', height: 220, borderRadius: radius.lg, marginBottom: spacing.md }} resizeMode="cover" />
+            </TouchableOpacity>
+          )}
+          <Text style={styles.pageTitle}>{detailArea.nombre}</Text>
+          {detailArea.descripcion ? (
+            <Text style={[styles.pageSub, { marginBottom: spacing.md }]}>{detailArea.descripcion}</Text>
+          ) : null}
+          <TouchableOpacity
+            style={{ marginTop: spacing.sm, alignSelf: 'center', backgroundColor: colors.primary, borderRadius: radius.md, paddingHorizontal: spacing.xl, paddingVertical: 14 }}
+            onPress={() => {
+              setDetailArea(null);
+              setSelectedArea(detailArea);
+              setForm({ fecha: '', horaInicio: '08:00', horaFin: '10:00', nota: '', diaCompleto: false });
+              setFormError('');
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.btnPriText, { fontSize: font.base }]}>Reservar área</Text>
+          </TouchableOpacity>
+        </ScrollView>
+        <Modal visible={!!imgModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setImgModal(null)}>
+          <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' }} activeOpacity={1} onPress={() => setImgModal(null)}>
+            <ScrollView style={{ width: '100%' }} contentContainerStyle={{ flex: 1, alignItems: 'center', justifyContent: 'center' }} maximumZoomScale={4} minimumZoomScale={1} bouncesZoom centerContent>
+              {imgModal && <Image source={{ uri: imgModal }} style={{ width: '100%', height: 340 }} resizeMode="contain" />}
+            </ScrollView>
+            <TouchableOpacity style={{ position: 'absolute', top: 48, right: 20, padding: 8 }} onPress={() => setImgModal(null)}>
+              <Text style={{ color: '#fff', fontSize: 26, fontWeight: '300' }}>✕</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+      </SafeAreaView>
+    );
+  }
+
   // Area selection view
   if (selectedArea) {
     return (
@@ -162,13 +379,12 @@ export default function MisReservasScreen() {
 
             <View style={styles.card}>
               <Text style={styles.label}>Fecha *</Text>
-              <TextInput
-                style={styles.input}
-                value={form.fecha}
-                onChangeText={t => setForm(f => ({ ...f, fecha: t }))}
-                placeholder={TODAY}
-                placeholderTextColor={colors.textMuted}
-              />
+              <TouchableOpacity style={styles.pickerBtn} onPress={() => openPicker('date', 'fecha', 'main')} activeOpacity={0.8}>
+                <CalendarIcon size={16} color={colors.primary} />
+                <Text style={[styles.pickerBtnText, !form.fecha && { color: colors.textMuted }]}>
+                  {form.fecha || 'Seleccioná una fecha'}
+                </Text>
+              </TouchableOpacity>
 
               <View style={styles.switchRow}>
                 <Text style={styles.label}>Reservar todo el día</Text>
@@ -185,23 +401,17 @@ export default function MisReservasScreen() {
                 <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.label}>Hora inicio</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={form.horaInicio}
-                      onChangeText={t => setForm(f => ({ ...f, horaInicio: t }))}
-                      placeholder="08:00"
-                      placeholderTextColor={colors.textMuted}
-                    />
+                    <TouchableOpacity style={styles.pickerBtn} onPress={() => openPicker('time', 'horaInicio', 'main')} activeOpacity={0.8}>
+                      <ClockIcon size={16} color={colors.primary} />
+                      <Text style={styles.pickerBtnText}>{form.horaInicio}</Text>
+                    </TouchableOpacity>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.label}>Hora fin</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={form.horaFin}
-                      onChangeText={t => setForm(f => ({ ...f, horaFin: t }))}
-                      placeholder="10:00"
-                      placeholderTextColor={colors.textMuted}
-                    />
+                    <TouchableOpacity style={styles.pickerBtn} onPress={() => openPicker('time', 'horaFin', 'main')} activeOpacity={0.8}>
+                      <ClockIcon size={16} color={colors.primary} />
+                      <Text style={styles.pickerBtnText}>{form.horaFin}</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               )}
@@ -244,6 +454,7 @@ export default function MisReservasScreen() {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+        {pickerJSX}
       </SafeAreaView>
     );
   }
@@ -257,7 +468,7 @@ export default function MisReservasScreen() {
         <Text style={styles.topBarTitle}>Reservas</Text>
         <View style={styles.rolePill}>
           <View style={styles.roleOrangeDot} />
-          <Text style={styles.rolePillText}>Residente</Text>
+          <Text style={styles.rolePillText}>{isSuperAdmin ? 'Super Admin' : isAdmin ? 'Administrador' : isOwner ? 'Propietario' : isTenant ? 'Inquilino' : 'Residente'}</Text>
         </View>
       </View>
 
@@ -269,63 +480,51 @@ export default function MisReservasScreen() {
         <Text style={styles.pageTitle}>Reservar Áreas</Text>
         <Text style={styles.pageSub}>Consultá las áreas sociales disponibles y realizá tu reserva.</Text>
 
-        {/* Available areas */}
+        {/* Available areas — horizontal scroll */}
+        <Text style={styles.sectionLabel}>ÁREAS DISPONIBLES</Text>
         {areas.length === 0 ? (
-          <View style={[styles.card, { alignItems: 'center', paddingVertical: spacing.xl }]}>
+          <View style={[styles.card, { alignItems: 'center', paddingVertical: spacing.lg }]}>
             <Text style={{ color: colors.textMuted }}>El administrador aún no creó áreas sociales.</Text>
           </View>
         ) : (
-          <>
-            <Text style={styles.sectionLabel}>ÁREAS DISPONIBLES</Text>
-            {areas.map(area => {
-              const imgs = Array.isArray(area.imagenUrl)
-                ? area.imagenUrl
-                : (area.imagenUrl ? [area.imagenUrl] : []);
-              return (
-              <View key={area.id} style={styles.areaCard}>
-                {imgs.length > 0 && (
+          <>{areas.map(area => {
+            const imgs = Array.isArray(area.imagenUrl)
+              ? area.imagenUrl
+              : (area.imagenUrl ? [area.imagenUrl] : []);
+            return (
+              <TouchableOpacity
+                key={area.id}
+                style={styles.areaCard}
+                onPress={() => setDetailArea(area)}
+                activeOpacity={0.85}
+              >
+                {imgs.length > 0 ? (
                   <Image source={{ uri: imgs[0] }} style={styles.areaThumb} resizeMode="cover" />
+                ) : (
+                  <View style={[styles.areaThumb, { backgroundColor: colors.inputBg }]} />
                 )}
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.areaName}>{area.nombre}</Text>
-                  {area.descripcion ? <Text style={styles.areaDesc} numberOfLines={2}>{area.descripcion}</Text> : null}
-                </View>
-                <TouchableOpacity
-                  style={styles.reservarBtn}
-                  onPress={() => {
-                    setSelectedArea(area);
-                    setForm({ fecha: '', horaInicio: '08:00', horaFin: '10:00', nota: '', diaCompleto: false });
-                    setFormError('');
-                  }}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.reservarBtnText}>Reservar</Text>
-                </TouchableOpacity>
-              </View>
-            );})}
-
-          </>
+                <Text style={styles.areaName} numberOfLines={1}>{area.nombre}</Text>
+              </TouchableOpacity>
+            );
+          })}</>
         )}
 
         {/* My reservations */}
-        <Text style={[styles.sectionLabel, { marginTop: spacing.md }]}>MIS RESERVAS</Text>
-        <View style={styles.tabs}>
-          <TouchableOpacity
-            style={[styles.tab, reservaTab === 'proximas' && styles.tabActive]}
-            onPress={() => setReservaTab('proximas')}
-          >
-            <Text style={[styles.tabText, reservaTab === 'proximas' && styles.tabTextActive]}>
-              Próximas{proximas.length ? ` (${proximas.length})` : ''}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, reservaTab === 'pasadas' && styles.tabActive]}
-            onPress={() => setReservaTab('pasadas')}
-          >
-            <Text style={[styles.tabText, reservaTab === 'pasadas' && styles.tabTextActive]}>
-              Pasadas{pasadas.length ? ` (${pasadas.length})` : ''}
-            </Text>
-          </TouchableOpacity>
+        <View style={{ marginTop: spacing.md, marginBottom: spacing.sm }}>
+          <Text style={styles.sectionLabel}>MIS RESERVAS</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 }}>
+            <TouchableOpacity style={[styles.tabBtn, reservaTab === 'proximas' && styles.tabBtnActive]} onPress={() => { setReservaTab('proximas'); setReservaPage(1); }}>
+              <Text style={[styles.tabText, reservaTab === 'proximas' && styles.tabTextActive]}>
+                Próximas{proximas.length ? ` (${proximas.length})` : ''}
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.tabSep}>|</Text>
+            <TouchableOpacity style={[styles.tabBtn, reservaTab === 'pasadas' && styles.tabBtnActive]} onPress={() => { setReservaTab('pasadas'); setReservaPage(1); }}>
+              <Text style={[styles.tabText, reservaTab === 'pasadas' && styles.tabTextActive]}>
+                Pasadas{pasadas.length ? ` (${pasadas.length})` : ''}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {visible.length === 0 ? (
@@ -342,9 +541,13 @@ export default function MisReservasScreen() {
               <View style={styles.reservaTop}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.reservaArea}>{r.areaNombre}</Text>
-                  <Text style={styles.reservaFecha}>
-                    📅 {r.fecha}  ·  🕐 {r.diaCompleto ? 'Todo el día' : `${r.horaInicio}–${r.horaFin}`}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2, flexWrap: 'wrap' }}>
+                    <CalendarIcon size={13} color={colors.textMuted} />
+                    <Text style={styles.reservaFecha}>{r.fecha}</Text>
+                    <Text style={styles.reservaFecha}>·</Text>
+                    <ClockIcon size={13} color={colors.textMuted} />
+                    <Text style={styles.reservaFecha}>{r.diaCompleto ? 'Todo el día' : `${r.horaInicio}–${r.horaFin}`}</Text>
+                  </View>
                   {r.nota ? <Text style={styles.reservaNota}>"{r.nota}"</Text> : null}
                   {r.solicitudCambio && (
                     <Text style={[styles.cambioStatus, {
@@ -365,13 +568,12 @@ export default function MisReservasScreen() {
                 isChanging ? (
                   <View style={styles.changeForm}>
                     <Text style={styles.label}>Nueva fecha</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={changeForm.fecha}
-                      onChangeText={t => setChangeForm(f => ({ ...f, fecha: t }))}
-                      placeholder={TODAY}
-                      placeholderTextColor={colors.textMuted}
-                    />
+                    <TouchableOpacity style={styles.pickerBtn} onPress={() => openPicker('date', 'fecha', 'change')} activeOpacity={0.8}>
+                      <CalendarIcon size={16} color={colors.primary} />
+                      <Text style={[styles.pickerBtnText, !changeForm.fecha && { color: colors.textMuted }]}>
+                        {changeForm.fecha || 'Seleccioná una fecha'}
+                      </Text>
+                    </TouchableOpacity>
                     <View style={styles.switchRow}>
                       <Text style={styles.label}>Todo el día</Text>
                       <Switch
@@ -385,11 +587,17 @@ export default function MisReservasScreen() {
                       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.label}>Hora inicio</Text>
-                          <TextInput style={styles.input} value={changeForm.horaInicio} onChangeText={t => setChangeForm(f => ({ ...f, horaInicio: t }))} placeholder="08:00" placeholderTextColor={colors.textMuted} />
+                          <TouchableOpacity style={styles.pickerBtn} onPress={() => openPicker('time', 'horaInicio', 'change')} activeOpacity={0.8}>
+                            <ClockIcon size={16} color={colors.primary} />
+                            <Text style={styles.pickerBtnText}>{changeForm.horaInicio}</Text>
+                          </TouchableOpacity>
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.label}>Hora fin</Text>
-                          <TextInput style={styles.input} value={changeForm.horaFin} onChangeText={t => setChangeForm(f => ({ ...f, horaFin: t }))} placeholder="10:00" placeholderTextColor={colors.textMuted} />
+                          <TouchableOpacity style={styles.pickerBtn} onPress={() => openPicker('time', 'horaFin', 'change')} activeOpacity={0.8}>
+                            <ClockIcon size={16} color={colors.primary} />
+                            <Text style={styles.pickerBtnText}>{changeForm.horaFin}</Text>
+                          </TouchableOpacity>
                         </View>
                       </View>
                     )}
@@ -420,7 +628,60 @@ export default function MisReservasScreen() {
             </View>
           );
         })}
+
+        {totalPages > 1 && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.md, gap: 12 }}>
+            <TouchableOpacity
+              onPress={() => setReservaPage(p => Math.max(1, p - 1))}
+              disabled={reservaPage === 1}
+              style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: reservaPage === 1 ? colors.border : colors.primary }}
+            >
+              <Text style={{ color: reservaPage === 1 ? colors.textMuted : '#fff', fontWeight: '600', fontSize: font.sm }}>‹ Anterior</Text>
+            </TouchableOpacity>
+            <Text style={{ color: colors.textMuted, fontSize: font.sm }}>{reservaPage} / {totalPages}</Text>
+            <TouchableOpacity
+              onPress={() => setReservaPage(p => Math.min(totalPages, p + 1))}
+              disabled={reservaPage === totalPages}
+              style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: reservaPage === totalPages ? colors.border : colors.primary }}
+            >
+              <Text style={{ color: reservaPage === totalPages ? colors.textMuted : '#fff', fontWeight: '600', fontSize: font.sm }}>Siguiente ›</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
+
+      {picker.visible && (
+        <DateTimePicker
+          value={picker.mode === 'date'
+            ? (() => { const f = picker.form === 'main' ? form.fecha : changeForm.fecha; return f ? new Date(f + 'T12:00:00') : new Date(); })()
+            : toTimeDate(picker.form === 'main' ? (picker.target === 'horaInicio' ? form.horaInicio : form.horaFin) : (picker.target === 'horaInicio' ? changeForm.horaInicio : changeForm.horaFin))
+          }
+          mode={picker.mode}
+          display={picker.mode === 'date' ? 'calendar' : 'clock'}
+          onChange={onPickerChange}
+          minimumDate={picker.mode === 'date' ? new Date() : undefined}
+        />
+      )}
+
+      <Modal visible={!!imgModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setImgModal(null)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' }} activeOpacity={1} onPress={() => setImgModal(null)}>
+          <ScrollView
+            style={{ width: '100%' }}
+            contentContainerStyle={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+            maximumZoomScale={4}
+            minimumZoomScale={1}
+            bouncesZoom
+            centerContent
+          >
+            {imgModal && (
+              <Image source={{ uri: imgModal }} style={{ width: '100%', height: 340 }} resizeMode="contain" />
+            )}
+          </ScrollView>
+          <TouchableOpacity style={{ position: 'absolute', top: 48, right: 20, padding: 8 }} onPress={() => setImgModal(null)}>
+            <Text style={{ color: '#fff', fontSize: 26, fontWeight: '300' }}>✕</Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       <AppDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </SafeAreaView>
@@ -440,7 +701,7 @@ function makeStyles(colors) {
   topBarTitle:    { flex: 1, fontSize: font.lg, fontWeight: '700', color: colors.text },
   rolePill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#f2f4f7', borderRadius: 20,
+    backgroundColor: colors.disabledBg, borderRadius: 20,
     paddingHorizontal: 10, paddingVertical: 5,
   },
   roleOrangeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#f59e0b' },
@@ -459,25 +720,18 @@ function makeStyles(colors) {
   areaCard: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: colors.surface, borderRadius: radius.lg,
-    padding: spacing.md, marginBottom: spacing.sm,
+    padding: spacing.sm, marginBottom: spacing.sm,
     borderWidth: 1, borderColor: colors.border, ...SHADOW,
   },
-  areaThumb:   { width: 64, height: 64, borderRadius: radius.md, marginRight: spacing.sm },
-  areaName:    { fontSize: font.base, fontWeight: '700', color: colors.text, marginBottom: 2 },
-  areaDesc:    { fontSize: font.sm, color: colors.text2, marginBottom: 4 },
-  areaPrice:   { fontSize: 12, fontWeight: '600', color: colors.primary },
+  areaThumb:   { width: 72, height: 72, borderRadius: radius.md, marginRight: spacing.sm, flexShrink: 0 },
+  areaName:    { fontSize: font.base, fontWeight: '700', color: colors.text, flex: 1 },
   anticipacion:{ fontSize: 12, color: '#92400e', backgroundColor: '#fffbeb', borderRadius: radius.sm, padding: spacing.sm, marginBottom: spacing.md, borderWidth: 1, borderColor: '#fde68a' },
-  reservarBtn: {
-    backgroundColor: colors.primary, borderRadius: radius.md,
-    paddingHorizontal: 14, paddingVertical: 9, marginLeft: spacing.sm,
-  },
-  reservarBtnText: { fontSize: 12, fontWeight: '700', color: '#fff' },
 
-  tabs:         { flexDirection: 'row', gap: 6, marginBottom: spacing.sm },
-  tab:          { flex: 1, paddingVertical: 10, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
-  tabActive:    { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabText:      { fontSize: font.sm, fontWeight: '600', color: colors.textMuted },
-  tabTextActive:{ color: '#fff' },
+  tabBtn:        { paddingBottom: 6, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabBtnActive:  { borderBottomColor: colors.primary },
+  tabText:       { fontSize: font.base, fontWeight: '600', color: colors.textMuted },
+  tabTextActive: { color: colors.primary, fontWeight: '700' },
+  tabSep:        { fontSize: font.lg, color: colors.border },
 
   reservaTop:   { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: spacing.xs },
   reservaArea:  { fontSize: font.base, fontWeight: '700', color: colors.text, marginBottom: 2 },
@@ -492,6 +746,8 @@ function makeStyles(colors) {
   changeForm:    { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.sm, marginTop: spacing.sm },
 
   label:      { fontSize: 12, fontWeight: '600', color: colors.text2, marginBottom: 4, marginTop: spacing.sm },
+  pickerBtn:  { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 12, backgroundColor: colors.inputBg },
+  pickerBtnText: { fontSize: font.base, color: colors.text, flex: 1 },
   input: {
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
     paddingHorizontal: spacing.md, paddingVertical: 11,

@@ -4,7 +4,8 @@ import {
   TextInput, Alert, RefreshControl, ActivityIndicator,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ChevronDownIcon } from '../../src/components/Icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { useCondo } from '../../src/context/CondoContext';
@@ -48,10 +49,9 @@ function InlinePicker({ value, options, onSelect, placeholder }) {
   const selected = options.find(o => o.value === value);
   const ps = {
     picker:        { flexDirection:'row', alignItems:'center', justifyContent:'space-between', borderWidth:1, borderColor:colors.border, borderRadius:radius.sm, paddingHorizontal:12, paddingVertical:10, backgroundColor:colors.inputBg },
-    pickerOpen:    { borderColor:colors.primary },
+    pickerOpen:    { borderColor:colors.primary, borderTopLeftRadius:0, borderTopRightRadius:0, borderTopColor:'transparent' },
     pickerText:    { flex:1, fontSize:font.sm, color:colors.text },
-    pickerArrow:   { fontSize:16, color:colors.textMuted, marginLeft:6 },
-    drop:          { backgroundColor:colors.surface, borderWidth:1, borderColor:colors.border, borderRadius:radius.sm, zIndex:99 },
+    drop:          { backgroundColor:colors.surface, borderWidth:1, borderBottomWidth:0, borderColor:colors.primary, borderTopLeftRadius:radius.sm, borderTopRightRadius:radius.sm, zIndex:99, overflow:'hidden' },
     dropItem:      { paddingHorizontal:12, paddingVertical:10, flexDirection:'row', alignItems:'center', justifyContent:'space-between', borderBottomWidth:1, borderBottomColor:colors.border },
     dropItemActive:{ backgroundColor:colors.primarySoft },
     dropText:      { fontSize:font.sm, color:colors.text, flex:1 },
@@ -66,10 +66,12 @@ function InlinePicker({ value, options, onSelect, placeholder }) {
         activeOpacity={0.85}
       >
         <Text style={ps.pickerText} numberOfLines={1}>{selected?.label ?? placeholder}</Text>
-        <Text style={ps.pickerArrow}>{open ? '∧' : '⌄'}</Text>
+        <View style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}>
+          <ChevronDownIcon size={16} color={open ? colors.primary : colors.textMuted} />
+        </View>
       </TouchableOpacity>
       {open && (
-        <View style={[ps.drop, { position: 'absolute', top: triggerH, left: 0, right: 0 }]}>
+        <View style={[ps.drop, { position: 'absolute', bottom: triggerH, left: 0, right: 0 }]}>
           {options.map(opt => (
             <TouchableOpacity
               key={opt.value}
@@ -79,7 +81,6 @@ function InlinePicker({ value, options, onSelect, placeholder }) {
               <Text style={[ps.dropText, value === opt.value && ps.dropTextActive]} numberOfLines={1}>
                 {opt.label}
               </Text>
-              {value === opt.value && <Text style={{ color: colors.primary, fontWeight: '700' }}>✓</Text>}
             </TouchableOpacity>
           ))}
         </View>
@@ -89,14 +90,17 @@ function InlinePicker({ value, options, onSelect, placeholder }) {
 }
 
 export default function AnunciosScreen() {
-  const { user, isSuperAdmin, isAdmin } = useAuth();
+  const { user, isSuperAdmin, isAdmin, isOwner, isTenant, isSeguridad } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
   const { condoName: ctxCondoName } = useCondo();
   const canManage = isSuperAdmin || isAdmin;
 
   const [dateFilter, setDateFilter]     = useState('todos');
   const [targetFilter, setTargetFilter] = useState('todos');
+  const [periodoDropOpen, setPeriodoDropOpen]   = useState(false);
+  const [destDropOpen, setDestDropOpen]         = useState(false);
   const [page, setPage]                 = useState(1);
   const [pageData, setPageData]       = useState({ data: [], total: 0, totalPages: 1 });
   const [loading, setLoading]         = useState(true);
@@ -111,6 +115,7 @@ export default function AnunciosScreen() {
   const [deletingId, setDeletingId]       = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [refreshKey, setRefreshKey]       = useState(0);
+  const [detailItem, setDetailItem]       = useState(null);
 
   const condoName  = ctxCondoName || user?.condo || undefined;
   // For Super Admin, wait until CondoContext resolves their condo name before loading
@@ -181,7 +186,12 @@ export default function AnunciosScreen() {
   };
 
   const roleLabel =
-    isSuperAdmin ? 'Super Admin' : isAdmin ? 'Administrador' : 'Residente';
+    isSuperAdmin ? 'Super Admin'
+    : isAdmin      ? 'Administrador'
+    : isSeguridad  ? 'Seguridad'
+    : isOwner      ? 'Propietario'
+    : isTenant     ? 'Inquilino'
+    : 'Residente';
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -224,47 +234,64 @@ export default function AnunciosScreen() {
               </Text>
             </View>
           )}
-          {/* Período chips */}
-          <Text style={styles.filterLabel}>Período</Text>
-          <View style={{ flexDirection: 'row', gap: 6, marginBottom: spacing.sm }}>
-            {[
-              { value: 'todos',    label: 'Todos' },
-              { value: 'semana',   label: 'Semana' },
-              { value: 'mes',      label: 'Mes' },
-              { value: 'antiguos', label: 'Antiguos' },
-            ].map(opt => (
+          {/* Filtros — Período + Destinatario en fila */}
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            {/* Período */}
+            <View style={{ flex: 1, zIndex: periodoDropOpen ? 200 : 1, elevation: periodoDropOpen ? 20 : 0 }}>
+              <Text style={styles.filterLabel}>Período</Text>
               <TouchableOpacity
-                key={opt.value}
-                onPress={() => { setDateFilter(opt.value); setPage(1); }}
-                style={{ flex: 1, paddingVertical: 8, borderRadius: 20, alignItems: 'center', backgroundColor: dateFilter === opt.value ? colors.primary : colors.surface, borderWidth: 1, borderColor: dateFilter === opt.value ? colors.primary : colors.border }}
+                style={{ height: 42, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.inputBg, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                onPress={() => { setPeriodoDropOpen(o => !o); setDestDropOpen(false); }}
+                activeOpacity={0.8}
               >
-                <Text style={{ fontSize: 12, fontWeight: '600', color: dateFilter === opt.value ? '#fff' : colors.textMuted }}>{opt.label}</Text>
+                <Text style={{ fontSize: font.sm, color: colors.text }}>
+                  {{ todos: 'Todos', semana: 'Semana', mes: 'Mes', antiguos: 'Antiguos' }[dateFilter]}
+                </Text>
+                <View style={{ transform: [{ rotate: periodoDropOpen ? '180deg' : '0deg' }] }}>
+                  <ChevronDownIcon size={15} color={periodoDropOpen ? colors.primary : colors.textMuted} />
+                </View>
               </TouchableOpacity>
-            ))}
-          </View>
+              {periodoDropOpen && (
+                <View style={{ position: 'absolute', top: 66, left: 0, right: 0, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: 10, elevation: 20, zIndex: 200, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 8 }}>
+                  {[{ value: 'todos', label: 'Todos' }, { value: 'semana', label: 'Semana' }, { value: 'mes', label: 'Mes' }, { value: 'antiguos', label: 'Antiguos' }].map((opt, i, arr) => (
+                    <TouchableOpacity key={opt.value} onPress={() => { setDateFilter(opt.value); setPeriodoDropOpen(false); setPage(1); }}
+                      style={{ paddingHorizontal: 12, paddingVertical: 11, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: i < arr.length - 1 ? 1 : 0, borderBottomColor: colors.border, backgroundColor: dateFilter === opt.value ? colors.primarySoft : 'transparent' }}>
+                      <Text style={{ fontSize: font.sm, color: dateFilter === opt.value ? colors.primary : colors.text, fontWeight: dateFilter === opt.value ? '700' : '400' }}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
 
-          {/* Destinatario chips */}
-          {canManage && (
-            <>
-              <Text style={styles.filterLabel}>Destinatario</Text>
-              <View style={{ flexDirection: 'row', gap: 6, marginBottom: spacing.sm }}>
-                {[
-                  { value: 'todos',        label: 'Todos' },
-                  { value: 'propietarios', label: 'Propiet.' },
-                  { value: 'inquilinos',   label: 'Inquilinos' },
-                  { value: 'seguridad',    label: 'Seguridad' },
-                ].map(opt => (
-                  <TouchableOpacity
-                    key={opt.value}
-                    onPress={() => { setTargetFilter(opt.value); setPage(1); }}
-                    style={{ flex: 1, paddingVertical: 8, borderRadius: 20, alignItems: 'center', backgroundColor: targetFilter === opt.value ? colors.primary : colors.surface, borderWidth: 1, borderColor: targetFilter === opt.value ? colors.primary : colors.border }}
-                  >
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: targetFilter === opt.value ? '#fff' : colors.textMuted }}>{opt.label}</Text>
-                  </TouchableOpacity>
-                ))}
+            {/* Destinatario */}
+            {canManage && (
+              <View style={{ flex: 1, zIndex: destDropOpen ? 200 : 1, elevation: destDropOpen ? 20 : 0 }}>
+                <Text style={styles.filterLabel}>Destinatario</Text>
+                <TouchableOpacity
+                  style={{ height: 42, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.inputBg, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                  onPress={() => { setDestDropOpen(o => !o); setPeriodoDropOpen(false); }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontSize: font.sm, color: colors.text }}>
+                    {{ todos: 'Todos', propietarios: 'Propiet.', inquilinos: 'Inquilinos', seguridad: 'Seguridad' }[targetFilter]}
+                  </Text>
+                  <View style={{ transform: [{ rotate: destDropOpen ? '180deg' : '0deg' }] }}>
+                    <ChevronDownIcon size={15} color={destDropOpen ? colors.primary : colors.textMuted} />
+                  </View>
+                </TouchableOpacity>
+                {destDropOpen && (
+                  <View style={{ position: 'absolute', top: 66, left: 0, right: 0, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: 10, elevation: 20, zIndex: 200, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 8 }}>
+                    {[{ value: 'todos', label: 'Todos' }, { value: 'propietarios', label: 'Propietarios' }, { value: 'inquilinos', label: 'Inquilinos' }, { value: 'seguridad', label: 'Seguridad' }].map((opt, i, arr) => (
+                      <TouchableOpacity key={opt.value} onPress={() => { setTargetFilter(opt.value); setDestDropOpen(false); setPage(1); }}
+                        style={{ paddingHorizontal: 12, paddingVertical: 11, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: i < arr.length - 1 ? 1 : 0, borderBottomColor: colors.border, backgroundColor: targetFilter === opt.value ? colors.primarySoft : 'transparent' }}>
+                        <Text style={{ fontSize: font.sm, color: targetFilter === opt.value ? colors.primary : colors.text, fontWeight: targetFilter === opt.value ? '700' : '400' }}>{opt.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
-            </>
-          )}
+            )}
+          </View>
         </View>
 
         {loading && pageData.data.length === 0 ? (
@@ -275,8 +302,9 @@ export default function AnunciosScreen() {
           </View>
         ) : pageData.data.map(item => {
           const tc = TARGET_STYLE[item.target] ?? TARGET_STYLE.todos;
+          const CardWrapper = canManage ? View : TouchableOpacity;
           return (
-            <View key={item.id} style={styles.card}>
+            <CardWrapper key={item.id} style={styles.card} {...(!canManage && { onPress: () => setDetailItem(item), activeOpacity: 0.85 })}>
               <View style={styles.cardTop}>
                 <View style={styles.bellCircle}>
                   <BellIcon size={18} color="#5b21b6" />
@@ -284,11 +312,13 @@ export default function AnunciosScreen() {
                 <View style={{ flex: 1 }}>
                   <View style={styles.titleRow}>
                     <Text style={styles.anuncioTitle} numberOfLines={2}>{item.title}</Text>
-                    <View style={[styles.chip, { backgroundColor: tc.bg }]}>
-                      <Text style={[styles.chipText, { color: tc.text }]}>
-                        {TARGET_OPTIONS.find(t => t.value === item.target)?.label ?? 'Todos'}
-                      </Text>
-                    </View>
+                    {canManage && (
+                      <View style={[styles.chip, { backgroundColor: tc.bg }]}>
+                        <Text style={[styles.chipText, { color: tc.text }]}>
+                          {TARGET_OPTIONS.find(t => t.value === item.target)?.label ?? 'Todos'}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                   <Text style={styles.anuncioMsg}>{item.message}</Text>
                   <Text style={styles.anuncioDate}>{item.dateLabel}</Text>
@@ -307,7 +337,7 @@ export default function AnunciosScreen() {
                   </TouchableOpacity>
                 </View>
               )}
-            </View>
+            </CardWrapper>
           );
         })}
 
@@ -333,59 +363,88 @@ export default function AnunciosScreen() {
       </ScrollView>
 
       {/* Create / Edit modal */}
-      <Modal visible={modalVisible} animationType="none" transparent onRequestClose={() => setModalVisible(false)}>
-        <KeyboardAvoidingView
-          style={styles.overlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>{editingId ? 'Editar Anuncio' : 'Nuevo Anuncio'}</Text>
+      <Modal visible={modalVisible} animationType="fade" transparent statusBarTranslucent onRequestClose={() => setModalVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} activeOpacity={1} onPress={() => setModalVisible(false)} />
+          <View style={[styles.bottomSheet, { position: 'relative' }]}>
+            <View style={{ padding: spacing.lg, paddingBottom: spacing.md + insets.bottom }}>
+              <View style={styles.sheetHandleRow}>
+                <Text style={styles.modalTitle}>{editingId ? 'Editar Anuncio' : 'Nuevo Anuncio'}</Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)}><Text style={styles.closeX}>✕</Text></TouchableOpacity>
+              </View>
 
-            <Text style={styles.label}>Título *</Text>
-            <TextInput
-              style={styles.input}
-              value={form.title}
-              onChangeText={t => setForm(f => ({ ...f, title: t }))}
-              placeholder="Título del anuncio"
-              placeholderTextColor={colors.textMuted}
-            />
+              <Text style={styles.label}>Título *</Text>
+              <TextInput
+                style={styles.input}
+                value={form.title}
+                onChangeText={t => setForm(f => ({ ...f, title: t }))}
+                placeholder="Título del anuncio"
+                placeholderTextColor={colors.textMuted}
+              />
 
-            <Text style={styles.label}>Mensaje *</Text>
-            <TextInput
-              style={[styles.input, { height: 88, textAlignVertical: 'top' }]}
-              value={form.message}
-              onChangeText={t => setForm(f => ({ ...f, message: t }))}
-              placeholder="Contenido del anuncio"
-              placeholderTextColor={colors.textMuted}
-              multiline
-            />
+              <Text style={styles.label}>Mensaje *</Text>
+              <TextInput
+                style={[styles.input, { height: 88, textAlignVertical: 'top' }]}
+                value={form.message}
+                onChangeText={t => setForm(f => ({ ...f, message: t }))}
+                placeholder="Contenido del anuncio"
+                placeholderTextColor={colors.textMuted}
+                multiline
+              />
 
-            <Text style={styles.label}>Dirigido a</Text>
-            <InlinePicker
-              value={form.target}
-              options={TARGET_OPTIONS}
-              onSelect={v => setForm(f => ({ ...f, target: v }))}
-              placeholder="Todos"
-            />
+              <Text style={styles.label}>Dirigido a</Text>
+              <InlinePicker
+                value={form.target}
+                options={TARGET_OPTIONS}
+                onSelect={v => setForm(f => ({ ...f, target: v }))}
+                placeholder="Todos"
+              />
 
-            <View style={[styles.actionRow, { marginTop: spacing.md }]}>
-              <TouchableOpacity style={styles.btnSec} onPress={() => setModalVisible(false)}>
-                <Text style={styles.btnSecText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.btnPri, formLoading && { opacity: 0.6 }]}
-                onPress={handleSave}
-                disabled={formLoading}
-              >
-                <Text style={styles.btnPriText}>{formLoading ? 'Guardando…' : 'Guardar'}</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: spacing.md }}>
+                <TouchableOpacity style={styles.btnSec} onPress={() => setModalVisible(false)}>
+                  <Text style={styles.btnSecText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.btnPri, formLoading && { opacity: 0.6 }]}
+                  onPress={handleSave}
+                  disabled={formLoading}
+                >
+                  <Text style={styles.btnPriText}>{formLoading ? 'Guardando…' : 'Guardar'}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* Announcement detail modal (residents) */}
+      <Modal visible={!!detailItem} animationType="none" transparent statusBarTranslucent onRequestClose={() => setDetailItem(null)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} activeOpacity={1} onPress={() => setDetailItem(null)} />
+        <View style={[styles.bottomSheet]}>
+          <View style={{ padding: spacing.lg, paddingBottom: spacing.lg + 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md }}>
+              <View style={styles.bellCircle}>
+                <BellIcon size={18} color="#5b21b6" />
+              </View>
+              <Text style={[styles.anuncioTitle, { flex: 1, marginLeft: spacing.sm, fontSize: font.lg }]} numberOfLines={3}>
+                {detailItem?.title}
+              </Text>
+              <TouchableOpacity onPress={() => setDetailItem(null)} style={{ padding: 4 }}>
+                <Text style={styles.closeX}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+              <Text style={{ fontSize: font.base, color: colors.text, lineHeight: 22 }}>{detailItem?.message}</Text>
+            </ScrollView>
+            {detailItem?.dateLabel ? (
+              <Text style={[styles.anuncioDate, { marginTop: spacing.md }]}>{detailItem.dateLabel}</Text>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
       {/* Delete confirm modal */}
-      <Modal visible={!!deletingId} animationType="none" transparent onRequestClose={() => setDeletingId(null)}>
+      <Modal visible={!!deletingId} animationType="fade" transparent statusBarTranslucent onRequestClose={() => setDeletingId(null)}>
         <View style={styles.overlay}>
           <View style={[styles.modalCard, { alignItems: 'center' }]}>
             <View style={styles.dangerCircle}>
@@ -429,7 +488,7 @@ function makeStyles(colors) {
   topBarTitle:    { flex: 1, fontSize: font.lg, fontWeight: '700', color: colors.text },
   rolePill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#f2f4f7', borderRadius: 20,
+    backgroundColor: colors.disabledBg, borderRadius: 20,
     paddingHorizontal: 10, paddingVertical: 5,
   },
   roleOrangeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#f59e0b' },
@@ -498,6 +557,14 @@ function makeStyles(colors) {
   pageInfo:   { fontSize: font.sm, color: colors.text2 },
 
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: spacing.lg },
+  backdrop: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.45)' },
+  bottomSheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
+  },
+  sheetHandleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
+  closeX: { fontSize: 18, color: colors.textMuted, padding: 4 },
   modalCard: {
     backgroundColor: colors.surface, borderRadius: radius.lg,
     padding: spacing.lg, ...SHADOW,
@@ -507,7 +574,7 @@ function makeStyles(colors) {
   input: {
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
     paddingHorizontal: spacing.md, paddingVertical: 11,
-    fontSize: font.base, color: colors.text, backgroundColor: '#f9fafb',
+    fontSize: font.base, color: colors.text, backgroundColor: colors.inputBg,
   },
   btnSec:     { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center' },
   btnSecText: { fontSize: font.sm, fontWeight: '600', color: colors.text2 },

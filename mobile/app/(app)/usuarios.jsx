@@ -1,11 +1,12 @@
 ﻿import { useMemo, useEffect, useState, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Modal, ActivityIndicator, Alert, KeyboardAvoidingView,
   Platform, Pressable,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ChevronDownIcon } from '../../src/components/Icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { useCondo } from '../../src/context/CondoContext';
@@ -82,14 +83,14 @@ function Picker({ value, options, onSelect, placeholder }) {
     btn:      { height: 46, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.inputBg, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     btnOpen:  { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomColor: 'transparent' },
     btnText:  { fontSize: font.sm, color: colors.text, flex: 1 },
-    dropdown: { borderWidth: 1, borderTopWidth: 0, borderColor: colors.border, backgroundColor: colors.surface, borderBottomLeftRadius: 10, borderBottomRightRadius: 10, overflow: 'hidden' },
+    dropdown: { position: 'absolute', top: 46, left: 0, right: 0, borderWidth: 1, borderTopWidth: 0, borderColor: colors.border, backgroundColor: colors.surface, borderBottomLeftRadius: 10, borderBottomRightRadius: 10, elevation: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 8, zIndex: 200 },
     item:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
     itemSel:  { backgroundColor: colors.primarySoft },
     itemText: { fontSize: font.sm, color: colors.text },
     itemTextSel: { color: colors.primary, fontWeight: '700' },
   };
   return (
-    <View style={{ zIndex: open ? 99 : 1 }}>
+    <View style={{ zIndex: open ? 200 : 1, elevation: open ? 20 : 0 }}>
       <TouchableOpacity style={[ps.btn, open && ps.btnOpen]} onPress={() => setOpen(o => !o)} activeOpacity={0.8}>
         <Text style={[ps.btnText, !value && { color: colors.textMuted }]}>
           {value || placeholder || '— Seleccionar —'}
@@ -134,6 +135,7 @@ export default function UsuariosScreen() {
   const { user, isSuperAdmin, isAdmin } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
   const { reloadCondo } = useCondo();
   const showAdmin = isSuperAdmin || isAdmin;
   const roleLabel = isSuperAdmin ? 'Super Admin' : isAdmin ? 'Administrador' : 'Residente';
@@ -421,29 +423,39 @@ export default function UsuariosScreen() {
 
         {/* Role filter — inline dropdown */}
         <Text style={styles.selectorLabel}>FILTRAR POR ROL</Text>
-        <View style={{ zIndex: roleDropOpen ? 99 : 1, marginBottom: spacing.md }}>
+        <View style={{ zIndex: roleDropOpen ? 99 : 1, elevation: roleDropOpen ? 20 : 0, marginBottom: spacing.md }}>
           <TouchableOpacity
-            style={[styles.picker, { marginBottom: 0 }]}
+            style={[styles.picker, { marginBottom: 0, borderColor: roleDropOpen ? colors.primary : colors.border, borderBottomLeftRadius: roleDropOpen ? 0 : radius.md, borderBottomRightRadius: roleDropOpen ? 0 : radius.md }]}
             onPress={() => { setRoleDropOpen(o => !o); setCondoDropOpen(false); }}
             activeOpacity={0.85}
           >
-            <Text style={styles.pickerText}>{roleFilter || '— Todos —'}</Text>
-            <Text style={styles.pickerArrow}>{roleDropOpen ? '∧' : '⌄'}</Text>
+            <Text style={[styles.pickerText, !roleFilter && { color: colors.textMuted }]}>{roleFilter || '— Todos los roles —'}</Text>
+            <View style={{ transform: [{ rotate: roleDropOpen ? '180deg' : '0deg' }] }}>
+              <ChevronDownIcon size={16} color={roleDropOpen ? colors.primary : colors.textMuted} />
+            </View>
           </TouchableOpacity>
           {roleDropOpen && (
             <View style={[styles.inlineDropdown, { position: 'absolute', top: 46, left: 0, right: 0 }]}>
-              {['', ...ROLES].map(r => (
-                <TouchableOpacity
-                  key={r || 'todos'}
-                  style={[styles.inlineDropdownItem, roleFilter === r && styles.inlineDropdownItemActive]}
-                  onPress={() => { setRoleFilter(r); setRoleDropOpen(false); }}
-                >
-                  <Text style={[styles.inlineDropdownText, roleFilter === r && styles.inlineDropdownTextActive]}>
-                    {r || '— Todos —'}
-                  </Text>
-                  {roleFilter === r && <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>✓</Text>}
-                </TouchableOpacity>
-              ))}
+              {['', ...ROLES].map((r, i) => {
+                const isSelected = roleFilter === r;
+                return (
+                  <TouchableOpacity
+                    key={r || 'todos'}
+                    style={[styles.inlineDropdownItem, isSelected && styles.inlineDropdownItemActive, i === ROLES.length && { borderBottomWidth: 0 }]}
+                    onPress={() => { setRoleFilter(r); setRoleDropOpen(false); }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.inlineDropdownText, isSelected && styles.inlineDropdownTextActive]}>
+                      {r || 'Todos los roles'}
+                    </Text>
+                    {isSelected && (
+                      <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>✓</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
         </View>
@@ -539,9 +551,9 @@ export default function UsuariosScreen() {
 
       {/* Edit Condo modal */}
       <Modal visible={!!editCondoModal} transparent animationType="none" onRequestClose={() => setEditCondoModal(null)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setEditCondoModal(null)}>
-            <Pressable style={styles.formSheet}>
+            <Pressable style={[styles.formSheet, { paddingBottom: spacing.lg + insets.bottom }]}>
               <View style={styles.formSheetHeader}>
                 <Text style={styles.formSheetTitle}>Editar Condominio</Text>
                 <TouchableOpacity onPress={() => setEditCondoModal(null)}><Text style={styles.closeX}>✕</Text></TouchableOpacity>
@@ -563,7 +575,7 @@ export default function UsuariosScreen() {
       </Modal>
 
       {/* Delete Condo confirm */}
-      <Modal visible={!!deleteCondoModal} transparent animationType="fade" onRequestClose={() => setDeleteCondoModal(null)}>
+      <Modal visible={!!deleteCondoModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setDeleteCondoModal(null)}>
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmCard}>
             <View style={styles.confirmHeader}>
@@ -586,11 +598,10 @@ export default function UsuariosScreen() {
       </Modal>
 
       {/* Create User modal */}
-      <Modal visible={createUserModal} transparent animationType="none" onRequestClose={() => setCreateUserModal(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setCreateUserModal(false)}>
-            <Pressable style={styles.formSheet}>
-              <ScrollView showsVerticalScrollIndicator={false}>
+      <Modal visible={createUserModal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setCreateUserModal(false)}>
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setCreateUserModal(false)} />
+        <View style={styles.bottomSheet}>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>
                 <View style={styles.formSheetHeader}>
                   <Text style={styles.formSheetTitle}>Registrar Usuario</Text>
                   <TouchableOpacity onPress={() => setCreateUserModal(false)}><Text style={styles.closeX}>✕</Text></TouchableOpacity>
@@ -645,17 +656,14 @@ export default function UsuariosScreen() {
                   </TouchableOpacity>
                 </View>
               </ScrollView>
-            </Pressable>
-          </TouchableOpacity>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* Edit User modal */}
-      <Modal visible={!!editUserModal} transparent animationType="none" onRequestClose={() => setEditUserModal(null)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setEditUserModal(null)}>
-            <Pressable style={styles.formSheet}>
-              <ScrollView showsVerticalScrollIndicator={false}>
+      <Modal visible={!!editUserModal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setEditUserModal(null)}>
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setEditUserModal(null)} />
+        <View style={styles.bottomSheet}>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>
                 <View style={styles.formSheetHeader}>
                   <Text style={styles.formSheetTitle}>Editar Usuario</Text>
                   <TouchableOpacity onPress={() => setEditUserModal(null)}><Text style={styles.closeX}>✕</Text></TouchableOpacity>
@@ -712,13 +720,11 @@ export default function UsuariosScreen() {
                   </TouchableOpacity>
                 </View>
               </ScrollView>
-            </Pressable>
-          </TouchableOpacity>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* Delete User confirm */}
-      <Modal visible={!!deleteUserModal} transparent animationType="fade" onRequestClose={() => setDeleteUserModal(null)}>
+      <Modal visible={!!deleteUserModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setDeleteUserModal(null)}>
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmCard}>
             <View style={styles.confirmHeader}>
@@ -817,7 +823,6 @@ function makeStyles(colors) {
     marginBottom: spacing.md, ...CARD_SHADOW,
   },
   pickerText:  { fontSize: font.base, color: colors.text, fontWeight: '500', flex: 1 },
-  pickerArrow: { fontSize: 16, color: colors.textMuted },
 
   condoCard: {
     backgroundColor: colors.cardBg, borderRadius: radius.lg,
@@ -899,6 +904,14 @@ function makeStyles(colors) {
 
   // Modals
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  backdrop: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.45)' },
+  bottomSheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    maxHeight: '82%',
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
+  },
+  sheetContent: { padding: spacing.lg, paddingBottom: spacing.md },
   modalSheet: {
     backgroundColor: colors.surface, borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl, padding: spacing.lg, maxHeight: '75%',
@@ -911,7 +924,7 @@ function makeStyles(colors) {
 
   formSheet: {
     backgroundColor: colors.surface, borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl, padding: spacing.lg, maxHeight: '90%',
+    borderTopRightRadius: radius.xl, padding: spacing.lg, maxHeight: '82%',
   },
   formSheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
   formSheetTitle:  { fontSize: font.lg, fontWeight: '700', color: colors.text },
@@ -920,12 +933,12 @@ function makeStyles(colors) {
   formLabel:       { fontSize: 11, fontWeight: '700', color: colors.textMuted, letterSpacing: 0.5, marginBottom: 6 },
   formInput: {
     height: 46, borderRadius: 10, borderWidth: 1, borderColor: colors.border,
-    backgroundColor: '#f9fafb', paddingHorizontal: 12, fontSize: font.sm, color: colors.text,
+    backgroundColor: colors.inputBg, paddingHorizontal: 12, fontSize: font.sm, color: colors.text,
   },
   formActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   phoneRow:    { flexDirection: 'row' },
   phonePrefix: {
-    height: 46, paddingHorizontal: 10, backgroundColor: '#f3f4f6',
+    height: 46, paddingHorizontal: 10, backgroundColor: colors.inputBg,
     borderWidth: 1, borderColor: colors.border, borderTopLeftRadius: 10,
     borderBottomLeftRadius: 10, alignItems: 'center', justifyContent: 'center',
   },
@@ -935,26 +948,26 @@ function makeStyles(colors) {
 
   pickerBtn: {
     height: 46, borderRadius: 10, borderWidth: 1, borderColor: colors.border,
-    backgroundColor: '#f9fafb', paddingHorizontal: 12,
+    backgroundColor: colors.inputBg, paddingHorizontal: 12,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   pickerBtnText: { fontSize: font.sm, color: colors.text, flex: 1 },
 
   inlineDropdown: {
-    borderWidth: 1, borderTopWidth: 0, borderColor: colors.border,
+    borderWidth: 1, borderTopWidth: 0, borderColor: colors.primary,
     backgroundColor: colors.surface,
-    borderBottomLeftRadius: 10, borderBottomRightRadius: 10,
+    borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md,
     overflow: 'hidden',
     shadowColor: '#101828', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08, shadowRadius: 8, elevation: 6,
+    shadowOpacity: 0.08, shadowRadius: 8, elevation: 20,
   },
   inlineDropdownItem: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: spacing.md, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
+    paddingHorizontal: spacing.md, paddingVertical: 13,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
   },
-  inlineDropdownItemActive: { backgroundColor: '#f5f3ff' },
-  inlineDropdownText:       { fontSize: font.sm, color: colors.text },
+  inlineDropdownItemActive: { backgroundColor: colors.primarySoft ?? '#f5f3ff' },
+  inlineDropdownText:       { fontSize: font.sm, color: colors.text, fontWeight: '500' },
   inlineDropdownTextActive: { color: colors.primary, fontWeight: '700' },
 
   confirmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', paddingHorizontal: spacing.lg },

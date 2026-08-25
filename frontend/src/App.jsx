@@ -11,7 +11,6 @@ import PagosScreen from "./screens/PagosScreen.jsx";
 import UsuariosScreen from "./screens/UsuariosScreen.jsx";
 import PropiedadesScreen from "./screens/PropiedadesScreen.jsx";
 import AnunciosScreen from "./screens/AnunciosScreen.jsx";
-import AsambleasScreen from "./screens/AsambleasScreen.jsx";
 import PreRegisterVisitsScreen from "./screens/PreRegisterVisitsScreen.jsx";
 import OwnerHomeScreen from "./screens/OwnerHomeScreen.jsx";
 import OwnerPaymentsScreen from "./screens/OwnerPaymentsScreen.jsx";
@@ -89,7 +88,6 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
   const [isCreateAnnouncementModalOpen, setIsCreateAnnouncementModalOpen] = useState(false);
   const [isEditAnuncioModalOpen, setIsEditAnuncioModalOpen] = useState(false);
   const [editingAnuncio, setEditingAnuncio] = useState(null);
-  const [isCreateAsambleaModalOpen, setIsCreateAsambleaModalOpen] = useState(false);
   // Profile
   const [profilePhoto, setProfilePhoto] = useState(() => localStorage.getItem(`profilePhoto_${user?.email}`) || null);
   const [isCreateCondoModalOpen, setIsCreateCondoModalOpen] = useState(false);
@@ -107,8 +105,6 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
   const [createUserLoading, setCreateUserLoading] = useState(false);
   const [createAnnouncementLoading, setCreateAnnouncementLoading] = useState(false);
   const [createAnnouncementError, setCreateAnnouncementError] = useState('');
-  const [createAsambleaLoading, setCreateAsambleaLoading] = useState(false);
-  const [createAsambleaError, setCreateAsambleaError] = useState('');
   // Áreas sociales y reservas
   const [areasSociales, setAreasSociales] = useState([]);
   const [reservasAreas, setReservasAreas] = useState([]);
@@ -264,19 +260,7 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
     target: "todos",
     condo: ""
   });
-  const [asambleasData, setAsambleasData] = useState([]);
   const [historialVisitasData, setHistorialVisitasData] = useState([]);
-  const [newAsambleaForm, setNewAsambleaForm] = useState({
-    title: "",
-    startDate: "",
-    dueDate: "",
-    description: "",
-  });
-  const [newAsambleaFile, setNewAsambleaFile] = useState(null);
-  const [editingAsamblea, setEditingAsamblea] = useState(null);
-  const [isEditAsambleaModalOpen, setIsEditAsambleaModalOpen] = useState(false);
-  const [editAsambleaForm, setEditAsambleaForm] = useState({ title: "", startDate: "", dueDate: "", description: "" });
-  const [editAsambleaFile, setEditAsambleaFile] = useState(null);
 
   useEffect(() => {
     const loadAll = async () => {
@@ -285,13 +269,12 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
       const isMgmt     = ["Super Admin", "Administrador", "Seguridad"].includes(user.role);
       const isResident = ["Propietario", "Inquilino"].includes(user.role);
 
-      const [condos, usuarios, propiedades, pagos, anuncios, asambleas, visitas, historial, panic, areas, reservasAr] = await Promise.all([
+      const [condos, usuarios, propiedades, pagos, anuncios, visitas, historial, panic, areas, reservasAr] = await Promise.all([
         isAdmin ? safe(api.getCondominios)      : Promise.resolve([]),
         isAdmin ? safe(api.getUsuarios)         : Promise.resolve([]),
         isMgmt  ? safe(api.getPropiedades)      : Promise.resolve([]),
         safe(api.getPagos),
         safe(api.getAnuncios),
-        safe(api.getAsambleas),
         safe(api.getVisitas),
         isMgmt  ? safe(api.getHistorialVisitas) : isResident ? safe(api.getMyVisitHistory) : Promise.resolve([]),
         safe(api.getPanicAlerts),
@@ -305,7 +288,6 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
       setPropiedadesData(propiedades);
       setPagosData(pagos);
       setAnunciosData(anuncios);
-      setAsambleasData(asambleas);
       setVisitPasses(visitas);
       setHistorialVisitasData(historial);
       setPanicAlerts(panic);
@@ -383,10 +365,31 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
         if (permResult.receive !== 'granted') return;
         await PushNotifications.register();
         PushNotifications.addListener('registration', async (token) => {
-          try { await api.registerFcmToken(token.value, 'android'); } catch { }
+          try {
+            localStorage.setItem('fcm_token', token.value);
+            await api.registerFcmToken(token.value, 'android');
+          } catch { }
+        });
+        PushNotifications.addListener('registrationError', (err) => {
+          console.error('[Push] Error de registro FCM:', err);
         });
         PushNotifications.addListener('pushNotificationReceived', (notification) => {
+          // Notificación recibida con app en primer plano — mostrar toast
           addToast(notification.body || notification.title || 'Nueva notificación', 'info');
+        });
+        PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+          // Usuario tocó la notificación — navegar a la sección correspondiente
+          const type = action.notification?.data?.type;
+          const sectionMap = {
+            announcement:           'Anuncios',
+            payment_submitted:      'Pagos',
+            payment_approved:       'Mis Pagos',
+            reservation_requested:  'Reservas',
+            reservation_approved:   'Mis Reservas',
+            panic:                  'Botón de Pánico',
+          };
+          const section = sectionMap[type];
+          if (section) setActiveSection(section);
         });
       } catch { }
     };
@@ -417,10 +420,10 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
 
   // Advertencia al cerrar/recargar si hay un formulario abierto
   const anyModalOpen = isPayExpensesModalOpen || isCreateAnnouncementModalOpen ||
-    isEditAnuncioModalOpen || isCreateAsambleaModalOpen || isCreateCondoModalOpen ||
+    isEditAnuncioModalOpen || isCreateCondoModalOpen ||
     isEditCondoModalOpen || isCreatePropertyModalOpen || isEditPropertyModalOpen ||
     isCreateUserModalOpen || isCreateAreaModalOpen || isEditUserModalOpen ||
-    isEditAsambleaModalOpen || isLogoutConfirmOpen;
+    isLogoutConfirmOpen;
 
   useEffect(() => {
     if (!anyModalOpen) return;
@@ -832,55 +835,6 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
     }
   };
 
-  const handleCreateAsamblea = async () => {
-    if (!newAsambleaForm.title.trim() || !newAsambleaForm.startDate || !newAsambleaForm.dueDate || !newAsambleaForm.description.trim()) {
-      setCreateAsambleaError('Completá todos los campos obligatorios.');
-      return;
-    }
-    setCreateAsambleaLoading(true);
-    setCreateAsambleaError('');
-    try {
-      const condoName = user.role === 'Super Admin'
-        ? (selectedManagementCondoName || condominiosData[0]?.name || 'General')
-        : user.condo || condominiosData[0]?.name || 'General';
-      const formData = new FormData();
-      formData.append('title',       newAsambleaForm.title.trim());
-      formData.append('startDate',   newAsambleaForm.startDate);
-      formData.append('dueDate',     newAsambleaForm.dueDate);
-      formData.append('description', newAsambleaForm.description.trim());
-      formData.append('condo',       condoName);
-      if (newAsambleaFile) formData.append('document', newAsambleaFile);
-      const newAsamblea = await api.createAsamblea(formData);
-      setAsambleasData(prev => [newAsamblea, ...prev]);
-      setNewAsambleaForm({ title: "", startDate: "", dueDate: "", description: "" });
-      setNewAsambleaFile(null);
-      setIsCreateAsambleaModalOpen(false);
-    } catch (err) {
-      setCreateAsambleaError(err.message || 'Error al crear la asamblea.');
-    } finally {
-      setCreateAsambleaLoading(false);
-    }
-  };
-
-  const handleEditAsamblea = async () => {
-    if (!editAsambleaForm.title.trim() || !editAsambleaForm.dueDate) return;
-    try {
-      const formData = new FormData();
-      formData.append('title',       editAsambleaForm.title.trim());
-      formData.append('startDate',   editAsambleaForm.startDate);
-      formData.append('dueDate',     editAsambleaForm.dueDate);
-      formData.append('description', editAsambleaForm.description.trim());
-      formData.append('condo', editingAsamblea.condo || 'General');
-      if (editAsambleaFile) formData.append('document', editAsambleaFile);
-      const updated = await api.updateAsamblea(editingAsamblea.id, formData);
-      setAsambleasData(asambleasData.map(a => String(a.id) === String(editingAsamblea.id) ? { ...a, ...updated } : a));
-      setIsEditAsambleaModalOpen(false);
-      setEditingAsamblea(null);
-    } catch (err) {
-      console.error("Error editando asamblea:", err.message);
-    }
-  };
-
   const getPropertyTenants = (propiedad) => {
     if (Array.isArray(propiedad.tenants)) {
       return propiedad.tenants.filter(Boolean);
@@ -1120,7 +1074,6 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
         setPropiedadesData(prev => prev.map(patch));
         setPagosData(prev => prev.map(patch));
         setAnunciosData(prev => prev.map(patch));
-        setAsambleasData(prev => prev.map(patch));
         setVisitPasses(prev => prev.map(patch));
         setHistorialVisitasData(prev => prev.map(patch));
         setPanicAlerts(prev => prev.map(patch));
@@ -1209,14 +1162,6 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
       )
     },
     {
-      label: "Asambleas",
-      icon: (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M6 3H14L18 7V21H6V3ZM14 3V7H18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-        </svg>
-      )
-    },
-    {
       label: "Botón de Pánico",
       icon: (
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1257,14 +1202,6 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
       icon: (
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M15 17H9M17 10C17 7.2 14.8 5 12 5C9.2 5 7 7.2 7 10V12.7C7 13.5 6.7 14.2 6.1 14.8L5 15.9H19L17.9 14.8C17.3 14.2 17 13.5 17 12.7V10Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )
-    },
-    {
-      label: "Asambleas",
-      icon: (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M6 3H14L18 7V21H6V3ZM14 3V7H18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
         </svg>
       )
     },
@@ -1831,20 +1768,6 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
             setIsCreateAnnouncementModalOpen={setIsCreateAnnouncementModalOpen}
             setEditingAnuncio={setEditingAnuncio}
             setIsEditAnuncioModalOpen={setIsEditAnuncioModalOpen}
-            onToast={addToast}
-          />
-        ) : activeSection === "Asambleas" && !isTenant ? (
-          <AsambleasScreen
-            user={user}
-            isSuperAdministrator={isSuperAdministrator}
-            condominiosData={condominiosData}
-            asambleasData={asambleasData}
-            setAsambleasData={setAsambleasData}
-            setIsCreateAsambleaModalOpen={setIsCreateAsambleaModalOpen}
-            setEditingAsamblea={setEditingAsamblea}
-            setEditAsambleaForm={setEditAsambleaForm}
-            setEditAsambleaFile={setEditAsambleaFile}
-            setIsEditAsambleaModalOpen={setIsEditAsambleaModalOpen}
             onToast={addToast}
           />
         ) : activeSection === "Mi Perfil" ? (
@@ -3172,171 +3095,6 @@ function Dashboard({ user, onUpdateUser, onLogout, isDarkMode, onToggleDark: tog
         </div>
       )}
 
-      {isCreateAsambleaModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content modal-edit-user modal-create-announcement">
-            <h2>Nueva Asamblea</h2>
-
-            <div className="modal-body-simple">
-              <div className="form-group-simple">
-                <label>Título <span style={{color:'var(--danger,#e53)'}}>*</span></label>
-                <input
-                  type="text"
-                  placeholder="Ej: Renovación de entrada principal"
-                  value={newAsambleaForm.title}
-                  onChange={(e) => setNewAsambleaForm({ ...newAsambleaForm, title: e.target.value })}
-                  onKeyDown={onEnterKey(handleCreateAsamblea, createAsambleaLoading)}
-                />
-              </div>
-
-              <div className="form-group-simple">
-                <label>Descripción <span style={{color:'var(--danger,#e53)'}}>*</span></label>
-                <textarea
-                  className="anuncio-textarea"
-                  placeholder="Describe la propuesta de asamblea"
-                  value={newAsambleaForm.description}
-                  onChange={(e) => setNewAsambleaForm({ ...newAsambleaForm, description: e.target.value })}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div className="form-group-simple">
-                  <label>Fecha de inicio <span style={{color:'var(--danger,#e53)'}}>*</span></label>
-                  <input
-                    type="date"
-                    value={newAsambleaForm.startDate}
-                    onChange={(e) => setNewAsambleaForm({ ...newAsambleaForm, startDate: e.target.value })}
-                    onKeyDown={onEnterKey(handleCreateAsamblea, createAsambleaLoading)}
-                  />
-                </div>
-                <div className="form-group-simple">
-                  <label>Fecha de vencimiento <span style={{color:'var(--danger,#e53)'}}>*</span></label>
-                  <input
-                    type="date"
-                    value={newAsambleaForm.dueDate}
-                    min={newAsambleaForm.startDate || undefined}
-                    onChange={(e) => setNewAsambleaForm({ ...newAsambleaForm, dueDate: e.target.value })}
-                    onKeyDown={onEnterKey(handleCreateAsamblea, createAsambleaLoading)}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group-simple">
-                <label>Documento (PDF, Word, Excel, imagen — máx. 10 MB)</label>
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png"
-                  onChange={(e) => setNewAsambleaFile(e.target.files?.[0] || null)}
-                  style={{ paddingTop: 6 }}
-                />
-                {newAsambleaFile && (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary,#666)', marginTop: 4 }}>
-                    Archivo seleccionado: {newAsambleaFile.name}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {createAsambleaError && (
-              <p style={{color:'var(--danger)',fontSize:'0.85rem',margin:'0 0 0.5rem',padding:'0 1.5rem'}}>{createAsambleaError}</p>
-            )}
-            <footer className="modal-footer-simple">
-              <button className="btn btn-secondary" type="button" disabled={createAsambleaLoading} onClick={() => { setIsCreateAsambleaModalOpen(false); setNewAsambleaFile(null); setCreateAsambleaError(''); }}>
-                Cancelar
-              </button>
-              <button className="btn btn-primary" type="button" disabled={createAsambleaLoading} onClick={handleCreateAsamblea}>
-                {createAsambleaLoading ? (
-                  <span style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
-                    <svg style={{width:14,height:14,animation:'spin 0.8s linear infinite'}} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-                    Creando…
-                  </span>
-                ) : 'Crear Asamblea'}
-              </button>
-            </footer>
-          </div>
-        </div>
-      )}
-
-      {isEditAsambleaModalOpen && editingAsamblea && (
-        <div className="modal-overlay">
-          <div className="modal-content modal-edit-user modal-create-announcement">
-            <h2>Editar Asamblea</h2>
-
-            <div className="modal-body-simple">
-              <div className="form-group-simple">
-                <label>Título <span style={{color:'var(--danger,#e53)'}}>*</span></label>
-                <input
-                  type="text"
-                  value={editAsambleaForm.title}
-                  onChange={(e) => setEditAsambleaForm({ ...editAsambleaForm, title: e.target.value })}
-                  onKeyDown={onEnterKey(handleEditAsamblea)}
-                />
-              </div>
-
-              <div className="form-group-simple">
-                <label>Descripción</label>
-                <textarea
-                  className="anuncio-textarea"
-                  value={editAsambleaForm.description}
-                  onChange={(e) => setEditAsambleaForm({ ...editAsambleaForm, description: e.target.value })}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div className="form-group-simple">
-                  <label>Fecha de inicio</label>
-                  <input
-                    type="date"
-                    value={editAsambleaForm.startDate}
-                    onChange={(e) => setEditAsambleaForm({ ...editAsambleaForm, startDate: e.target.value })}
-                    onKeyDown={onEnterKey(handleEditAsamblea)}
-                  />
-                </div>
-                <div className="form-group-simple">
-                  <label>Fecha de vencimiento</label>
-                  <input
-                    type="date"
-                    value={editAsambleaForm.dueDate}
-                    min={editAsambleaForm.startDate || undefined}
-                    onChange={(e) => setEditAsambleaForm({ ...editAsambleaForm, dueDate: e.target.value })}
-                    onKeyDown={onEnterKey(handleEditAsamblea)}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group-simple">
-                <label>Reemplazar documento (opcional)</label>
-                {editingAsamblea.documentName && !editAsambleaFile && (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary,#666)', marginBottom: 6 }}>
-                    Documento actual: {editingAsamblea.documentName}
-                  </p>
-                )}
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png"
-                  onChange={(e) => setEditAsambleaFile(e.target.files?.[0] || null)}
-                  style={{ paddingTop: 6 }}
-                />
-                {editAsambleaFile && (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary,#666)', marginTop: 4 }}>
-                    Nuevo archivo: {editAsambleaFile.name}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <footer className="modal-footer-simple">
-              <button className="btn btn-secondary" type="button" onClick={() => { setIsEditAsambleaModalOpen(false); setEditingAsamblea(null); setEditAsambleaFile(null); }}>
-                Cancelar
-              </button>
-              <button className="btn btn-primary" type="button" onClick={handleEditAsamblea}>
-                Guardar Cambios
-              </button>
-            </footer>
-          </div>
-        </div>
-      )}
-
       {isLogoutConfirmOpen && (
         <div className="modal-overlay" onClick={() => setIsLogoutConfirmOpen(false)}>
           <div className="modal-content" style={{ maxWidth: '380px' }} onClick={e => e.stopPropagation()}>
@@ -3529,8 +3287,16 @@ export default function App() {
           sessionWarning={sessionWarning}
           onDismissSessionWarning={() => setSessionWarning("")}
           isOnline={isOnline}
-          onLogout={() => {
+          onLogout={async () => {
             if (autoLogoutTimerRef.current) clearTimeout(autoLogoutTimerRef.current);
+            // Eliminar token FCM antes de cerrar sesión
+            try {
+              const token = localStorage.getItem('fcm_token');
+              if (token) {
+                await api.removeFcmToken(token).catch(() => {});
+                localStorage.removeItem('fcm_token');
+              }
+            } catch { }
             api.logout();
             setSessionUser(null);
             setScreen("landing");

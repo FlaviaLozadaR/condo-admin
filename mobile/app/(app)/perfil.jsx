@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'react-native';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert,
-  ScrollView, TextInput, Switch, ActivityIndicator,
+  ScrollView, TextInput, Switch, ActivityIndicator, Modal,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,12 +17,8 @@ import * as api from '../../src/api';
 const NOTIF_KEY = 'condo_notif_prefs';
 
 const ALL_NOTIF_TYPES = [
-  { key: 'pagoAprobado',     label: 'Pago aprobado',              desc: 'Cuando aprueban tu comprobante.',               roles: ['Propietario', 'Inquilino'] },
-  { key: 'nuevoComprobante', label: 'Nuevo comprobante recibido', desc: 'Cuando un residente envía un pago.',            roles: ['Super Admin', 'Administrador'] },
-  { key: 'nuevosAnuncios',   label: 'Nuevos anuncios',            desc: 'Cuando se publica un anuncio.',                 roles: ['Super Admin', 'Administrador', 'Propietario', 'Inquilino', 'Seguridad'] },
-  { key: 'alertaPanico',     label: 'Alerta de pánico',           desc: 'Cuando alguien activa el botón de emergencia.', roles: ['Super Admin', 'Administrador', 'Seguridad'] },
-  { key: 'reservaAprobada',  label: 'Reserva aprobada',           desc: 'Cuando aprueban tu reserva de área.',           roles: ['Propietario', 'Inquilino'] },
-  { key: 'nuevaSolicitud',   label: 'Nueva solicitud de reserva', desc: 'Cuando un residente solicita una reserva.',     roles: ['Super Admin', 'Administrador'] },
+  { key: 'nuevosAnuncios',  label: 'Nuevos anuncios',  desc: 'Cuando se publica un anuncio.',        roles: ['Super Admin', 'Administrador', 'Propietario', 'Inquilino', 'Seguridad'] },
+  { key: 'reservaAprobada', label: 'Reserva aprobada', desc: 'Cuando aprueban tu reserva de área.',  roles: ['Propietario', 'Inquilino'] },
 ];
 
 const DEFAULT_NOTIFS = Object.fromEntries(ALL_NOTIF_TYPES.map(t => [t.key, true]));
@@ -49,6 +47,11 @@ export default function PerfilScreen() {
   const { user, refreshUser } = useAuth();
   const { isDark, toggleTheme, colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  // ── Dialog ──────────────────────────────────────────────────────────────────
+  const [dialog, setDialog] = useState({ visible: false, title: '', message: '', type: 'success' });
+  const showDialog = useCallback((title, message, type = 'success') => {
+    setDialog({ visible: true, title, message, type });
+  }, []);
 
   const roleLabel = {
     'Super Admin':   'Super Admin',
@@ -64,14 +67,14 @@ export default function PerfilScreen() {
   const [saving, setSaving] = useState(false);
 
   const handleSaveProfile = async () => {
-    if (!name.trim()) return Alert.alert('Error', 'El nombre no puede estar vacío.');
+    if (!name.trim()) { showDialog('Error', 'El nombre no puede estar vacío.', 'error'); return; }
     setSaving(true);
     try {
       await api.updateUsuario(user.id, { name: name.trim(), phone: phone.trim() });
       await refreshUser();
-      Alert.alert('Listo', 'Datos actualizados correctamente.');
+      showDialog('¡Listo!', 'Datos actualizados correctamente.', 'success');
     } catch (e) {
-      Alert.alert('Error', e.message || 'No se pudo guardar.');
+      showDialog('Error', e.message || 'No se pudo guardar.', 'error');
     } finally {
       setSaving(false);
     }
@@ -82,19 +85,22 @@ export default function PerfilScreen() {
   const [passLoading, setPassLoading] = useState(false);
 
   const handleChangePassword = async () => {
-    if (!passForm.current || !passForm.newPass || !passForm.confirm)
-      return Alert.alert('Error', 'Completá todos los campos.');
-    if (passForm.newPass.length < 8)
-      return Alert.alert('Error', 'La nueva contraseña debe tener al menos 8 caracteres.');
-    if (passForm.newPass !== passForm.confirm)
-      return Alert.alert('Error', 'Las contraseñas no coinciden.');
+    if (!passForm.current || !passForm.newPass || !passForm.confirm) {
+      showDialog('Error', 'Completá todos los campos.', 'error'); return;
+    }
+    if (passForm.newPass.length < 8) {
+      showDialog('Error', 'La nueva contraseña debe tener al menos 8 caracteres.', 'error'); return;
+    }
+    if (passForm.newPass !== passForm.confirm) {
+      showDialog('Error', 'Las contraseñas no coinciden.', 'error'); return;
+    }
     setPassLoading(true);
     try {
       await api.changePassword(user.id, { currentPassword: passForm.current, newPassword: passForm.newPass });
       setPassForm({ current: '', newPass: '', confirm: '' });
-      Alert.alert('Listo', 'Contraseña actualizada.');
+      showDialog('¡Listo!', 'Contraseña actualizada correctamente.', 'success');
     } catch (e) {
-      Alert.alert('Error', e.message || 'No se pudo cambiar la contraseña.');
+      showDialog('Error', e.message || 'No se pudo cambiar la contraseña.', 'error');
     } finally {
       setPassLoading(false);
     }
@@ -120,6 +126,33 @@ export default function PerfilScreen() {
 
   const initial = (user?.name ?? 'U').charAt(0).toUpperCase();
 
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const handlePickAvatar = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      showDialog('Permiso requerido', 'Necesitamos acceso a tu galería para cambiar la foto.', 'error');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.7,
+    });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    setAvatarUploading(true);
+    try {
+      await api.uploadAvatar(user.id, asset.uri, asset.mimeType ?? 'image/jpeg');
+      await refreshUser();
+      showDialog('¡Listo!', 'Foto de perfil actualizada.', 'success');
+    } catch (e) {
+      showDialog('Error', e.message || 'No se pudo subir la foto.', 'error');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       {/* Top bar */}
@@ -137,14 +170,20 @@ export default function PerfilScreen() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {/* Avatar */}
         <View style={styles.avatarSection}>
-          <View style={styles.avatarWrap}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initial}</Text>
-            </View>
+          <TouchableOpacity style={styles.avatarWrap} onPress={handlePickAvatar} activeOpacity={0.8} disabled={avatarUploading}>
+            {user?.avatarUrl ? (
+              <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initial}</Text>
+              </View>
+            )}
             <View style={styles.cameraBadge}>
-              <CameraIcon size={12} />
+              {avatarUploading
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <CameraIcon size={12} />}
             </View>
-          </View>
+          </TouchableOpacity>
           <Text style={styles.profileName}>{user?.name}</Text>
           <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{roleLabel}</Text></View>
         </View>
@@ -183,11 +222,6 @@ export default function PerfilScreen() {
             <Text style={styles.sectionTitle}>Notificaciones</Text>
             <Text style={styles.sectionDesc}>Elegí qué avisos querés recibir en tu celular.</Text>
 
-            <View style={styles.notifTableHeader}>
-              <Text style={[styles.notifColHead, { flex: 1 }]}> </Text>
-              <Text style={styles.notifColHead}>Push</Text>
-            </View>
-
             {notifTypes.map(t => (
               <View key={t.key} style={styles.notifRow}>
                 <View style={{ flex: 1, marginRight: spacing.sm }}>
@@ -224,6 +258,28 @@ export default function PerfilScreen() {
 
         <View style={{ height: spacing.xl }} />
       </ScrollView>
+
+      {/* ── Dialog ────────────────────────────────────────────────────────── */}
+      <Modal visible={dialog.visible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setDialog(d => ({ ...d, visible: false }))}>
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialogCard}>
+            <View style={[styles.dialogIconWrap, { backgroundColor: dialog.type === 'success' ? '#22c55e' : colors.danger }]}>
+              <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }}>
+                {dialog.type === 'success' ? '✓' : '✕'}
+              </Text>
+            </View>
+            <Text style={styles.dialogTitle}>{dialog.title}</Text>
+            <Text style={styles.dialogMessage}>{dialog.message}</Text>
+            <TouchableOpacity
+              style={[styles.dialogBtn, { backgroundColor: dialog.type === 'success' ? colors.primary : colors.danger }]}
+              onPress={() => setDialog(d => ({ ...d, visible: false }))}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.dialogBtnText}>Aceptar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -338,5 +394,21 @@ function makeStyles(colors) {
     },
     notifLabel: { fontSize: font.sm, fontWeight: '600', color: colors.text },
     notifDesc:  { fontSize: 11, color: colors.textMuted, marginTop: 2 },
+
+    // Dialog
+    dialogOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
+    dialogCard: {
+      backgroundColor: colors.surface, borderRadius: radius.xl,
+      padding: spacing.lg, width: '100%', maxWidth: 320,
+      alignItems: 'center',
+      shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.2, shadowRadius: 20, elevation: 10,
+      borderWidth: 1, borderColor: colors.border,
+    },
+    dialogIconWrap: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
+    dialogTitle:   { fontSize: font.lg, fontWeight: '800', color: colors.text, marginBottom: spacing.xs, textAlign: 'center' },
+    dialogMessage: { fontSize: font.sm, color: colors.textMuted, textAlign: 'center', lineHeight: 21, marginBottom: spacing.lg },
+    dialogBtn:     { borderRadius: radius.md, paddingVertical: 13, paddingHorizontal: spacing.xl, alignItems: 'center', width: '100%' },
+    dialogBtnText: { color: '#fff', fontWeight: '700', fontSize: font.base },
   });
 }

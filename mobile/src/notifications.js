@@ -38,7 +38,7 @@ export async function registerPushToken() {
     const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
     const token = tokenData.data;
 
-    await api.registerPushToken(token);
+    await api.registerPushToken(token, Platform.OS);
     return token;
   } catch (e) {
     console.warn('[Push] No se pudo registrar el token:', e.message);

@@ -19,6 +19,7 @@ export default function SecurityHistoryScreen({ visitPasses, setVisitPasses, his
   const [saving, setSaving] = useState(false);
   const [deletingVisitaId, setDeletingVisitaId] = useState(null);
   const [deletingVisitaBusy, setDeletingVisitaBusy] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState(null);
   const [historyMonthFilter, setHistoryMonthFilter] = useState("todos");
   const [historyMonthDropdownOpen, setHistoryMonthDropdownOpen] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
@@ -79,7 +80,8 @@ export default function SecurityHistoryScreen({ visitPasses, setVisitPasses, his
     setBusyKey(key);
     try {
       const { url } = await api.getVisitaDocumentUrl(id, type);
-      window.open(url, "_blank", "noopener,noreferrer");
+      const label = DOC_TYPES.find(d => d.type === type)?.label || type;
+      setPreviewDoc({ url, label });
     } catch (err) {
       onToast?.(err.message || "No se pudo abrir el documento.", "error");
     } finally {
@@ -420,6 +422,30 @@ export default function SecurityHistoryScreen({ visitPasses, setVisitPasses, his
                 {deletingVisitaBusy ? "Eliminando…" : "Eliminar"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {previewDoc && (
+        <div className="modal-overlay modal-overlay-centered" onClick={() => setPreviewDoc(null)}>
+          <div className="doc-preview-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="doc-preview-header">
+              <span>{previewDoc.label}</span>
+              <button type="button" className="doc-preview-close" onClick={() => setPreviewDoc(null)} aria-label="Cerrar">✕</button>
+            </div>
+            <div className="doc-preview-body">
+              <img
+                src={previewDoc.url}
+                alt={previewDoc.label}
+                className="doc-preview-img"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  e.currentTarget.nextElementSibling.style.display = 'block';
+                }}
+              />
+              <iframe src={previewDoc.url} title={previewDoc.label} className="doc-preview-iframe" />
+            </div>
+            <button type="button" className="confirm-modal-cancel" style={{width:'100%',marginTop:'0.75rem'}} onClick={() => setPreviewDoc(null)}>Cerrar</button>
           </div>
         </div>
       )}

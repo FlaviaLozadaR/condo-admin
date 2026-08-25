@@ -1,4 +1,4 @@
-﻿import { useMemo, useEffect, useState, useCallback } from 'react';
+﻿import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal,
   Alert, RefreshControl, Linking, ActivityIndicator,
@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { useCondo } from '../../src/context/CondoContext';
-import { colors, spacing, radius, font } from '../../src/theme';
+import { spacing, radius, font } from '../../src/theme';
 import AppDrawer from '../../src/components/Drawer';
 import * as api from '../../src/api';
 import Svg, { Path, Rect as SvgRect } from 'react-native-svg';
@@ -38,54 +38,76 @@ function monthKey(d) {
 function InlinePicker({ value, options, onSelect }) {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
-  const [h, setH]       = useState(48);
+  const [layout, setLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const triggerRef = React.useRef(null);
   const selected = options.find(o => o.value === value);
   const ps = {
-    picker:        { flexDirection:'row', alignItems:'center', justifyContent:'space-between', borderWidth:1, borderColor:colors.border, borderRadius:radius.sm, paddingHorizontal:12, paddingVertical:10, backgroundColor:colors.inputBg },
-    pickerOpen:    { borderColor:colors.primary },
-    pickerText:    { flex:1, fontSize:font.sm, color:colors.text },
-    pickerArrow:   { fontSize:16, color:colors.textMuted, marginLeft:6 },
-    drop:          { backgroundColor:colors.surface, borderWidth:1, borderColor:colors.border, borderRadius:radius.sm, zIndex:99, elevation:12 },
-    dropItem:      { paddingHorizontal:12, paddingVertical:10, flexDirection:'row', alignItems:'center', justifyContent:'space-between', borderBottomWidth:1, borderBottomColor:colors.border },
-    dropItemActive:{ backgroundColor:colors.primarySoft },
-    dropText:      { fontSize:font.sm, color:colors.text, flex:1 },
-    dropTextActive:{ fontWeight:'700', color:colors.primary },
+    picker:      { flexDirection:'row', alignItems:'center', justifyContent:'space-between', borderWidth:1, borderColor:colors.border, borderRadius:radius.sm, paddingHorizontal:12, paddingVertical:10, backgroundColor:colors.inputBg },
+    pickerOpen:  { borderColor:colors.primary },
+    pickerText:  { flex:1, fontSize:font.sm, color:colors.text },
+    pickerArrow: { fontSize:16, color:colors.textMuted, marginLeft:6 },
+    dropItem:    { paddingHorizontal:12, paddingVertical:11, flexDirection:'row', alignItems:'center', justifyContent:'space-between', borderBottomWidth:1, borderBottomColor:colors.border },
+    dropText:    { fontSize:font.sm, color:colors.text, flex:1 },
+    dropTextActive: { fontWeight:'700', color:colors.primary },
+  };
+  const openPicker = () => {
+    triggerRef.current?.measureInWindow((x, y, w, h) => {
+      setLayout({ x, y, width: w, height: h });
+      setOpen(true);
+    });
   };
   return (
-    <View style={{ zIndex: open ? 99 : 1 }}>
+    <View>
       <TouchableOpacity
+        ref={triggerRef}
         style={[ps.picker, open && ps.pickerOpen]}
-        onPress={() => setOpen(o => !o)}
-        onLayout={e => setH(e.nativeEvent.layout.height)}
+        onPress={openPicker}
         activeOpacity={0.85}
       >
         <Text style={ps.pickerText} numberOfLines={1}>{selected?.label ?? 'Seleccionar'}</Text>
-        <Text style={ps.pickerArrow}>{open ? '∧' : '⌄'}</Text>
+        <Text style={ps.pickerArrow}>{open ? '▴' : '▾'}</Text>
       </TouchableOpacity>
-      {open && (
-        <View style={[ps.drop, { position: 'absolute', top: h, left: 0, right: 0, maxHeight: 220 }]}>
-          <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
-            {options.map(opt => (
-              <TouchableOpacity
-                key={opt.value}
-                style={[ps.dropItem, value === opt.value && ps.dropItemActive]}
-                onPress={() => { onSelect(opt.value); setOpen(false); }}
-              >
-                <Text style={[ps.dropText, value === opt.value && ps.dropTextActive]} numberOfLines={1}>
-                  {opt.label}
-                </Text>
-                {value === opt.value && <Text style={{ color: colors.primary, fontWeight: '700' }}>✓</Text>}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+      <Modal visible={open} transparent animationType="none" onRequestClose={() => setOpen(false)}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setOpen(false)}>
+          <View style={{
+            position: 'absolute',
+            top: layout.y + layout.height + 4,
+            left: layout.x,
+            width: layout.width,
+            maxHeight: 240,
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: radius.sm,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.12,
+            shadowRadius: 8,
+            elevation: 16,
+          }}>
+            <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
+              {options.map(opt => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={ps.dropItem}
+                  onPress={() => { onSelect(opt.value); setOpen(false); }}
+                >
+                  <Text style={[ps.dropText, value === opt.value && ps.dropTextActive]} numberOfLines={1}>
+                    {opt.label}
+                  </Text>
+                  {value === opt.value && <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
 
 export default function PanicoScreen() {
-  const { user, isSuperAdmin, isAdmin, isSeguridad, isResident } = useAuth();
+  const { user, isSuperAdmin, isAdmin, isSeguridad, isOwner, isTenant, isResident } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { condoName: ctxCondoName } = useCondo();
@@ -106,6 +128,7 @@ export default function PanicoScreen() {
   const [contacts, setContacts]         = useState([]);
   const [myProp, setMyProp]             = useState(null);
   const [confirmOpen, setConfirmOpen]   = useState(false);
+  const [successOpen, setSuccessOpen]   = useState(false);
   const [sendingPanic, setSendingPanic] = useState(false);
   const [drawerOpen, setDrawerOpen]     = useState(false);
 
@@ -165,12 +188,12 @@ export default function PanicoScreen() {
       await api.createPanicAlert({
         resident: user?.name,
         phone:    user?.phone || '',
-        address:  myProp?.street || '',
+        address:  myProp?.street || user?.condo || 'Sin dirección',
         unit:     myProp?.code || '',
         condo:    user?.condo || '',
       });
       setConfirmOpen(false);
-      Alert.alert('Alerta enviada', 'El equipo de seguridad fue notificado. Mantente en un lugar seguro.');
+      setSuccessOpen(true);
     } catch (err) {
       Alert.alert('Error', err.message);
     } finally {
@@ -182,7 +205,7 @@ export default function PanicoScreen() {
   const attendedAlerts = alerts.filter(a => a.status === 'Atendida');
 
   // Year options: all years from data + current year, always present
-  const yearsInData = [...new Set(attendedAlerts.map(a => new Date(a.insertedAt).getFullYear()).filter(y => !isNaN(y)))];
+  const yearsInData = [...new Set(attendedAlerts.map(a => new Date(a.insertedAt || a.createdAt).getFullYear()).filter(y => !isNaN(y)))];
   if (!yearsInData.includes(CURRENT_YEAR)) yearsInData.push(CURRENT_YEAR);
   yearsInData.sort((a, b) => b - a);
   const yearOptions = yearsInData.map(y => ({ value: y, label: String(y) }));
@@ -196,7 +219,7 @@ export default function PanicoScreen() {
   ];
 
   const visibleAttended = attendedAlerts.filter(a => {
-    const d = new Date(a.insertedAt);
+    const d = new Date(a.insertedAt || a.createdAt);
     if (isNaN(d)) return false;
     if (d.getFullYear() !== yearFilter) return false;
     if (monthFilter !== 0 && d.getMonth() + 1 !== monthFilter) return false;
@@ -208,7 +231,7 @@ export default function PanicoScreen() {
 
   const roleLabel =
     isSuperAdmin ? 'Super Admin' : isAdmin ? 'Administrador'
-    : isSeguridad ? 'Seguridad' : 'Residente';
+    : isSeguridad ? 'Seguridad' : isOwner ? 'Propietario' : isTenant ? 'Inquilino' : 'Residente';
 
   // ── Resident view ──────────────────────────────────────────────────────────
   if (isResident) {
@@ -233,29 +256,29 @@ export default function PanicoScreen() {
             <Text style={styles.panicH1}>Alerta de Emergencia</Text>
             <Text style={styles.panicSub}>Presioná el botón solo en caso de emergencia real</Text>
 
-            {myProp && (
-              <View style={styles.infoBox}>
-                <Text style={styles.infoTitle}>Información de tu propiedad</Text>
+            <View style={styles.infoBox}>
+              <Text style={styles.infoTitle}>Información de tu propiedad</Text>
+              {user?.condo ? (
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Dirección:</Text>
-                  <Text style={styles.infoVal}>{myProp.street}</Text>
+                  <Text style={styles.infoVal}>{user.condo}</Text>
                 </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Unidad:</Text>
-                  <Text style={styles.infoVal}>{myProp.code}</Text>
-                </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Residente:</Text>
-                  <Text style={styles.infoVal}>{user?.name}</Text>
-                </View>
-                {user?.phone && (
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Teléfono:</Text>
-                    <Text style={styles.infoVal}>{user.phone}</Text>
-                  </View>
-                )}
+              ) : null}
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Unidad:</Text>
+                <Text style={styles.infoVal}>{myProp?.street || user?.property || '-'}</Text>
               </View>
-            )}
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Residente:</Text>
+                <Text style={styles.infoVal}>{user?.name}</Text>
+              </View>
+              {user?.phone && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Teléfono:</Text>
+                  <Text style={styles.infoVal}>{user.phone}</Text>
+                </View>
+              )}
+            </View>
 
             <TouchableOpacity style={styles.panicBtn} onPress={() => setConfirmOpen(true)} activeOpacity={0.8}>
               <Text style={styles.panicBtnText}>ACTIVAR ALERTA DE EMERGENCIA</Text>
@@ -280,7 +303,14 @@ export default function PanicoScreen() {
                     {c.phone && (
                       <TouchableOpacity
                         style={styles.callBtn}
-                        onPress={() => Linking.openURL(`tel:${c.phone}`)}
+                        onPress={() => {
+                          const clean = c.phone.replace(/[^\d+]/g, '');
+                          const url = `tel:${clean}`;
+                          Linking.canOpenURL(url).then(supported => {
+                            if (supported) Linking.openURL(url);
+                            else Alert.alert('Error', 'Este dispositivo no puede realizar llamadas.');
+                          });
+                        }}
                       >
                         <Text style={styles.callBtnText}>Llamar</Text>
                       </TouchableOpacity>
@@ -315,6 +345,27 @@ export default function PanicoScreen() {
                   <Text style={styles.btnDangerText}>{sendingPanic ? 'Enviando…' : 'Confirmar'}</Text>
                 </TouchableOpacity>
               </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Success modal */}
+        <Modal visible={successOpen} animationType="none" transparent onRequestClose={() => setSuccessOpen(false)}>
+          <View style={styles.overlay}>
+            <View style={[styles.modalCard, { alignItems: 'center' }]}>
+              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#dcfce7', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm }}>
+                <Text style={{ fontSize: 26, color: '#16a34a' }}>✓</Text>
+              </View>
+              <Text style={styles.modalTitle}>Alerta enviada</Text>
+              <Text style={[styles.pageSub, { textAlign: 'center', marginBottom: spacing.lg }]}>
+                El equipo de seguridad fue notificado. Mantente en un lugar seguro.
+              </Text>
+              <TouchableOpacity
+                onPress={() => setSuccessOpen(false)}
+                style={{ width: '100%', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingVertical: 13, alignItems: 'center', marginTop: spacing.sm }}
+              >
+                <Text style={{ fontSize: font.sm, fontWeight: '600', color: colors.text2 }}>Cerrar</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
@@ -413,7 +464,7 @@ export default function PanicoScreen() {
                   {alert.address} - {alert.unit}
                   {isSuperAdmin && alert.condo ? ` · ${alert.condo}` : ''}
                 </Text>
-                <Text style={styles.alertMeta}>Tel: {alert.phone} · {alert.createdAt}</Text>
+                <Text style={styles.alertMeta}>Tel: {alert.phone} · {alert.insertedAt || alert.createdAt || ''}</Text>
               </View>
               <View style={styles.alertRight}>
                 <View style={[styles.statusChip,
@@ -458,7 +509,7 @@ export default function PanicoScreen() {
                     {alert.address} - {alert.unit}
                     {isSuperAdmin && alert.condo ? ` · ${alert.condo}` : ''}
                   </Text>
-                  <Text style={styles.alertMeta}>Tel: {alert.phone} · {alert.createdAt}</Text>
+                  <Text style={styles.alertMeta}>Tel: {alert.phone} · {alert.insertedAt || alert.createdAt || ''}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 6 }}>
                     <View style={[styles.statusChip, styles.statusDone]}>
                       <Text style={[styles.statusChipText, { color: '#065f46' }]}>Atendida</Text>
@@ -502,7 +553,7 @@ function makeStyles(colors) {
   topBarTitle:    { flex: 1, fontSize: font.lg, fontWeight: '700', color: colors.text },
   rolePill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#f2f4f7', borderRadius: 20,
+    backgroundColor: colors.disabledBg, borderRadius: 20,
     paddingHorizontal: 10, paddingVertical: 5,
   },
   roleOrangeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#f59e0b' },
@@ -531,7 +582,7 @@ function makeStyles(colors) {
   dropText:       { fontSize: font.base, color: colors.text, flex: 1 },
   dropTextActive: { color: colors.primary, fontWeight: '700' },
 
-  tabs:         { flexDirection: 'row', gap: 6, marginBottom: spacing.md },
+  tabs:         { flexDirection: 'row', gap: 6, marginTop: 28, marginBottom: spacing.md },
   tab:          { flex: 1, paddingVertical: 10, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
   tabActive:    { backgroundColor: colors.primary, borderColor: colors.primary },
   tabText:      { fontSize: font.sm, fontWeight: '600', color: colors.textMuted },

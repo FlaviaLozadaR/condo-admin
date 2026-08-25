@@ -34,4 +34,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Cámara: requerida por el lector QR de seguridad (html5-qrcode / getUserMedia) -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Notificaciones push en Android 13+ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

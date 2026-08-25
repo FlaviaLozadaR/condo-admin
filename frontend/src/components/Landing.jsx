@@ -40,7 +40,7 @@ export default function Landing({ onStartLogin, isDarkMode, onToggleDark }) {
             <h1>Gestion Inteligente para<span> Tu Condominio</span></h1>
             <p className="subtitle">
               Plataforma completa de administracion condominial con control de accesos, pagos
-              digitales, reservas, asambleas virtuales y mucho mas.
+              digitales, reservas y mucho mas.
             </p>
             <div className="cta-row">
               <button className="btn btn-primary" type="button" onClick={onStartLogin}>Empezar Ahora</button>

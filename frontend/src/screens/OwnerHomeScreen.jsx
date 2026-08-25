@@ -208,16 +208,6 @@ export default function OwnerHomeScreen({
           </span>
           <strong>Pre-registro Visitas</strong>
         </button>
-        {!isTenant && (
-          <button type="button" className="owner-action-card owner-action-card-indigo" onClick={() => setActiveSection("Asambleas")}>
-            <span className="owner-action-icon owner-action-indigo" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M21 15l-3 3-1.5-1.5"/>
-              </svg>
-            </span>
-            <strong>Votar Asambleas</strong>
-          </button>
-        )}
       </section>
 
       <section className="owner-announcements-panel">

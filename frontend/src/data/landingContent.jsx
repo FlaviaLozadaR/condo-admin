@@ -28,15 +28,6 @@ export const features = [
     highlight: true
   },
   {
-    title: "Asambleas Digitales",
-    description: "Votaciones electronicas y participacion remota en asambleas.",
-    icon: (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M16 8C17.7 8 19 6.7 19 5C19 3.3 17.7 2 16 2C14.3 2 13 3.3 13 5C13 6.7 14.3 8 16 8ZM8 10C9.7 10 11 8.7 11 7C11 5.3 9.7 4 8 4C6.3 4 5 5.3 5 7C5 8.7 6.3 10 8 10ZM4 20V18.8C4 16.7 5.8 15 8 15H10C12.2 15 14 16.7 14 18.8V20M13 20V18.7C13 17.5 12.5 16.4 11.7 15.6C12.3 15.2 13 15 13.8 15H16.2C18.4 15 20 16.6 20 18.8V20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    )
-  },
-  {
     title: "Comunicacion Directa",
     description: "Anuncios instantaneos y notificaciones a todos los residentes.",
     icon: (
@@ -67,6 +58,6 @@ export const reasons = [
   },
   {
     title: "Automatización real, no cosmética",
-    description: "Cobros recurrentes, recordatorios de mora, actas de asamblea y reportes financieros se generan solos. Menos trabajo manual, cero errores de tipeo.",
+    description: "Cobros recurrentes, recordatorios de mora y reportes financieros se generan solos. Menos trabajo manual, cero errores de tipeo.",
   }
 ];

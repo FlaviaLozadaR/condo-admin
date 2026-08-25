@@ -161,20 +161,6 @@ export const createAnuncio = (data) => request('/anuncios', { method: 'POST', bo
 export const updateAnuncio = (id, data) => request(`/anuncios/${id}`, { method: 'PUT', body: data });
 export const deleteAnuncio = (id) => request(`/anuncios/${id}`, { method: 'DELETE' });
 
-// Asambleas
-export const getAsambleas = () => request('/asambleas');
-export const getAsambleasPaged = (params = {}) => {
-  const qs = new URLSearchParams();
-  Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && v !== '') qs.set(k, v);
-  });
-  return request(`/asambleas?${qs.toString()}`);
-};
-export const createAsamblea = (formData) => request('/asambleas', { method: 'POST', body: formData });
-export const updateAsamblea = (id, formData) => request(`/asambleas/${id}`, { method: 'PUT', body: formData });
-export const deleteAsamblea = (id) => request(`/asambleas/${id}`, { method: 'DELETE' });
-export const voteAsamblea = (id, tipo, userId) => request(`/asambleas/${id}/vote`, { method: 'POST', body: { tipo, userId } });
-export const getAsambleaDocumentUrl = (id) => `${BASE_URL}/asambleas/${id}/document`;
 export const getUploadUrl = (relativePath) => `${SERVER_URL}/uploads/${relativePath}`;
 
 // Visitas (pases QR)

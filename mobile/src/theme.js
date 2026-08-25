@@ -1,3 +1,7 @@
+import { Platform } from 'react-native';
+
+const and = Platform.OS === 'android';
+
 export const lightColors = {
   primary:     '#6366f1',
   primaryDark: '#4f46e5',
@@ -78,12 +82,12 @@ export const darkColors = {
 export const colors = lightColors;
 
 export const spacing = {
-  xs:  4,
-  sm:  8,
-  md:  16,
-  lg:  24,
-  xl:  32,
-  xxl: 48,
+  xs:  and ?  3 :  4,
+  sm:  and ?  7 :  8,
+  md:  and ? 14 : 16,
+  lg:  and ? 20 : 24,
+  xl:  and ? 27 : 32,
+  xxl: and ? 40 : 48,
 };
 
 export const radius = {
@@ -94,11 +98,11 @@ export const radius = {
 };
 
 export const font = {
-  xs:   11,
-  sm:   13,
-  base: 15,
-  md:   16,
-  lg:   18,
-  xl:   22,
-  xxl:  28,
+  xs:   and ? 10 : 11,
+  sm:   and ? 12 : 13,
+  base: and ? 14 : 15,
+  md:   and ? 15 : 16,
+  lg:   and ? 16 : 18,
+  xl:   and ? 20 : 22,
+  xxl:  and ? 24 : 28,
 };

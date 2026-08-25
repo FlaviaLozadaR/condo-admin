@@ -95,7 +95,7 @@ export async function logout() {
 export const getMe = () => request('/auth/me');
 
 // Push notifications
-export const registerPushToken   = (token) => request('/notifications/token', { method: 'POST', body: { token, platform: 'android' } });
+export const registerPushToken   = (token, platform) => request('/notifications/token', { method: 'POST', body: { token, platform } });
 export const unregisterPushToken = (token) => request('/notifications/token', { method: 'DELETE', body: { token } });
 export const getNotifPrefs       = ()       => request('/notifications/preferences');
 export const updateNotifPrefs    = (prefs)  => request('/notifications/preferences', { method: 'PUT', body: prefs });
@@ -126,6 +126,11 @@ export const getUsuariosPaged = (params = {}) => {
 export const createUsuario = (data) => request('/usuarios', { method: 'POST', body: data });
 export const updateUsuario = (id, data) => request(`/usuarios/${id}`, { method: 'PUT', body: data });
 export const changePassword = (id, data) => request(`/usuarios/${id}/change-password`, { method: 'POST', body: data });
+export const uploadAvatar = (id, uri, mimeType = 'image/jpeg') => {
+  const form = new FormData();
+  form.append('avatar', { uri, name: 'avatar.jpg', type: mimeType });
+  return request(`/usuarios/${id}/avatar`, { method: 'POST', body: form });
+};
 export const deleteUsuario = (id) => request(`/usuarios/${id}`, { method: 'DELETE' });
 
 // Propiedades
@@ -182,6 +187,7 @@ export const getHistorialVisitasPaged = (params = {}) => {
   return request(`/historial-visitas?${qs.toString()}`);
 };
 export const createHistorialVisita = (data) => request('/historial-visitas', { method: 'POST', body: data });
+export const updateHistorialVisita = (id, data) => request(`/historial-visitas/${id}`, { method: 'PATCH', body: data });
 export const updateHistorialSalida = (id, salida) => request(`/historial-visitas/${id}/salida`, { method: 'PATCH', body: { salida } });
 export const deleteHistorialVisita = (id) => request(`/historial-visitas/${id}`, { method: 'DELETE' });
 

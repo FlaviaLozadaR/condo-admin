@@ -1,10 +1,10 @@
-﻿import { useMemo, useEffect, useState, useCallback } from 'react';
+﻿import { useMemo, useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal,
   Alert, RefreshControl, ActivityIndicator, TextInput, Switch,
-  KeyboardAvoidingView, Platform, Image, Dimensions,
+  KeyboardAvoidingView, Platform, Image, Dimensions, Animated,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { colors, spacing, radius, font } from '../../src/theme';
@@ -13,7 +13,7 @@ import * as api from '../../src/api';
 import * as ImagePicker from 'expo-image-picker';
 import Svg, { Rect, Path, Line } from 'react-native-svg';
 
-const { width: SW } = Dimensions.get('window');
+const { width: SW, height: SH } = Dimensions.get('window');
 
 const SHADOW = {
   shadowColor: '#101828', shadowOffset: { width: 0, height: 2 },
@@ -30,23 +30,33 @@ function InlinePicker({ value, options, onSelect, placeholder }) {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
   const [h, setH] = useState(48);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const selected = options.find(o => o.value === value);
+
+  const doOpen = () => {
+    setOpen(true);
+    Animated.timing(fadeAnim, { toValue: 1, duration: 160, useNativeDriver: true }).start();
+  };
+  const doClose = () => {
+    Animated.timing(fadeAnim, { toValue: 0, duration: 110, useNativeDriver: true }).start(() => setOpen(false));
+  };
+
   const ps = {
-    picker:       { flexDirection:'row', alignItems:'center', justifyContent:'space-between', borderWidth:1, borderColor:colors.border, borderRadius:radius.sm, paddingHorizontal:12, paddingVertical:10, backgroundColor:colors.inputBg },
-    pickerOpen:   { borderColor:colors.primary },
-    pickerText:   { flex:1, fontSize:font.sm, color:colors.text },
-    pickerArrow:  { fontSize:16, color:colors.textMuted, marginLeft:6 },
-    drop:         { backgroundColor:colors.surface, borderWidth:1, borderColor:colors.border, borderRadius:radius.sm, zIndex:99, maxHeight:220 },
-    dropItem:     { paddingHorizontal:12, paddingVertical:10, flexDirection:'row', alignItems:'center', justifyContent:'space-between', borderBottomWidth:1, borderBottomColor:colors.border },
+    picker:        { flexDirection:'row', alignItems:'center', justifyContent:'space-between', borderWidth:1, borderColor:colors.border, borderRadius:radius.sm, paddingHorizontal:12, paddingVertical:10, backgroundColor:colors.inputBg },
+    pickerOpen:    { borderColor:colors.primary },
+    pickerText:    { flex:1, fontSize:font.sm, color:colors.text },
+    pickerArrow:   { fontSize:16, color:colors.textMuted, marginLeft:6 },
+    drop:          { backgroundColor:colors.surface, borderWidth:1, borderColor:colors.border, borderRadius:radius.sm, zIndex:99, overflow:'hidden' },
+    dropItem:      { paddingHorizontal:12, paddingVertical:10, flexDirection:'row', alignItems:'center', justifyContent:'space-between', borderBottomWidth:1, borderBottomColor:colors.border },
     dropItemActive:{ backgroundColor:colors.primarySoft },
-    dropText:     { fontSize:font.sm, color:colors.text, flex:1 },
+    dropText:      { fontSize:font.sm, color:colors.text, flex:1 },
     dropTextActive:{ fontWeight:'700', color:colors.primary },
   };
   return (
     <View style={{ zIndex: open ? 99 : 1 }}>
       <TouchableOpacity
         style={[ps.picker, open && ps.pickerOpen]}
-        onPress={() => setOpen(o => !o)}
+        onPress={() => open ? doClose() : doOpen()}
         onLayout={e => setH(e.nativeEvent.layout.height)}
         activeOpacity={0.85}
       >
@@ -54,20 +64,22 @@ function InlinePicker({ value, options, onSelect, placeholder }) {
         <Text style={ps.pickerArrow}>{open ? '∧' : '⌄'}</Text>
       </TouchableOpacity>
       {open && (
-        <ScrollView style={[ps.drop, { position: 'absolute', top: h, left: 0, right: 0 }]} nestedScrollEnabled>
-          {options.map(opt => (
-            <TouchableOpacity
-              key={opt.value}
-              style={[ps.dropItem, value === opt.value && ps.dropItemActive]}
-              onPress={() => { onSelect(opt.value); setOpen(false); }}
-            >
-              <Text style={[ps.dropText, value === opt.value && ps.dropTextActive]} numberOfLines={2}>
-                {opt.label}
-              </Text>
-              {value === opt.value && <Text style={{ color: colors.primary, fontWeight: '700' }}>✓</Text>}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <Animated.View style={[ps.drop, { position: 'absolute', top: h, left: 0, right: 0, opacity: fadeAnim, transform: [{ translateY: fadeAnim.interpolate({ inputRange: [0, 1], outputRange: [-6, 0] }) }] }]}>
+          <ScrollView nestedScrollEnabled style={{ maxHeight: 220 }}>
+            {options.map(opt => (
+              <TouchableOpacity
+                key={opt.value}
+                style={[ps.dropItem, value === opt.value && ps.dropItemActive]}
+                onPress={() => { onSelect(opt.value); doClose(); }}
+              >
+                <Text style={[ps.dropText, value === opt.value && ps.dropTextActive]} numberOfLines={2}>
+                  {opt.label}
+                </Text>
+                {value === opt.value && <Text style={{ color: colors.primary, fontWeight: '700' }}>✓</Text>}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </Animated.View>
       )}
     </View>
   );
@@ -104,7 +116,7 @@ function CalendarPicker({ visible, value, onSelect, onClose }) {
   const cells = [...Array(firstDow).fill(null), ...Array.from({length: daysInMonth}, (_, i) => i + 1)];
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <View style={calStyles.overlay}>
         <View style={calStyles.card}>
           <View style={calStyles.header}>
@@ -200,10 +212,11 @@ const TIME_SLOTS = Array.from({length: 48}, (_, i) => {
 function TimePicker({ visible, value, onSelect, onClose, label }) {
   const { colors } = useTheme();
   const calStyles = makeCalStyles(colors);
+  const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={[calStyles.overlay, {justifyContent:'flex-end'}]}>
-        <View style={{backgroundColor: colors.surface, borderTopLeftRadius:20, borderTopRightRadius:20, maxHeight:'70%', paddingBottom:24}}>
+        <View style={{backgroundColor: colors.surface, borderTopLeftRadius:20, borderTopRightRadius:20, maxHeight:'70%', paddingBottom: Math.max(24, insets.bottom + 16)}}>
           <View style={{flexDirection:'row', alignItems:'center', justifyContent:'space-between', padding:spacing.lg, borderBottomWidth:1, borderBottomColor:colors.border}}>
             <Text style={{fontSize:font.base, fontWeight:'700', color:colors.text}}>{label}</Text>
             <TouchableOpacity onPress={onClose}><Text style={{fontSize:20, color:colors.textMuted}}>✕</Text></TouchableOpacity>
@@ -250,6 +263,7 @@ export default function ReservasScreen() {
   const { user, isSuperAdmin, isAdmin } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
 
   const [areas,      setAreas]      = useState([]);
   const [reservas,   setReservas]   = useState([]);
@@ -282,6 +296,7 @@ export default function ReservasScreen() {
 
   // Manual reservation modal
   const [manualModal,        setManualModal]        = useState(false);
+  const manualSlideAnim = useRef(new Animated.Value(700)).current;
   const [manualForm,         setManualForm]         = useState({ areaId: '', residenteId: '', fecha: '', diaCompleto: false, horaInicio: '08:00', horaFin: '10:00', nota: '' });
   const [manualLoading,      setManualLoading]      = useState(false);
   const [manualError,        setManualError]        = useState('');
@@ -343,6 +358,18 @@ export default function ReservasScreen() {
   const onRefresh = () => { setRefreshing(true); loadData(false); };
 
   useEffect(() => { setReservaPage(1); }, [reservaTab]);
+
+  useEffect(() => {
+    if (manualModal) {
+      manualSlideAnim.setValue(700);
+      Animated.spring(manualSlideAnim, { toValue: 0, damping: 24, stiffness: 170, useNativeDriver: true }).start();
+    }
+  }, [manualModal]);
+
+  const closeManualModal = () => {
+    Animated.timing(manualSlideAnim, { toValue: 700, duration: 210, useNativeDriver: true })
+      .start(() => setManualModal(false));
+  };
 
   const condoName = isAdmin ? user?.condo : undefined;
 
@@ -441,8 +468,11 @@ export default function ReservasScreen() {
         manualPropiedad:   residente?.property || '',
       });
       setReservas(prev => [nueva, ...prev]);
-      setManualModal(false);
-      setManualForm({ areaId: '', residenteId: '', fecha: '', diaCompleto: false, horaInicio: '08:00', horaFin: '10:00', nota: '' });
+      Animated.timing(manualSlideAnim, { toValue: 700, duration: 210, useNativeDriver: true })
+        .start(() => {
+          setManualModal(false);
+          setManualForm({ areaId: '', residenteId: '', fecha: '', diaCompleto: false, horaInicio: '08:00', horaFin: '10:00', nota: '' });
+        });
     } catch (err) {
       setManualError(err.message);
     } finally {
@@ -652,7 +682,7 @@ export default function ReservasScreen() {
         </Modal>
 
         {/* Lightbox */}
-        <Modal visible={lightboxVisible} transparent animationType="fade" onRequestClose={() => setLightboxVisible(false)}>
+        <Modal visible={lightboxVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setLightboxVisible(false)}>
           <View style={styles.lightboxBg}>
             <TouchableOpacity style={styles.lightboxClose} onPress={() => setLightboxVisible(false)}>
               <Text style={styles.lightboxCloseText}>✕</Text>
@@ -888,7 +918,7 @@ export default function ReservasScreen() {
         return (
           <Modal visible animationType="none" transparent onRequestClose={() => setSelectedReserva(null)}>
             <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}>
-              <View style={{ backgroundColor: colors.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%' }}>
+              <View style={{ backgroundColor: colors.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%', paddingBottom: insets.bottom }}>
                 <ScrollView showsVerticalScrollIndicator={false}>
                   {areaImgs.length > 0 && (
                     <Image source={{ uri: areaImgs[0] }} style={{ width: '100%', height: 200, borderTopLeftRadius: 20, borderTopRightRadius: 20 }} resizeMode="cover" />
@@ -982,13 +1012,18 @@ export default function ReservasScreen() {
       })()}
 
       {/* Manual reservation modal */}
-      <Modal visible={manualModal} animationType="none" transparent onRequestClose={() => setManualModal(false)}>
-        <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }} keyboardShouldPersistTaps="handled">
-            <View style={styles.modalCard}>
+      <Modal visible={manualModal} animationType="none" transparent statusBarTranslucent onRequestClose={closeManualModal}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} activeOpacity={1} onPress={closeManualModal} />
+          <Animated.View style={[styles.modalCard, { borderRadius: 0, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: 0, transform: [{ translateY: manualSlideAnim }] }]}>
+            {/* Header */}
+            <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.sm }}>
               <Text style={styles.modalTitle}>Reserva Manual</Text>
               <Text style={styles.modalSub}>Registrá una reserva en nombre de un residente.</Text>
+            </View>
 
+            {/* Scrollable form fields */}
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }} style={{ maxHeight: SH * 0.62 }}>
               <Text style={styles.label}>Área *</Text>
               <View style={{ marginBottom: spacing.sm }}>
                 <InlinePicker value={manualForm.areaId} options={areaOptions} onSelect={v => setManualForm(f => ({ ...f, areaId: v }))} placeholder="Seleccioná un área" />
@@ -1040,7 +1075,7 @@ export default function ReservasScreen() {
                                 const selected = String(r.id) === String(manualForm.residenteId);
                                 return (
                                   <TouchableOpacity key={r.id}
-                                    style={{ paddingHorizontal: spacing.md, paddingVertical: 12, borderBottomWidth: 1, borderColor: '#f3f4f6', flexDirection: 'row', alignItems: 'center', backgroundColor: selected ? '#f5f3ff' : 'transparent' }}
+                                    style={{ paddingHorizontal: spacing.md, paddingVertical: 12, borderBottomWidth: 1, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', backgroundColor: selected ? colors.primarySoft : 'transparent' }}
                                     onPress={() => { setManualForm(f => ({ ...f, residenteId: String(r.id) })); setResidentPickerOpen(false); }}
                                   >
                                     <View style={{ flex: 1 }}>
@@ -1091,11 +1126,13 @@ export default function ReservasScreen() {
 
               <Text style={styles.label}>Nota (opcional)</Text>
               <TextInput style={styles.input} value={manualForm.nota} onChangeText={t => setManualForm(f => ({ ...f, nota: t }))} placeholder="Motivo o comentario" placeholderTextColor={colors.textMuted} />
+            </ScrollView>
 
-              {manualError ? <Text style={styles.errorText}>{manualError}</Text> : null}
-
-              <View style={[styles.rowBtns, { marginTop: spacing.md }]}>
-                <TouchableOpacity style={styles.btnSec} onPress={() => setManualModal(false)}>
+            {/* Fixed footer — always visible */}
+            <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.lg + insets.bottom }}>
+              {manualError ? <Text style={[styles.errorText, { marginBottom: spacing.sm }]}>{manualError}</Text> : null}
+              <View style={styles.rowBtns}>
+                <TouchableOpacity style={styles.btnSec} onPress={closeManualModal}>
                   <Text style={styles.btnSecText}>Cancelar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.btnPri, manualLoading && { opacity: 0.6 }]} onPress={handleManualCreate} disabled={manualLoading}>
@@ -1103,48 +1140,58 @@ export default function ReservasScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </ScrollView>
-          {showDatePicker && (
-            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.35)', padding: spacing.lg }}>
-              <CalendarGrid
-                value={manualForm.fecha}
-                onSelect={ds => setManualForm(f => ({ ...f, fecha: ds }))}
-                onClose={() => setShowDatePicker(false)}
-              />
-            </View>
-          )}
-          {(showStartPicker || showEndPicker) && (() => {
-            const isStart = showStartPicker;
-            const currentVal = isStart ? manualForm.horaInicio : manualForm.horaFin;
-            const onSelect = t => { setManualForm(f => ({ ...f, [isStart ? 'horaInicio' : 'horaFin']: t })); setShowStartPicker(false); setShowEndPicker(false); };
-            return (
-              <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.35)', padding: spacing.lg }}>
-                <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, width: '100%', maxHeight: '75%', overflow: 'hidden' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, borderColor: colors.border }}>
-                    <Text style={{ fontSize: font.base, fontWeight: '700', color: colors.text }}>{isStart ? 'Hora de inicio' : 'Hora de fin'}</Text>
-                    <TouchableOpacity onPress={() => { setShowStartPicker(false); setShowEndPicker(false); }}>
-                      <Text style={{ fontSize: 20, color: colors.textMuted }}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <ScrollView keyboardShouldPersistTaps="handled">
-                    {TIME_SLOTS.map(t => {
-                      const sel = t === currentVal;
-                      return (
-                        <TouchableOpacity key={t} onPress={() => onSelect(t)}
-                          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', backgroundColor: sel ? '#f5f3ff' : 'transparent' }}>
-                          <Text style={{ fontSize: font.base, fontWeight: sel ? '700' : '400', color: sel ? colors.primary : colors.text }}>{t}</Text>
-                          {sel && <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 16 }}>✓</Text>}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-              </View>
-            );
-          })()}
+          </Animated.View>
+
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* Date picker — Modal propio para garantizar z-order en Android */}
+      <Modal visible={showDatePicker} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowDatePicker(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: spacing.lg }}>
+          <CalendarGrid
+            value={manualForm.fecha}
+            onSelect={ds => setManualForm(f => ({ ...f, fecha: ds }))}
+            onClose={() => setShowDatePicker(false)}
+          />
+        </View>
+      </Modal>
+
+      {/* Time picker — Modal propio para garantizar z-order en Android */}
+      {(() => {
+        const isStart = showStartPicker;
+        const currentVal = isStart ? manualForm.horaInicio : manualForm.horaFin;
+        const onTimeSelect = t => {
+          setManualForm(f => ({ ...f, [isStart ? 'horaInicio' : 'horaFin']: t }));
+          setShowStartPicker(false);
+          setShowEndPicker(false);
+        };
+        return (
+          <Modal visible={showStartPicker || showEndPicker} transparent animationType="fade" statusBarTranslucent onRequestClose={() => { setShowStartPicker(false); setShowEndPicker(false); }}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: spacing.lg }}>
+              <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                  <Text style={{ fontSize: font.base, fontWeight: '700', color: colors.text }}>{isStart ? 'Hora de inicio' : 'Hora de fin'}</Text>
+                  <TouchableOpacity onPress={() => { setShowStartPicker(false); setShowEndPicker(false); }}>
+                    <Text style={{ fontSize: 20, color: colors.textMuted }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+                <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: SH * 0.55 }}>
+                  {TIME_SLOTS.map(t => {
+                    const sel = t === currentVal;
+                    return (
+                      <TouchableOpacity key={t} onPress={() => onTimeSelect(t)}
+                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: sel ? colors.primarySoft : 'transparent' }}>
+                        <Text style={{ fontSize: font.base, fontWeight: sel ? '700' : '400', color: sel ? colors.primary : colors.text }}>{t}</Text>
+                        {sel && <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 16 }}>✓</Text>}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+        );
+      })()}
 
       <AppDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </SafeAreaView>
@@ -1164,7 +1211,7 @@ function makeStyles(colors) {
   topBarTitle:    { flex: 1, fontSize: font.lg, fontWeight: '700', color: colors.text },
   rolePill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#f2f4f7', borderRadius: 20,
+    backgroundColor: colors.disabledBg, borderRadius: 20,
     paddingHorizontal: 10, paddingVertical: 5,
   },
   roleOrangeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#f59e0b' },
@@ -1264,7 +1311,7 @@ function makeStyles(colors) {
   pickerText:  { fontSize: font.base, color: colors.text, flex: 1 },
   pickerArrow: { fontSize: 16, color: colors.textMuted },
   drop:        { borderWidth: 1, borderTopWidth: 0, borderColor: colors.border, backgroundColor: colors.surface, borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md, elevation: 12, zIndex: 99, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8 },
-  dropItem:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  dropItem:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: colors.border },
   dropItemActive: { backgroundColor: '#f5f3ff' },
   dropText:    { fontSize: font.base, color: colors.text, flex: 1 },
   dropTextActive: { color: colors.primary, fontWeight: '700' },
@@ -1280,7 +1327,7 @@ function makeStyles(colors) {
   residenteDetalle: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
 
   label:     { fontSize: 12, fontWeight: '600', color: colors.text2, marginBottom: 4, marginTop: spacing.sm },
-  input:     { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 11, fontSize: font.base, color: colors.text, backgroundColor: '#f9fafb' },
+  input:     { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 11, fontSize: font.base, color: colors.text, backgroundColor: colors.inputBg },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm, marginBottom: spacing.xs },
   rowBtns:   { flexDirection: 'row', gap: 8 },
   btnSec:    { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center' },

@@ -4,13 +4,14 @@ import {
   TextInput, Modal, ActivityIndicator, Alert, Share, Image,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ChevronDownIcon } from '../../src/components/Icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/context/ThemeContext';
 import { useCondo } from '../../src/context/CondoContext';
-import { colors, spacing, radius, font } from '../../src/theme';
+import { spacing, radius, font } from '../../src/theme';
 import TopBar from '../../src/components/TopBar';
 import AppDrawer from '../../src/components/Drawer';
 import * as api from '../../src/api';
@@ -90,8 +91,6 @@ function PdfIcon() {
   );
 }
 
-const styles = makeStyles(colors);
-
 // ── Visit detail row ──────────────────────────────────────────────────────────
 function VisitaRow({ label, value, last }) {
   return (
@@ -104,30 +103,33 @@ function VisitaRow({ label, value, last }) {
 
 // ── Inline picker (single select) ─────────────────────────────────────────────
 function InlinePicker({ value, options, onSelect, placeholder }) {
+  const { colors: c } = useTheme();
   const [open, setOpen] = useState(false);
   const label = options.find(o => o.value === value)?.label || placeholder || '— Seleccionar —';
   return (
     <View style={{ zIndex: open ? 99 : 1 }}>
       <TouchableOpacity
-        style={[styles.pickerBtn, open && styles.pickerBtnOpen]}
+        style={[styles.pickerBtn, { backgroundColor: c.inputBg }, open && styles.pickerBtnOpen]}
         onPress={() => setOpen(o => !o)}
         activeOpacity={0.8}
       >
-        <Text style={styles.pickerBtnText} numberOfLines={1}>{label}</Text>
-        <Text style={{ color: colors.textMuted, fontSize: 14 }}>{open ? '∧' : '⌄'}</Text>
+        <Text style={[styles.pickerBtnText, { color: c.text }]} numberOfLines={1}>{label}</Text>
+        <View style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}>
+          <ChevronDownIcon size={16} color={open ? c.primary : c.textMuted} />
+        </View>
       </TouchableOpacity>
       {open && (
-        <View style={styles.inlineDrop}>
+        <View style={[styles.inlineDrop, { backgroundColor: c.surface }]}>
           {options.map(opt => (
             <TouchableOpacity
               key={opt.value}
               style={[styles.inlineDropItem, value === opt.value && styles.inlineDropItemActive]}
               onPress={() => { onSelect(opt.value); setOpen(false); }}
             >
-              <Text style={[styles.inlineDropText, value === opt.value && styles.inlineDropTextActive]} numberOfLines={1}>
+              <Text style={[styles.inlineDropText, { color: value === opt.value ? c.primary : c.text }, value === opt.value && styles.inlineDropTextActive]} numberOfLines={1}>
                 {opt.label}
               </Text>
-              {value === opt.value && <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>✓</Text>}
+              {value === opt.value && <Text style={{ color: c.primary, fontWeight: '700', fontSize: 13 }}>✓</Text>}
             </TouchableOpacity>
           ))}
         </View>
@@ -138,6 +140,7 @@ function InlinePicker({ value, options, onSelect, placeholder }) {
 
 // ── Multi-select month picker (grouped by year) ───────────────────────────────
 function MonthPicker({ allMonths, selected, onToggle, onToggleYear, onToggleAll }) {
+  const { colors: c } = useTheme();
   const [open, setOpen] = useState(false);
   const [expandedYears, setExpandedYears] = useState(new Set());
 
@@ -169,27 +172,29 @@ function MonthPicker({ allMonths, selected, onToggle, onToggleYear, onToggleAll 
   return (
     <View style={{ zIndex: open ? 99 : 1 }}>
       <TouchableOpacity
-        style={[styles.pickerBtn, open && styles.pickerBtnOpen]}
+        style={[styles.pickerBtn, { backgroundColor: c.inputBg }, open && styles.pickerBtnOpen]}
         onPress={handleToggleOpen}
         activeOpacity={0.8}
       >
-        <Text style={styles.pickerBtnText} numberOfLines={1}>{label}</Text>
-        <Text style={{ color: colors.textMuted, fontSize: 14 }}>{open ? '∧' : '⌄'}</Text>
+        <Text style={[styles.pickerBtnText, { color: c.text }]} numberOfLines={1}>{label}</Text>
+        <View style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}>
+          <ChevronDownIcon size={16} color={open ? c.primary : c.textMuted} />
+        </View>
       </TouchableOpacity>
       {open && (
-        <View style={styles.inlineDrop}>
+        <View style={[styles.inlineDrop, { backgroundColor: c.surface }]}>
           <TouchableOpacity
-            style={[styles.inlineDropItem, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+            style={[styles.inlineDropItem, { borderBottomWidth: 1, borderBottomColor: c.border }]}
             onPress={onToggleAll}
           >
             <View style={[styles.checkbox, allSelected && styles.checkboxChecked]}>
               {allSelected && <Text style={styles.checkmark}>✓</Text>}
             </View>
-            <Text style={styles.inlineDropText}>{allSelected ? 'Quitar todos' : 'Seleccionar todos'}</Text>
+            <Text style={[styles.inlineDropText, { color: c.text }]}>{allSelected ? 'Quitar todos' : 'Seleccionar todos'}</Text>
           </TouchableOpacity>
           {allMonths.length === 0 ? (
             <View style={styles.inlineDropItem}>
-              <Text style={[styles.inlineDropText, { color: colors.textMuted }]}>Sin visitas registradas todavía.</Text>
+              <Text style={[styles.inlineDropText, { color: c.textMuted }]}>Sin visitas registradas todavía.</Text>
             </View>
           ) : (
             <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -200,7 +205,7 @@ function MonthPicker({ allMonths, selected, onToggle, onToggleYear, onToggleAll 
                 const expanded = expandedYears.has(year);
                 return (
                   <View key={year}>
-                    <View style={styles.yearHeader}>
+                    <View style={[styles.yearHeader, { backgroundColor: c.surface }]}>
                       <TouchableOpacity
                         style={styles.yearCheckRow}
                         onPress={() => onToggleYear(yearKeys, !allYearSel)}
@@ -215,11 +220,12 @@ function MonthPicker({ allMonths, selected, onToggle, onToggleYear, onToggleAll 
                             ? <Text style={styles.checkmark}>✓</Text>
                             : someYearSel && <Text style={styles.checkmarkPartial}>−</Text>}
                         </View>
-                        <Text style={styles.yearLabel}>{year}</Text>
-                        <Text style={styles.yearCount}>{months.reduce((s, m) => s + m.count, 0)} reg. · {months.length} mes{months.length !== 1 ? 'es' : ''}</Text>
+                        <Text style={[styles.yearLabel, { color: c.text }]}>{year}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => toggleExpandYear(year)} style={styles.yearExpandBtn} activeOpacity={0.7}>
-                        <Text style={{ color: colors.textMuted, fontSize: 13 }}>{expanded ? '∧' : '⌄'}</Text>
+                        <View style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }}>
+          <ChevronDownIcon size={15} color={c.textMuted} />
+        </View>
                       </TouchableOpacity>
                     </View>
                     {expanded && months.map(opt => (
@@ -227,8 +233,8 @@ function MonthPicker({ allMonths, selected, onToggle, onToggleYear, onToggleAll 
                         <View style={[styles.checkbox, selected.has(opt.key) && styles.checkboxChecked]}>
                           {selected.has(opt.key) && <Text style={styles.checkmark}>✓</Text>}
                         </View>
-                        <Text style={[styles.inlineDropText, opt.count === 0 && { color: colors.textMuted }]}>{opt.label}</Text>
-                        <Text style={styles.monthRecordCount}>{opt.count} reg.</Text>
+                        <Text style={[styles.inlineDropText, { color: opt.count === 0 ? c.textMuted : c.text }]}>{opt.label}</Text>
+                        <Text style={[styles.monthRecordCount, { color: c.textMuted }]}>{opt.count} reg.</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -244,9 +250,10 @@ function MonthPicker({ allMonths, selected, onToggle, onToggleYear, onToggleAll 
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 export default function VisitasScreen() {
-  const { user, isSuperAdmin, isAdmin, isSeguridad } = useAuth();
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { user, isSuperAdmin, isAdmin, isSeguridad, isOwner, isTenant } = useAuth();
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
+  const insets = useSafeAreaInsets();
   const { condoName } = useCondo();
   const [drawerOpen, setDrawerOpen]   = useState(false);
   const [condos, setCondos]           = useState([]);
@@ -267,9 +274,13 @@ export default function VisitasScreen() {
   const [previewModal, setPreviewModal] = useState(null); // { url, label }
   const [previewLoading, setPreviewLoading] = useState(false);
   const [selectedVisita, setSelectedVisita] = useState(null);
+  const [editItem,    setEditItem]    = useState(null);
+  const [editForm,    setEditForm]    = useState({});
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError,   setEditError]   = useState('');
 
   const canDelete = ['Super Admin', 'Administrador', 'Seguridad'].includes(user?.role);
-  const roleLabel = isSuperAdmin ? 'Super Admin' : isAdmin ? 'Administrador' : isSeguridad ? 'Seguridad' : 'Residente';
+  const roleLabel = isSuperAdmin ? 'Super Admin' : isAdmin ? 'Administrador' : isSeguridad ? 'Seguridad' : isOwner ? 'Propietario' : isTenant ? 'Inquilino' : 'Residente';
 
   useEffect(() => { api.getCondominios().then(setCondos).catch(() => {}); }, []);
   useEffect(() => {
@@ -464,6 +475,46 @@ export default function VisitasScreen() {
     }
   };
 
+  const openEdit = (item) => {
+    setEditForm({
+      visitante: item.visitante || '',
+      cedula:    item.cedula    || '',
+      propiedad: item.propiedad || '',
+      tipo:      item.tipo      || 'peatonal',
+      placa:     item.placa     || '',
+      fecha:     item.fecha     || '',
+      entrada:   item.entrada   || '',
+      salida:    item.salida    || '',
+      motivo:    item.motivo    || '',
+    });
+    setEditError('');
+    setEditItem(item);
+  };
+
+  const confirmEdit = async () => {
+    if (!editForm.visitante.trim()) { setEditError('El nombre del visitante es requerido.'); return; }
+    setEditLoading(true);
+    try {
+      await api.updateHistorialVisita(String(editItem.id), {
+        visitante: editForm.visitante.trim(),
+        cedula:    editForm.cedula.trim(),
+        propiedad: editForm.propiedad.trim(),
+        tipo:      editForm.tipo,
+        placa:     editForm.tipo === 'vehicular' ? editForm.placa.trim() : '',
+        fecha:     editForm.fecha.trim(),
+        entrada:   editForm.entrada.trim(),
+        salida:    editForm.salida.trim(),
+        motivo:    editForm.motivo.trim(),
+      });
+      setEditItem(null);
+      setRefreshKey(k => k + 1);
+    } catch (err) {
+      setEditError(err.message || 'No se pudo guardar los cambios.');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
   const typeOptions = [
     { value: 'todos',     label: 'Todos los tipos' },
     { value: 'peatonal',  label: 'Peatonal' },
@@ -494,11 +545,11 @@ export default function VisitasScreen() {
           <View style={styles.exportBtns}>
             <TouchableOpacity style={[styles.exportBtn, styles.exportBtnExcel]} onPress={handleExportExcel} activeOpacity={0.8}>
               <ExcelIcon />
-              <Text style={[styles.exportBtnText, { color: '#16a34a' }]}>Excel</Text>
+              <Text style={[styles.exportBtnText, { color: '#16a34a' }]}>CSV</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.exportBtn, styles.exportBtnPdf]} onPress={handleExportPdf} activeOpacity={0.8}>
               <PdfIcon />
-              <Text style={[styles.exportBtnText, { color: '#dc2626' }]}>PDF</Text>
+              <Text style={[styles.exportBtnText, { color: '#dc2626' }]}>Texto</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -558,29 +609,36 @@ export default function VisitasScreen() {
           />
         </View>
 
-        {/* Type filter — chips */}
+        {/* Type filter — pill tabs */}
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: spacing.sm }}>
           {[
             { value: 'todos',     label: 'Todos' },
             { value: 'peatonal',  label: 'Peatonal' },
             { value: 'vehicular', label: 'Vehicular' },
-          ].map(opt => (
-            <TouchableOpacity
-              key={opt.value}
-              onPress={() => setTypeFilter(opt.value)}
-              style={{
-                flex: 1, paddingVertical: 9, borderRadius: 20,
-                alignItems: 'center',
-                backgroundColor: typeFilter === opt.value ? colors.primary : colors.surface,
-                borderWidth: 1,
-                borderColor: typeFilter === opt.value ? colors.primary : colors.border,
-              }}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '600', color: typeFilter === opt.value ? '#fff' : colors.textMuted }}>
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          ].map(opt => {
+            const active = typeFilter === opt.value;
+            return (
+              <TouchableOpacity
+                key={opt.value}
+                onPress={() => setTypeFilter(opt.value)}
+                activeOpacity={0.75}
+                style={{
+                  paddingHorizontal: 16, paddingVertical: 7,
+                  borderRadius: 20,
+                  backgroundColor: active ? colors.primary : colors.surface,
+                  borderWidth: 1,
+                  borderColor: active ? colors.primary : colors.border,
+                }}
+              >
+                <Text style={{
+                  fontSize: 13, fontWeight: active ? '700' : '500',
+                  color: active ? '#fff' : colors.textMuted,
+                }}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* Horizontal-scroll table */}
@@ -712,7 +770,7 @@ export default function VisitasScreen() {
                     <TouchableOpacity
                       style={styles.docBtnSec}
                       disabled={!!docsBusy}
-                      onPress={() => handleViewDoc(docsItem.visitaId, d.type, d.label)}
+                      onPress={() => handleViewDoc(docsItem.visitaId || docsItem.id, d.type, d.label)}
                       activeOpacity={0.8}
                     >
                       <Text style={styles.docBtnSecTxt}>{docsBusy === `${d.type}-view` ? '…' : 'Ver'}</Text>
@@ -720,7 +778,7 @@ export default function VisitasScreen() {
                     <TouchableOpacity
                       style={styles.docBtnPri}
                       disabled={!!docsBusy}
-                      onPress={() => handleDownloadDoc(docsItem.visitaId, d.type, d.label)}
+                      onPress={() => handleDownloadDoc(docsItem.visitaId || docsItem.id, d.type, d.label)}
                       activeOpacity={0.8}
                     >
                       <Text style={styles.docBtnPriTxt}>{docsBusy === `${d.type}-download` ? '…' : 'Descargar'}</Text>
@@ -736,9 +794,9 @@ export default function VisitasScreen() {
       </Modal>
 
       {/* ── Visita detail bottom sheet ─────────────────────────────────── */}
-      <Modal visible={!!selectedVisita} transparent animationType="fade" onRequestClose={() => setSelectedVisita(null)}>
+      <Modal visible={!!selectedVisita} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSelectedVisita(null)}>
         <TouchableOpacity style={styles.bottomOverlay} activeOpacity={1} onPress={() => setSelectedVisita(null)}>
-          <TouchableOpacity style={styles.visitaSheet} activeOpacity={1} onPress={() => {}}>
+          <TouchableOpacity style={[styles.visitaSheet, { paddingBottom: spacing.lg + insets.bottom }]} activeOpacity={1} onPress={() => {}}>
             <View style={styles.sheetHandle} />
             <Text style={styles.visitaSheetTitle}>Detalles de la visita</Text>
 
@@ -787,14 +845,23 @@ export default function VisitasScreen() {
               })()}
 
               {canDelete && (
-                <TouchableOpacity
-                  style={styles.visitaDeleteBtn}
-                  onPress={() => { setSelectedVisita(null); setTimeout(() => setDeletingId(selectedVisita?.id), 350); }}
-                  activeOpacity={0.8}
-                >
-                  <TrashIcon />
-                  <Text style={styles.visitaDeleteTxt}>Eliminar registro</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm }}>
+                  <TouchableOpacity
+                    style={[styles.visitaDeleteBtn, { flex: 1, marginBottom: 0 }]}
+                    onPress={() => { setSelectedVisita(null); setTimeout(() => setDeletingId(selectedVisita?.id), 350); }}
+                    activeOpacity={0.8}
+                  >
+                    <TrashIcon />
+                    <Text style={styles.visitaDeleteTxt}>Eliminar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.visitaEditBtn, { flex: 1 }]}
+                    onPress={() => { const v = selectedVisita; setSelectedVisita(null); setTimeout(() => openEdit(v), 350); }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.visitaEditTxt}>Editar datos</Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </ScrollView>
 
@@ -805,8 +872,84 @@ export default function VisitasScreen() {
         </TouchableOpacity>
       </Modal>
 
+      {/* ── Edit modal ────────────────────────────────────────────────── */}
+      <Modal visible={!!editItem} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setEditItem(null)}>
+        <TouchableOpacity style={styles.bottomOverlay} activeOpacity={1} onPress={() => setEditItem(null)}>
+          <TouchableOpacity style={[styles.visitaSheet, { maxHeight: '85%', paddingBottom: spacing.lg + insets.bottom }]} activeOpacity={1} onPress={() => {}}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.visitaSheetTitle}>Editar visita</Text>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
+              <Text style={styles.editLabel}>Nombre del visitante *</Text>
+              <TextInput style={[styles.editInput, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border }]} value={editForm.visitante} onChangeText={v => setEditForm(f => ({ ...f, visitante: v }))} placeholderTextColor={colors.textMuted} placeholder="Nombre completo" />
+
+              <Text style={styles.editLabel}>Cédula / Documento</Text>
+              <TextInput style={[styles.editInput, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border }]} value={editForm.cedula} onChangeText={v => setEditForm(f => ({ ...f, cedula: v }))} placeholderTextColor={colors.textMuted} placeholder="Número de cédula" keyboardType="numeric" />
+
+              <Text style={styles.editLabel}>Propiedad</Text>
+              <TextInput style={[styles.editInput, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border }]} value={editForm.propiedad} onChangeText={v => setEditForm(f => ({ ...f, propiedad: v }))} placeholderTextColor={colors.textMuted} placeholder="Ej: Apt 101" />
+
+              <Text style={styles.editLabel}>Tipo</Text>
+              <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm }}>
+                {['peatonal', 'vehicular'].map(t => (
+                  <TouchableOpacity
+                    key={t}
+                    onPress={() => setEditForm(f => ({ ...f, tipo: t }))}
+                    style={{
+                      flex: 1, paddingVertical: 10, borderRadius: radius.sm, alignItems: 'center',
+                      backgroundColor: editForm.tipo === t ? colors.primary : colors.inputBg,
+                      borderWidth: 1, borderColor: editForm.tipo === t ? colors.primary : colors.border,
+                    }}
+                  >
+                    <Text style={{ fontSize: font.sm, fontWeight: '600', color: editForm.tipo === t ? '#fff' : colors.textMuted }}>
+                      {t.charAt(0).toUpperCase() + t.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {editForm.tipo === 'vehicular' && (
+                <>
+                  <Text style={styles.editLabel}>Placa</Text>
+                  <TextInput style={[styles.editInput, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border }]} value={editForm.placa} onChangeText={v => setEditForm(f => ({ ...f, placa: v }))} placeholderTextColor={colors.textMuted} placeholder="ABC-1234" autoCapitalize="characters" />
+                </>
+              )}
+
+              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.editLabel}>Hora entrada</Text>
+                  <TextInput style={[styles.editInput, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border }]} value={editForm.entrada} onChangeText={v => setEditForm(f => ({ ...f, entrada: v }))} placeholderTextColor={colors.textMuted} placeholder="HH:MM" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.editLabel}>Hora salida</Text>
+                  <TextInput style={[styles.editInput, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border }]} value={editForm.salida} onChangeText={v => setEditForm(f => ({ ...f, salida: v }))} placeholderTextColor={colors.textMuted} placeholder="HH:MM" />
+                </View>
+              </View>
+
+              <Text style={styles.editLabel}>Fecha</Text>
+              <TextInput style={[styles.editInput, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border }]} value={editForm.fecha} onChangeText={v => setEditForm(f => ({ ...f, fecha: v }))} placeholderTextColor={colors.textMuted} placeholder="DD/MM/AAAA" />
+
+              <Text style={styles.editLabel}>Motivo (opcional)</Text>
+              <TextInput style={[styles.editInput, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border, minHeight: 64, textAlignVertical: 'top' }]} value={editForm.motivo} onChangeText={v => setEditForm(f => ({ ...f, motivo: v }))} placeholderTextColor={colors.textMuted} placeholder="Motivo de la visita" multiline />
+
+              {editError ? <Text style={{ fontSize: 12, color: colors.danger, marginBottom: spacing.sm }}>{editError}</Text> : null}
+
+            </ScrollView>
+
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+              <TouchableOpacity style={styles.btnCancel} onPress={() => setEditItem(null)} disabled={editLoading} activeOpacity={0.8}>
+                <Text style={styles.btnCancelTxt}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.btnSave, editLoading && { opacity: 0.6 }]} onPress={confirmEdit} disabled={editLoading} activeOpacity={0.8}>
+                <Text style={styles.btnSaveTxt}>{editLoading ? 'Guardando…' : 'Guardar cambios'}</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* ── Image preview modal ────────────────────────────────────────── */}
-      <Modal visible={!!previewModal} transparent animationType="fade">
+      <Modal visible={!!previewModal} transparent animationType="fade" statusBarTranslucent>
         <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setPreviewModal(null)}>
           <TouchableOpacity style={styles.previewCard} activeOpacity={1} onPress={() => {}}>
             <View style={styles.previewHeader}>
@@ -839,7 +982,7 @@ export default function VisitasScreen() {
 // Column widths (matches headers array order)
 const COL_W = [120, 90, 110, 90, 80, 88, 84, 80, 100, 104, 84];
 
-function makeStyles(colors) {
+function makeStyles(colors, isDark = false) {
   return StyleSheet.create({
   safe:    { flex: 1, backgroundColor: colors.bg },
   scroll:  { flex: 1 },
@@ -853,8 +996,8 @@ function makeStyles(colors) {
   exportLabel:    { fontSize: 11, fontWeight: '700', color: colors.textMuted, letterSpacing: 0.5, marginBottom: spacing.sm },
   exportBtns:     { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   exportBtn:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: radius.sm, borderWidth: 1 },
-  exportBtnExcel: { borderColor: '#16a34a', backgroundColor: '#f0fdf4' },
-  exportBtnPdf:   { borderColor: '#dc2626', backgroundColor: '#fef2f2' },
+  exportBtnExcel: { borderColor: isDark ? 'rgba(34,197,94,0.45)' : '#16a34a', backgroundColor: isDark ? 'rgba(34,197,94,0.1)' : '#f0fdf4' },
+  exportBtnPdf:   { borderColor: isDark ? 'rgba(239,68,68,0.45)'  : '#dc2626', backgroundColor: isDark ? 'rgba(239,68,68,0.1)'  : '#fef2f2' },
   exportBtnText:  { fontSize: font.sm, fontWeight: '600' },
 
   // Search
@@ -863,9 +1006,9 @@ function makeStyles(colors) {
 
   // Picker
   pickerBtn:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, paddingVertical: 12 },
-  pickerBtnOpen:      { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomColor: 'transparent' },
+  pickerBtnOpen:      { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderColor: colors.primary, borderBottomColor: 'transparent' },
   pickerBtnText:      { fontSize: font.sm, color: colors.text, flex: 1 },
-  inlineDrop:         { backgroundColor: colors.surface, borderWidth: 1, borderTopWidth: 0, borderColor: colors.border, borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md, overflow: 'hidden' },
+  inlineDrop:         { backgroundColor: colors.surface, borderWidth: 1, borderTopWidth: 0, borderColor: colors.primary, borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md, overflow: 'hidden' },
   inlineDropItem:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 11, gap: 8 },
   inlineDropItemActive: { backgroundColor: colors.primarySoft },
   inlineDropText:     { fontSize: font.sm, color: colors.text, flex: 1 },
@@ -887,10 +1030,22 @@ function makeStyles(colors) {
   monthIndent:       { paddingLeft: 36 },
   monthRecordCount:  { fontSize: 11, color: colors.textMuted },
 
-  // KPI
-  kpiTotal:   { backgroundColor: '#f3f0ff', borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: '#ddd6fe' },
-  kpiWalk:    { backgroundColor: '#f0fdf4', borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: '#bbf7d0', marginRight: spacing.xs },
-  kpiVehicle: { backgroundColor: '#f3f0ff', borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: '#ddd6fe', marginLeft: spacing.xs },
+  // KPI — cristalizados en dark mode
+  kpiTotal:   {
+    backgroundColor: isDark ? 'rgba(139,92,246,0.1)'  : '#f3f0ff',
+    borderColor:     isDark ? 'rgba(139,92,246,0.3)'  : '#ddd6fe',
+    borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1,
+  },
+  kpiWalk:    {
+    backgroundColor: isDark ? 'rgba(16,185,129,0.1)'  : '#f0fdf4',
+    borderColor:     isDark ? 'rgba(16,185,129,0.3)'  : '#bbf7d0',
+    borderRadius: radius.md, padding: spacing.md, borderWidth: 1, marginRight: spacing.xs,
+  },
+  kpiVehicle: {
+    backgroundColor: isDark ? 'rgba(139,92,246,0.1)'  : '#f3f0ff',
+    borderColor:     isDark ? 'rgba(139,92,246,0.3)'  : '#ddd6fe',
+    borderRadius: radius.md, padding: spacing.md, borderWidth: 1, marginLeft: spacing.xs,
+  },
   kpiPair:    { flexDirection: 'row', marginBottom: spacing.md },
   kpiInner:   { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.xs },
   kpiLabel:   { fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
@@ -898,30 +1053,30 @@ function makeStyles(colors) {
   kpiValue:   { fontSize: font.xxl, fontWeight: '800', color: colors.text, lineHeight: 36 },
   kpiSub:     { fontSize: 11, marginTop: 2 },
 
-  // Table
+  // Table — cristalizada en dark mode
   tableWrap:      { backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md, overflow: 'hidden' },
-  tableHead:      { flexDirection: 'row', backgroundColor: '#f9fafb', borderBottomWidth: 1, borderBottomColor: colors.border },
+  tableHead:      { flexDirection: 'row', backgroundColor: isDark ? 'rgba(139,92,246,0.08)' : '#f9fafb', borderBottomWidth: 1, borderBottomColor: colors.border },
   th:             { paddingHorizontal: 10, paddingVertical: 10, fontSize: 10, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.3 },
-  tableRow:       { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#c8cdd8', alignItems: 'center', minHeight: 44, backgroundColor: '#ffffff' },
-  tableRowAlt:    { backgroundColor: '#f0f4ff' },
+  tableRow:       { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: isDark ? colors.border : '#c8cdd8', alignItems: 'center', minHeight: 44, backgroundColor: isDark ? 'transparent' : '#ffffff' },
+  tableRowAlt:    { backgroundColor: isDark ? 'rgba(139,92,246,0.06)' : '#f0f4ff' },
   td:             { paddingHorizontal: 10, paddingVertical: 6, fontSize: 11, color: colors.text },
   tdCell:         { paddingHorizontal: 10, paddingVertical: 4, justifyContent: 'center' },
   tdMuted:        { fontSize: 11, color: colors.textMuted },
   tableEmpty:     { padding: spacing.xl, alignItems: 'center' },
   tableEmptyText: { fontSize: font.sm, color: colors.textMuted },
 
-  // Type chip
-  chip:       { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start' },
-  chipWalk:   { backgroundColor: '#dcfce7' },
-  chipVeh:    { backgroundColor: '#dbeafe' },
+  // Type chip — cristalizados en dark mode
+  chip:       { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', borderWidth: isDark ? 1 : 0 },
+  chipWalk:   { backgroundColor: isDark ? 'rgba(16,185,129,0.15)'  : '#dcfce7', borderColor: isDark ? 'rgba(16,185,129,0.4)' : 'transparent' },
+  chipVeh:    { backgroundColor: isDark ? 'rgba(59,130,246,0.15)'  : '#dbeafe', borderColor: isDark ? 'rgba(59,130,246,0.4)' : 'transparent' },
   chipTxt:    { fontSize: 10, fontWeight: '700' },
-  chipTxtWalk:{ color: '#16a34a' },
-  chipTxtVeh: { color: '#1d4ed8' },
-  dentroChip: { backgroundColor: '#dcfce7', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-  dentroTxt:  { fontSize: 10, fontWeight: '700', color: '#16a34a' },
+  chipTxtWalk:{ color: isDark ? '#6ee7b7' : '#16a34a' },
+  chipTxtVeh: { color: isDark ? '#93c5fd' : '#1d4ed8' },
+  dentroChip: { backgroundColor: isDark ? 'rgba(16,185,129,0.15)' : '#dcfce7', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3, borderWidth: isDark ? 1 : 0, borderColor: isDark ? 'rgba(16,185,129,0.4)' : 'transparent' },
+  dentroTxt:  { fontSize: 10, fontWeight: '700', color: isDark ? '#6ee7b7' : '#16a34a' },
 
   // Docs button (in table)
-  docsBtn:    { backgroundColor: '#ede9fe', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
+  docsBtn:    { backgroundColor: isDark ? 'rgba(139,92,246,0.15)' : '#ede9fe', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: isDark ? 1 : 0, borderColor: isDark ? 'rgba(139,92,246,0.35)' : 'transparent' },
   docsBtnTxt: { fontSize: 11, fontWeight: '700', color: colors.primary },
   deleteBtn:  { padding: 6 },
 
@@ -966,10 +1121,18 @@ function makeStyles(colors) {
   visitaRowValue:   { fontSize: font.sm, color: colors.text, fontWeight: '500', flex: 1, textAlign: 'right' },
   visitaDocsBtn:    { backgroundColor: colors.primarySoft, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center', marginBottom: spacing.sm },
   visitaDocsBtnTxt: { fontSize: font.sm, fontWeight: '700', color: colors.primary },
-  visitaDeleteBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#fff5f5', borderRadius: radius.md, paddingVertical: 12, marginBottom: spacing.sm, borderWidth: 1, borderColor: '#fee2e2' },
+  visitaDeleteBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: isDark ? '#3b0d0d' : '#fff5f5', borderRadius: radius.md, paddingVertical: 12, borderWidth: 1, borderColor: isDark ? '#7f1d1d' : '#fee2e2' },
   visitaDeleteTxt:  { fontSize: font.sm, fontWeight: '600', color: colors.dangerText },
-  visitaCloseBtn:   { backgroundColor: '#f3f4f6', borderRadius: radius.sm, paddingVertical: 12, alignItems: 'center', marginTop: spacing.xs },
+  visitaEditBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primarySoft, borderRadius: radius.md, paddingVertical: 12, borderWidth: 1, borderColor: isDark ? 'rgba(139,92,246,0.35)' : '#ddd6fe' },
+  visitaEditTxt:    { fontSize: font.sm, fontWeight: '600', color: colors.primary },
+  visitaCloseBtn:   { backgroundColor: isDark ? colors.surface : '#f3f4f6', borderRadius: radius.sm, paddingVertical: 12, alignItems: 'center', marginTop: spacing.xs },
   visitaCloseTxt:   { fontSize: font.sm, fontWeight: '600', color: colors.text },
+
+  // Edit form
+  editLabel: { fontSize: 12, fontWeight: '600', color: colors.textMuted, marginBottom: 4, marginTop: spacing.sm },
+  editInput: { borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 10, fontSize: font.sm, marginBottom: 4 },
+  btnSave:    { flex: 1, backgroundColor: colors.primary, borderRadius: radius.sm, paddingVertical: 12, alignItems: 'center' },
+  btnSaveTxt: { fontSize: font.sm, fontWeight: '700', color: '#fff' },
 
   // Image preview modal
   previewCard:     { backgroundColor: colors.surface, borderRadius: radius.lg, width: '100%', maxWidth: 360, overflow: 'hidden' },
