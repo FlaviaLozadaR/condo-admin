@@ -120,6 +120,7 @@ export default function PerfilScreen() {
     setNotifs(prev => {
       const next = { ...prev, [key]: !prev[key] };
       AsyncStorage.setItem(NOTIF_KEY, JSON.stringify(next)).catch(() => {});
+      api.updateNotifPrefs(next).catch(() => {});
       return next;
     });
   }, []);

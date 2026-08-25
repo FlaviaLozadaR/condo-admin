@@ -1250,18 +1250,6 @@ function makeStyles(colors) {
   reservaCardImg:     { width: '100%', height: 140 },
   reservaCardContent: { padding: spacing.md },
 
-  // Area list card (legacy, kept for reference)
-  areaCard: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    backgroundColor: colors.surface, borderRadius: radius.lg,
-    padding: spacing.md, marginBottom: spacing.sm,
-    borderWidth: 1, borderColor: colors.border, ...SHADOW,
-  },
-  areaThumb:   { width: 72, height: 72, borderRadius: radius.md },
-  areaName:    { fontSize: font.base, fontWeight: '700', color: colors.text, marginBottom: 2 },
-  areaDesc:    { fontSize: font.sm, color: colors.text2 },
-  activoBadge: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-
   // Reservation card
   card: {
     backgroundColor: colors.surface, borderRadius: radius.lg,

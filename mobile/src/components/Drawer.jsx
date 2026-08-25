@@ -145,7 +145,7 @@ function makeStyles(colors, isDark) {
     header: {
       paddingHorizontal: spacing.lg, paddingBottom: spacing.md,
       borderBottomWidth: 1, borderBottomColor: colors.border,
-      backgroundColor: isDark ? colors.cardBg : '#f5f3ff',
+      backgroundColor: colors.surfaceSoft,
     },
     accentBar: { position: 'absolute', top: 0, left: 0, right: 0, height: 3 },
     closeBtn: { alignSelf: 'flex-end', marginBottom: 10 },
@@ -170,7 +170,7 @@ function makeStyles(colors, isDark) {
     /* Footer */
     footer: { borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: spacing.lg, paddingTop: spacing.md },
     logoutBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
-    logoutIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center' },
+    logoutIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: colors.dangerBg, alignItems: 'center', justifyContent: 'center' },
     logoutText: { fontSize: font.sm, fontWeight: '600', color: '#ef4444' },
   });
 }

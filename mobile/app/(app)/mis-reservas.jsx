@@ -102,7 +102,7 @@ function reservasConflictan(a, b) {
 }
 
 export default function MisReservasScreen() {
-  const { user, isSuperAdmin, isAdmin, isOwner, isTenant } = useAuth();
+  const { user, isSuperAdmin, isAdmin, isOwner, isTenant, isSeguridad } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -468,7 +468,7 @@ export default function MisReservasScreen() {
         <Text style={styles.topBarTitle}>Reservas</Text>
         <View style={styles.rolePill}>
           <View style={styles.roleOrangeDot} />
-          <Text style={styles.rolePillText}>{isSuperAdmin ? 'Super Admin' : isAdmin ? 'Administrador' : isOwner ? 'Propietario' : isTenant ? 'Inquilino' : 'Residente'}</Text>
+          <Text style={styles.rolePillText}>{isSuperAdmin ? 'Super Admin' : isAdmin ? 'Administrador' : isSeguridad ? 'Seguridad' : isOwner ? 'Propietario' : isTenant ? 'Inquilino' : 'Residente'}</Text>
         </View>
       </View>
 
@@ -725,7 +725,7 @@ function makeStyles(colors) {
   },
   areaThumb:   { width: 72, height: 72, borderRadius: radius.md, marginRight: spacing.sm, flexShrink: 0 },
   areaName:    { fontSize: font.base, fontWeight: '700', color: colors.text, flex: 1 },
-  anticipacion:{ fontSize: 12, color: '#92400e', backgroundColor: '#fffbeb', borderRadius: radius.sm, padding: spacing.sm, marginBottom: spacing.md, borderWidth: 1, borderColor: '#fde68a' },
+  anticipacion:{ fontSize: 12, color: colors.warningText, backgroundColor: colors.warningBg, borderRadius: radius.sm, padding: spacing.sm, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border },
 
   tabBtn:        { paddingBottom: 6, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabBtnActive:  { borderBottomColor: colors.primary },
@@ -760,8 +760,8 @@ function makeStyles(colors) {
   btnPri:      { flex: 1, backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center' },
   btnPriText:  { fontSize: font.sm, fontWeight: '700', color: '#fff' },
 
-  ocupadosBox:   { backgroundColor: '#fff8ec', borderRadius: radius.sm, padding: spacing.sm, marginTop: spacing.sm, borderWidth: 1, borderColor: '#fde68a' },
-  ocupadosTitle: { fontSize: 12, fontWeight: '600', color: '#92400e', marginBottom: 4 },
+  ocupadosBox:   { backgroundColor: colors.warningBg, borderRadius: radius.sm, padding: spacing.sm, marginTop: spacing.sm, borderWidth: 1, borderColor: colors.border },
+  ocupadosTitle: { fontSize: 12, fontWeight: '600', color: colors.warningText, marginBottom: 4 },
   ocupadoChip:   { fontSize: 12, color: '#dc2626', fontWeight: '600' },
   conflictoMsg:  { fontSize: 12, color: colors.danger, marginTop: 4 },
   errorText:     { fontSize: 12, color: colors.danger, marginTop: spacing.sm },
