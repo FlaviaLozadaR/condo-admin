@@ -714,6 +714,29 @@ async function upsertNotificationPreferences(usuarioId, prefs) {
   ));
 }
 
+// CONTACTS
+async function getContacts(condo, createdBy = null) {
+  let query = supabase.from('contacts').select('*').order('full_name');
+  if (condo)     query = query.eq('condo_id', condo);
+  if (createdBy) query = query.eq('created_by', createdBy);
+  return (await q(query)).map(rowToApp);
+}
+async function getContactById(id) {
+  const { data, error } = await supabase.from('contacts').select('*').eq('id', id).single();
+  if (error?.code === 'PGRST116') return null;
+  if (error) throw error;
+  return rowToApp(data);
+}
+async function createContact(data) {
+  return rowToApp(await q(supabase.from('contacts').insert(appToRow(data)).select().single()));
+}
+async function updateContact(id, changes) {
+  return rowToApp(await q(supabase.from('contacts').update(appToRow(changes)).eq('id', id).select().single()));
+}
+async function deleteContact(id) {
+  await q(supabase.from('contacts').delete().eq('id', id));
+}
+
 async function createExpensaHistorial({ condo, monto, tipo, propiedades, assignedBy }) {
   const { data, error } = await supabase
     .from('expensas_historial')
@@ -771,4 +794,5 @@ module.exports = {
   getUsuarioIdsByRole, getUsuariosByIds,
   getNotificationPreferences, getNotificationPreferencesBatch, upsertNotificationPreferences,
   createExpensaHistorial, getExpensasHistorial,
+  getContacts, getContactById, createContact, updateContact, deleteContact,
 };

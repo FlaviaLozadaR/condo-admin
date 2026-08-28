@@ -99,6 +99,7 @@ app.use('/api/panic',             require('./src/routes/panic'));
 app.use('/api/areas-sociales',    require('./src/routes/areasSociales'));
 app.use('/api/reservas-areas',    require('./src/routes/reservasAreas'));
 app.use('/api/notifications',     require('./src/routes/notifications'));
+app.use('/api/contacts',          require('./src/routes/contacts'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
 
